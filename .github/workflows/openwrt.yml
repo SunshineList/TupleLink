@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.1.1'
+        default: '0.1.2'
         required: true
 
 permissions:
@@ -159,7 +159,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends build-essential gawk gettext libncurses-dev libssl-dev python3 rsync unzip zstd
           python3 openwrt/build.py --target '${{ matrix.target }}' --binary .build/runtime/daed --btf-probe .build/runtime/btf-probe --version "$VERSION" --work /tmp/daed-sdk --output .build/packages
-      - name: Real APK uninstall and dependency retention
+      - name: Real APK architecture, preflight and uninstall tests
         if: matrix.target == 'apk-x86_64'
         run: |
           curl -fL --proto '=https' -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz

@@ -1,4 +1,5 @@
-"""Exercise dependency retention using real APK v3 in a disposable OpenWrt rootfs."""
+"""Exercise architecture selection, preflight and uninstall using real APK v3."""
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -8,6 +9,19 @@ import tarfile
 import unittest
 
 import test_router
+
+
+def install_host_apk(case, apk):
+    """Run the SDK's real APK binary inside the isolated musl rootfs."""
+    host_lib = apk.parent.parent / "lib"
+    loader = host_lib / "ld-linux-x86-64.so.2"
+    binary = apk.parent / ".apk.bin"
+    libraries = subprocess.check_output([str(loader), "--library-path", str(host_lib), "--list", str(binary)], text=True)
+    for item in re.findall(r"=> (/\S+)", libraries):
+        case.write("/opt/apk-host/" + Path(item).name, Path(item).read_bytes(), True)
+    case.write("/opt/apk-host/ld.so", loader.read_bytes(), True)
+    case.write("/opt/apk-host/apk", binary.read_bytes(), True)
+    case.script("/bin/apk", 'exec /opt/apk-host/ld.so --library-path /opt/apk-host /opt/apk-host/apk "$@"')
 
 
 class NativeAPKUninstallTests(unittest.TestCase):
@@ -24,15 +38,7 @@ class NativeAPKUninstallTests(unittest.TestCase):
         case.setUp()
         try:
             case.legacy()
-            host_lib = self.apk.parent.parent / "lib"
-            loader = host_lib / "ld-linux-x86-64.so.2"
-            binary = self.apk.parent / ".apk.bin"
-            libraries = subprocess.check_output([str(loader), "--library-path", str(host_lib), "--list", str(binary)], text=True)
-            for item in re.findall(r"=> (/\S+)", libraries):
-                case.write("/opt/apk-host/" + Path(item).name, Path(item).read_bytes(), True)
-            case.write("/opt/apk-host/ld.so", loader.read_bytes(), True)
-            case.write("/opt/apk-host/apk", binary.read_bytes(), True)
-            case.script("/bin/apk", 'exec /opt/apk-host/ld.so --library-path /opt/apk-host /opt/apk-host/apk "$@"')
+            install_host_apk(case, self.apk)
             directory = Path(case.temp.name)
             packages = []
             definitions = [
@@ -76,3 +82,67 @@ class NativeAPKUninstallTests(unittest.TestCase):
                 self.assertEqual(archive.extractfile("etc/daed/wing.db-wal").read(), b"old WAL")
         finally:
             case.tearDown()
+
+    def selection_case(self, depends=""):
+        case = test_router.RouterTests()
+        case.setUp()
+        self.addCleanup(case.tearDown)
+        case.write("/tmp/machine", "aarch64\n")
+        install_host_apk(case, self.apk)
+        directory = Path(case.temp.name)
+        payload = directory / "empty-payload"
+        payload.mkdir()
+        rows = []
+        for name, arch, dependency, filename in (
+            ("fixture-anchor", "noarch", "", "anchor.apk"),
+            ("daed-router", "aarch64", depends, "wrong.apk"),
+            ("daed-router", "aarch64_generic", depends, "runtime.apk"),
+            ("luci-app-daed-router", "noarch", "daed-router", "luci.apk"),
+        ):
+            package = directory / filename
+            args = [str(self.apk), "mkpkg", "--info", "name:" + name, "--info", "version:0.1.2-r1", "--info", "arch:" + arch, "--files", str(payload), "--output", str(package)]
+            if dependency:
+                args += ["--info", "depends:" + dependency]
+            subprocess.run(args, check=True, capture_output=True)
+            case.write("/assets/" + filename, package.read_bytes())
+            if name != "fixture-anchor":
+                rows.append("\t".join(["apk", "all" if arch == "noarch" else arch, name, filename, hashlib.sha256(package.read_bytes()).hexdigest(), "0.1.2"]))
+        subprocess.run([str(self.apk), "--root", str(case.root), "add", "--initdb", "--no-scripts", "--allow-untrusted", str(directory / "anchor.apk")], check=True, capture_output=True)
+        case.write("/etc/apk/arch", "aarch64_generic\n")
+        # Keep the real checker plus an explicit BTF/parser fixture. The test
+        # exercises APK architecture/solver behavior without executing ARM code.
+        for role, arch, filename, data in (
+            ("check", "all", "daed-check", (test_router.OPENWRT / "files/daed-check").read_bytes()),
+            ("btf-probe", "arm64", "btf-probe-arm64", (case.root / "fixtures/btf-probe").read_bytes()),
+        ):
+            case.write("/assets/" + filename, data)
+            rows.append("\t".join(["support", arch, role, filename, hashlib.sha256(data).hexdigest(), "0.1.2"]))
+        case.write("/assets/manifest.tsv", "# daed-openwrt-manifest-v1\n" + "\n".join(rows) + "\n")
+        case.legacy()
+        return case
+
+    def test_real_apk_rejects_default_arch_and_installer_selects_database_arch(self):
+        case = self.selection_case()
+        self.assertEqual(case.run_router("apk", "--print-arch").stdout.strip(), "x86_64")
+        world = (case.root / "etc/apk/world").read_bytes()
+        wrong = case.run_router("apk", "add", "--simulate", "--no-network", "--allow-untrusted", "/assets/wrong.apk", "/assets/luci.apk")
+        self.assertNotEqual(wrong.returncode, 0)
+        self.assertIn("uninstallable", wrong.stderr)
+        result = case.install("--reinstall", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("aarch64 / apk / aarch64_generic", result.stdout)
+        self.assertIn("Installing daed-router", result.stdout)
+        self.assertEqual((case.root / "etc/apk/world").read_bytes(), world)
+        self.assertNotEqual(case.run_router("apk", "info", "--exists", "daed-router").returncode, 0)
+        self.assertTrue((case.root / "tmp/daemon-running").exists())
+        self.assertEqual((case.root / "etc/daed/wing.db-wal").read_text(), "old WAL")
+
+    def test_real_apk_missing_dependency_stops_reinstall_before_service_or_data_changes(self):
+        case = self.selection_case("fixture-unavailable-kmod=999")
+        result = case.install("--reinstall")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Package preflight failed", result.stderr)
+        self.assertIn("fixture-unavailable-kmod", result.stderr)
+        self.assertTrue((case.root / "tmp/daemon-running").exists())
+        self.assertEqual((case.root / "etc/daed/wing.db-wal").read_text(), "old WAL")
+        self.assertFalse((case.root / "root/daed-backups").exists())

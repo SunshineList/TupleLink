@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.1.1
+release=openwrt-v0.1.2
 asset_dir=''
 mode=install
 action=install
@@ -21,7 +21,7 @@ Usage: sh install.sh [--install | --uninstall | --reinstall] [--release TAG] [--
   --uninstall   Back up data, remove Daed packages and clear its config/data.
   --reinstall   Verify new assets, then back up/uninstall and install fresh.
   --check       Read-only compatibility check; no package/repository changes.
-  --dry-run     Also select and verify packages; do not install or start anything.
+  --dry-run     Verify assets; APK also simulates dependencies using cached feeds.
   --asset-dir   Use downloaded release assets (dependencies still use firmware feeds).
 EOF
 }
@@ -71,7 +71,17 @@ if command -v apk >/dev/null 2>&1; then
 	if [ "$action" != uninstall ]; then
 		apk_version=$(apk --version) || fail 'Cannot read apk-tools version.'
 		printf '%s\n' "$apk_version" | grep -Eq '^apk-tools v?3\.' || fail 'These APK packages require apk-tools 3.x. Use compatible firmware; no package manager or firmware is replaced.'
-		architectures=$(apk --print-arch) || fail 'Cannot read apk architecture.'
+		# --print-arch returns APK's compile-time default, not the database's
+		# accepted architectures (e.g. aarch64 vs OpenWrt aarch64_generic).
+		architectures=''
+		if [ -e /etc/apk/arch ]; then
+			[ -r /etc/apk/arch ] || fail 'Cannot read /etc/apk/arch.'
+			architectures=$(awk 'NF {$1=$1; if (NF!=1 || $1!~/^[a-zA-Z0-9_+-]+$/) exit 1; print $1}' /etc/apk/arch) || fail 'Invalid APK architecture configuration.'
+		fi
+		# APK itself falls back to its default only when this list is empty.
+		if [ -z "$architectures" ]; then
+			architectures=$(apk --print-arch) || fail 'Cannot read apk architecture.'
+		fi
 	fi
 elif command -v opkg >/dev/null 2>&1; then
 	format=ipk
@@ -246,11 +256,18 @@ elif [ -e /usr/bin/daed ] || [ -e /etc/config/daed ] || [ -e /etc/init.d/daed ] 
 fi
 if [ "$action" != reinstall ] && { installed daed || installed luci-app-daed; }; then fail 'Another Daed package is installed; use --reinstall for a backed-up fresh installation.'; fi
 printf 'Daed: %s / %s / %s, release %s\n' "$machine" "$format" "$selected_arch" "$version"
-[ "$mode" != dry-run ] || { printf 'Daed: Dry run passed; no packages, configuration or services changed.\n'; exit 0; }
 
 # Native package managers resolve kmods against the router's own feeds/kernel ABI.
 # Never force dependencies or add a feed for a different firmware.
-if [ "$format" = apk ]; then apk update; else opkg update; fi
+if [ "$mode" != dry-run ]; then
+	if [ "$format" = apk ]; then apk update; else opkg update; fi
+fi
+# APK resolves architecture and dependencies before stopping/uninstalling Daed.
+# Dry runs use existing indexes only, without network or repository refreshes.
+if [ "$format" = apk ]; then
+	apk add --simulate --no-network --allow-untrusted "$stage/$runtime_file" "$stage/$plugin_file" || fail 'Package preflight failed. Daed was not stopped or uninstalled. Check firmware feeds/dependencies; dry runs require cached indexes.'
+fi
+[ "$mode" != dry-run ] || { printf 'Daed: Dry run passed; no packages, configuration or services changed.\n'; exit 0; }
 if [ "$action" = reinstall ]; then uninstall_daed; stopped=1; fi
 was_running=0
 was_autostart=0

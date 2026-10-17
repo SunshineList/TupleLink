@@ -66,7 +66,7 @@ Please refer to the [Quick Start Guide](./docs/getting-started.md) to start usin
 
 新增 x86_64 / ARM64 原生包构建、一键安装脚本，以及“服务 → Daed”
 LuCI 页面。使用方式、构建流程和实机验收边界见 [软路由插件说明](./openwrt/README.md)。
-第一期测试版及一键安装入口见 [openwrt-v0.1.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.1)。
+第一期测试版及一键安装入口见 [openwrt-v0.1.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.2)。
 已完成本地构建和自动化验证，三类固件的实机网络验收仍待完成。
 
 ## 🐳 Docker Deployment

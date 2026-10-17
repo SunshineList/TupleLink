@@ -155,7 +155,12 @@ info)
   for p in /tmp/installed-*; do [ ! -f "$p" ] || echo "${p##*/installed-}"; done
  fi ;;
 update) exit 0 ;;
-add) if [ "$2" = --no-network ]; then exit 0; else /fixtures/install; fi ;;
+add)
+ case "$2" in
+ --simulate) [ ! -e /tmp/preflight-fail ] ;;
+ --no-network) exit 0 ;;
+ *) /fixtures/install ;;
+ esac ;;
 del) shift; /fixtures/remove "$@" ;;
 *) exit 1 ;;
 esac''')
@@ -264,6 +269,54 @@ esac''')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("apk-tools 3.x", result.stderr)
         self.assertNotIn("update", (self.root / "tmp/pm-calls").read_text())
+
+    def test_apk_database_architectures_override_compile_time_default(self):
+        self.use_apk(architecture="aarch64_generic")
+        self.write("/tmp/arch", "aarch64\n")
+        self.write("/etc/apk/arch", "  aarch64_generic  \n\n")
+        result = self.install("--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("aarch64 / apk / aarch64_generic", result.stdout)
+        self.assertNotIn("--print-arch", (self.root / "tmp/pm-calls").read_text())
+
+    def test_apk_empty_arch_file_uses_default_but_unknown_arch_never_does(self):
+        self.use_apk()
+        self.write("/etc/apk/arch", "\n")
+        self.assertEqual(self.install("--dry-run").returncode, 0)
+        self.write("/etc/apk/arch", "aarch64_unknown\n")
+        result = self.install("--dry-run")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("No apk runtime", result.stderr)
+
+    def test_apk_accepts_supported_secondary_architecture_in_order(self):
+        self.use_apk()
+        self.write("/etc/apk/arch", "aarch64_unknown\naarch64_cortex-a53\n")
+        result = self.install("--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn("aarch64 / apk / aarch64_cortex-a53", result.stdout)
+
+    def test_preflight_failure_preserves_old_service_packages_and_data(self):
+        self.use_apk()
+        self.legacy()
+        self.write("/tmp/preflight-fail", "1")
+        result = self.install("--reinstall")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Package preflight failed", result.stderr)
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+        self.assertTrue((self.root / "tmp/installed-daed").exists())
+        self.assertEqual((self.root / "etc/daed/wing.db-wal").read_text(), "old WAL")
+        self.assertFalse((self.root / "root/daed-backups").exists())
+
+    def test_failed_dependency_dry_run_does_not_refresh_or_stop(self):
+        self.use_apk()
+        self.legacy()
+        self.write("/tmp/preflight-fail", "1")
+        result = self.install("--reinstall", "--dry-run")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+        calls = (self.root / "tmp/pm-calls").read_text()
+        self.assertNotIn("update", calls)
+        self.assertNotIn("del ", calls)
 
     def test_upgrade_stops_before_consistent_backup_and_preserves_boot_choice(self):
         self.managed()
