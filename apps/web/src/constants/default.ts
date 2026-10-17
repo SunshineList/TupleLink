@@ -15,9 +15,11 @@ import type {
 import type { GlobalInput } from '~/schemas/gql/graphql'
 
 import { Policy } from '~/schemas/gql/graphql'
+import { defaultEndpointURL } from '~/utils/endpoint'
+
 import { DialMode, LogLevel, TcpCheckHttpMethod, TLSImplementation, UTLSImitate } from './misc'
 
-export const DEFAULT_ENDPOINT_URL = `${location.protocol}//${location.hostname}:2023/graphql`
+export const DEFAULT_ENDPOINT_URL = defaultEndpointURL(location, import.meta.env.DEV)
 
 export const DEFAULT_LOG_LEVEL = LogLevel.info
 export const DEFAULT_TPROXY_PORT = 12345

@@ -10,7 +10,8 @@ export default antfu(
     typescript: true,
     yaml: false,
     stylistic: false,
-    ignores: ['wing', 'apps/web/src/schemas/**'],
+    // LuCI wraps its modules in functions; validate them with tests/openwrt/ui.test.cjs.
+    ignores: ['wing', 'apps/web/src/schemas/**', 'openwrt/htdocs/**'],
     rules: {
       'no-template-curly-in-string': 'off',
       // Allow exporting variants alongside components (shadcn pattern)
