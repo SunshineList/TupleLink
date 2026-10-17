@@ -5,7 +5,7 @@
 APK 包使用 OpenWrt 的 APK v3 格式，安装器要求 apk-tools 3.x。
 
 当前为待实机验收的第一期测试版，发行标签为
-[openwrt-v0.1.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.2)。
+[openwrt-v0.1.3](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.3)。
 工作流只生成构建产物，不自动发布；测试发行由维护者上传完整资产。
 
 ## 使用前提
@@ -50,7 +50,7 @@ ARM64 包覆盖清单中的 generic、a35、a53、a55、a72、a73、a75、a76
 在路由器 SSH 中以 root 执行：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.1.2/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.1.2
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.1.3/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.1.3
 ```
 
 仅预检时，在末尾追加 `--check`；选包并校验但不安装时追加 `--dry-run`。
@@ -71,6 +71,8 @@ sh install.sh --asset-dir /tmp/daed-release
 
 `--check` 只检查环境；`--dry-run` 还会选包并校验 SHA-256，APK 额外使用
 已有软件源索引模拟依赖解析；索引缺失时可能失败，正式安装会先更新索引。
+模拟解析允许选择 HTTP(S) 源中尚未缓存的包，不使用 `--no-network`；
+`--simulate` 本身不会下载依赖包或执行安装。
 两者都不会更新软件源缓存、安装包或启动服务。正式安装通过本机
 opkg/apk 解析依赖，不添加外部软件源。APK 正式安装也会先模拟解析，失败时
 不停止或卸载原有 Daed。首次安装会启动管理服务并开启自启，
@@ -137,9 +139,9 @@ APK 会自动移除孤立依赖，因此卸载前会将已安装的 BTF、内核
 # Linux 构建主机；解析器从 wing/ 构建，复用其依赖
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../btf-probe ../openwrt/btf-probe.go)
 # 提供同架构的真实静态 Daed 程序和解析器
-python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --version 0.1.2 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --version 0.1.3 --work /path/to/sdk-cache --output /path/to/packages
 # 其余 target：ipk-arm64 / apk-x86_64 / apk-arm64
-python3 openwrt/manifest.py /path/to/packages --version 0.1.2
+python3 openwrt/manifest.py /path/to/packages --version 0.1.3
 node --test tests/openwrt/ui.test.cjs
 ```
 

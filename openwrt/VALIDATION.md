@@ -2,7 +2,7 @@
 
 日期：2026-10-17。工作分支：`codex/openwrt-plugin`。
 开发基线：`be4ef873c352a9ec930c877a3a821163f4b4ac0a`。
-测试发行：[openwrt-v0.1.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.2)。
+测试发行：[openwrt-v0.1.3](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.3)。
 以下为本地构建和自动化验证记录；发布资产的准确源码提交见
 `SOURCE_COMMIT.txt`，发行状态以 GitHub Release 为准。
 
@@ -15,14 +15,14 @@
 | 语言工具工作区测试 | 100 项通过，涵盖 node-parser、lang-core 和 LSP；提交前由仓库 hook 执行                                                      |
 | 类型与代码检查     | Web TypeScript 类型检查、三个相关 TS 文件 ESLint 通过                                                                       |
 | LuCI 页面测试      | 6 项通过，使用 LuCI 函数包装约定；覆盖状态、固定操作、HTTPS 降级入口及日志文本渲染                                          |
-| 安装与发行测试     | 42 项 Python 测试通过；其中使用真实 OpenWrt BusyBox ash、UCI、jshn、jsonfilter 执行安装/RPC 测试                            |
+| 安装与发行测试     | 43 项 Python 测试通过；其中使用真实 OpenWrt BusyBox ash、UCI、jshn、jsonfilter 执行安装/RPC 测试                            |
 | Shell 检查         | 安装脚本、检查器、RPC、procd 脚本 ShellCheck 通过；仅排除固件提供的外部 source 和 rc.common 的 ash 扩展提示                 |
 | 真实程序构建       | Go 1.26.0 + Clang/LLVM 18 生成真实 eBPF 对象，完成 x86_64 和 ARM64 静态程序编译                                             |
 | 原生安装包         | 固定 SHA-256 的 OpenWrt 24.10.4、25.12.4 SDK 成功生成 22 个 IPK/APK 包                                                      |
 | 包内容验证         | 22 个包逐一检查原生包元数据、版本、架构、ELF 静态链接、必需文件、源文件内容和执行权限；APK 另用原生工具 verify/extract 验证 |
 | 启动烟测           | x86_64 原始程序，以及从 IPK/APK 提取的程序，均通过版本检查和本机回环 HTTP 面板启动测试；使用 API-only 模式                  |
 
-自动化测试共 169 项（18 前端 + 100 语言工具 + 6 LuCI + 42 Python + 3 Go BTF 解析测试，另含 5 个无效数据子场景）。
+自动化测试共 170 项（18 前端 + 100 语言工具 + 6 LuCI + 43 Python + 3 Go BTF 解析测试，另含 5 个无效数据子场景）。
 
 新增真实 APK v3 卸载测试：在一次性 OpenWrt rootfs 内运行 SDK 的实际 APK
 工具，安装带依赖关系的测试包，再通过真实卸载器移除 Daed。确认原本只作为
@@ -39,6 +39,16 @@ WAL 进入备份。这里使用的是专门构造的测试包，不是路由器�
 确认 `aarch64` 包被拒绝，`aarch64_generic` 运行包与 LuCI 包的 37 项安装计划
 可以解析，包括匹配内核 ABI 的三个 kmod。此验证使用空的隔离包数据库，
 没有在路由器安装包，也没有加载 eBPF；第三方源与本机已有包状态仍须实测。
+
+0.1.3 修正预检中 `--no-network` 对 HTTP(S) 依赖包的屏蔽。新增真实 HTTP
+软件源测试：只下载索引，不缓存依赖 APK；旧命令复现设备日志中的
+`masked in: --no-network`，新安装器的模拟解析成功。服务端请求记录确认
+模拟阶段没有重新请求索引或下载依赖 APK，world、旧服务及数据库 WAL 保持
+原状。独立卸载保留依赖时的离线参数不变。此前的本地文件源模拟不能覆盖
+远端依赖可用性，这项验证已补入 SDK 构建工作流所执行的原生 APK 测试。
+另外将上述五组 R4S 官方索引通过 HTTP 提供给隔离 APK 数据库，更新索引后
+使用真实 0.1.3 ARM64 发行包模拟解析：旧参数复现依赖屏蔽，新参数成功
+生成包含三个匹配内核模块的 37 项安装计划；预检没有产生新的 HTTP 请求。
 
 安装包数量：每种格式包含 1 个 x86_64 运行包、9 个 ARM64 架构标签运行包、
 1 个通用 LuCI 包，共 11 × 2。ARM64 标签及 SDK 固定值见

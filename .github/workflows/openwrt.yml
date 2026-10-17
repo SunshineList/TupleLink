@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.1.2'
+        default: '0.1.3'
         required: true
 
 permissions:

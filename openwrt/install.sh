@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.1.2
+release=openwrt-v0.1.3
 asset_dir=''
 mode=install
 action=install
@@ -263,9 +263,10 @@ if [ "$mode" != dry-run ]; then
 	if [ "$format" = apk ]; then apk update; else opkg update; fi
 fi
 # APK resolves architecture and dependencies before stopping/uninstalling Daed.
-# Dry runs use existing indexes only, without network or repository refreshes.
+# --simulate opens the database read-only and uses existing index caches.
+# Do not add --no-network: APK would mask uncached packages in HTTP(S) feeds.
 if [ "$format" = apk ]; then
-	apk add --simulate --no-network --allow-untrusted "$stage/$runtime_file" "$stage/$plugin_file" || fail 'Package preflight failed. Daed was not stopped or uninstalled. Check firmware feeds/dependencies; dry runs require cached indexes.'
+	apk add --simulate --allow-untrusted "$stage/$runtime_file" "$stage/$plugin_file" || fail 'Package preflight failed. Daed was not stopped or uninstalled. Check firmware feeds/dependencies; dry runs require cached indexes.'
 fi
 [ "$mode" != dry-run ] || { printf 'Daed: Dry run passed; no packages, configuration or services changed.\n'; exit 0; }
 if [ "$action" = reinstall ]; then uninstall_daed; stopped=1; fi

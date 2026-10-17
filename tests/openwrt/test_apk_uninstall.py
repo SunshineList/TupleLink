@@ -1,11 +1,13 @@
 """Exercise architecture selection, preflight and uninstall using real APK v3."""
 import hashlib
+import http.server
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import tarfile
+import threading
 import unittest
 
 import test_router
@@ -146,3 +148,55 @@ class NativeAPKUninstallTests(unittest.TestCase):
         self.assertTrue((case.root / "tmp/daemon-running").exists())
         self.assertEqual((case.root / "etc/daed/wing.db-wal").read_text(), "old WAL")
         self.assertFalse((case.root / "root/daed-backups").exists())
+
+    def test_real_apk_cached_http_index_can_select_uncached_dependency_without_mutations(self):
+        case = self.selection_case("fixture-remote-kmod")
+        repository = Path(case.temp.name) / "http-repository"
+        payload = repository / "payload"
+        payload.mkdir(parents=True)
+        (payload / "should-not-install").write_text("remote dependency payload")
+        package = repository / "fixture-remote-kmod-1.apk"
+        subprocess.run([str(self.apk), "mkpkg", "--info", "name:fixture-remote-kmod", "--info", "version:1", "--info", "arch:aarch64_generic", "--files", str(payload), "--output", str(package)], check=True, capture_output=True)
+        subprocess.run([str(self.apk), "mkndx", "--allow-untrusted", "--output", str(repository / "packages.adb"), str(package)], check=True, capture_output=True)
+
+        requests = []
+
+        class Handler(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, directory=str(repository), **kwargs)
+
+            def do_GET(self):
+                requests.append(self.path)
+                super().do_GET()
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            case.write("/etc/apk/repositories", "http://127.0.0.1:" + str(server.server_port) + "/packages.adb\n")
+            # Fetch only the index, as on a router just after `apk update`.
+            subprocess.run([str(self.apk), "--root", str(case.root), "update", "--allow-untrusted"], check=True, capture_output=True)
+            self.assertEqual(requests, ["/packages.adb"])
+            world = (case.root / "etc/apk/world").read_bytes()
+            # This is the previous release's command, with an actual HTTP repo.
+            offline = case.run_router("apk", "add", "--simulate", "--no-network", "--allow-untrusted", "/assets/runtime.apk", "/assets/luci.apk")
+            self.assertNotEqual(offline.returncode, 0)
+            self.assertIn("masked in: --no-network", offline.stderr)
+            result = case.install("--reinstall", "--dry-run")
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertIn("Installing fixture-remote-kmod", result.stdout)
+            # Simulation reads the cached index without fetching a package or
+            # refreshing the index, installing files or modifying world/service.
+            self.assertEqual(requests, ["/packages.adb"])
+            self.assertEqual((case.root / "etc/apk/world").read_bytes(), world)
+            self.assertFalse((case.root / "should-not-install").exists())
+            self.assertNotEqual(case.run_router("apk", "info", "--exists", "fixture-remote-kmod").returncode, 0)
+            self.assertTrue((case.root / "tmp/daemon-running").exists())
+            self.assertEqual((case.root / "etc/daed/wing.db-wal").read_text(), "old WAL")
+        finally:
+            server.shutdown()
+            worker.join()
+            server.server_close()
