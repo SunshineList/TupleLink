@@ -91,7 +91,11 @@ uninstall_daed() {
 	if [ "$format" = apk ]; then names=$(apk info); else names=$(opkg list-installed | awk '{print $1}'); fi
 	remove=''
 	for package in $names; do
-		case "$package" in daed|daed-router|luci-app-daed|luci-app-daed-router|luci-i18n-daed-*) remove="$remove $package" ;; esac
+		case "$package" in luci-i18n-daed-*) remove="$remove $package" ;; esac
+	done
+	# opkg processes removals in order: remove dependents before their runtime.
+	for package in luci-app-daed-router luci-app-daed daed-router daed; do
+		if installed "$package"; then remove="$remove $package"; fi
 	done
 	if [ "$mode" = dry-run ]; then
 		printf 'Daed: Uninstall dry run; eligible packages:%s. Data would be backed up and cleared.\n' "${remove:- none}"
@@ -129,7 +133,7 @@ uninstall_daed() {
 			# APK automatically removes orphan dependencies. Keep existing BTF
 			# and networking/runtime dependencies in world before deleting Daed.
 			keep=''
-			for package in vmlinux-btf ca-bundle jshn jsonfilter uclient-fetch kmod-sched-core kmod-sched-bpf kmod-veth v2ray-geoip v2ray-geosite; do
+			for package in vmlinux-btf ca-bundle jshn jsonfilter uclient-fetch kmod-sched-core kmod-sched-bpf kmod-veth v2ray-geoip v2ray-geosite luci-base luci-compat rpcd rpcd-mod-luci uhttpd uhttpd-mod-ubus; do
 				if installed "$package"; then keep="$keep $package"; fi
 			done
 			# Each argument is a fixed installed package name, never an option.

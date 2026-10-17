@@ -97,7 +97,15 @@ case "$1" in
 print-architecture) echo 'arch all 1'; printf 'arch %s 10\\n' "$(cat /tmp/arch)" ;;
 status) [ -f "/tmp/installed-$2" ] && echo 'Status: install ok installed' ;;
 list-installed) for p in /tmp/installed-*; do [ ! -f "$p" ] || echo "${p##*/installed-} - 1"; done ;;
-remove) shift; /fixtures/remove "$@" ;;
+remove)
+ shift
+ for p in "$@"; do
+  case "$p" in
+   daed) [ ! -f /tmp/installed-luci-app-daed ] || exit 19 ;;
+   daed-router) [ ! -f /tmp/installed-luci-app-daed-router ] || exit 19 ;;
+  esac
+  /fixtures/remove "$p" || exit "$?"
+ done ;;
 update) exit 0 ;;
 install) /fixtures/install ;;
 *) exit 1 ;;
