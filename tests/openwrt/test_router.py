@@ -80,10 +80,13 @@ enable) touch /tmp/autostart ;;
 disable) rm -f /tmp/autostart ;;
 esac''')
         self.write("/fixtures/check", (OPENWRT / "files/daed-check").read_bytes(), True)
+        self.script("/fixtures/btf-probe", '[ ! -e /tmp/btf-bad ] || { echo "invalid BTF fixture" >&2; exit 1; }')
         self.write("/installer/install.sh", (OPENWRT / "install.sh").read_bytes(), True)
         self.script("/fixtures/install", '''[ ! -e /tmp/pm-fail ] || exit 17
 mkdir -p /usr/libexec/daed /usr/share/daed-router /etc/daed
 cp /fixtures/check /usr/libexec/daed/check
+cp /fixtures/btf-probe /usr/libexec/daed/btf-probe
+cp /installer/install.sh /usr/sbin/daed-router-setup
 cp /fixtures/daed-init /etc/init.d/daed
 echo '#!/bin/sh' > /usr/bin/daed
 chmod +x /usr/bin/daed
@@ -93,10 +96,14 @@ touch /tmp/installed-daed-router /tmp/installed-luci-app-daed-router''')
 case "$1" in
 print-architecture) echo 'arch all 1'; printf 'arch %s 10\\n' "$(cat /tmp/arch)" ;;
 status) [ -f "/tmp/installed-$2" ] && echo 'Status: install ok installed' ;;
+list-installed) for p in /tmp/installed-*; do [ ! -f "$p" ] || echo "${p##*/installed-} - 1"; done ;;
+remove) shift; /fixtures/remove "$@" ;;
 update) exit 0 ;;
 install) /fixtures/install ;;
 *) exit 1 ;;
 esac''')
+        self.script("/fixtures/remove", '''[ ! -e /tmp/remove-fail ] || exit 17
+for package in "$@"; do rm -f "/tmp/installed-$package"; done''')
         # The checked-in default config would be treated as an unmanaged install.
         (self.root / "etc/config/daed").unlink()
         self.write("/fixtures/daed.config", (OPENWRT / "files/daed.config").read_bytes())
@@ -113,13 +120,14 @@ esac''')
             ("daed-router", arch, "runtime." + fmt, b"package manager fixture, not a real runtime"),
             ("luci-app-daed-router", "all", "luci." + fmt, b"LuCI package fixture"),
             ("check", "all", "daed-check", (OPENWRT / "files/daed-check").read_bytes()),
+            ("btf-probe", "arm64" if arch.startswith("aarch64") else "x86_64", "btf-probe-" + ("arm64" if arch.startswith("aarch64") else "x86_64"), (self.root / "fixtures/btf-probe").read_bytes()),
         ]:
             self.write("/assets/" + filename, content)
-            records.append("\t".join(["support" if package == "check" else fmt, architecture, package, filename, hashlib.sha256(content).hexdigest(), version]))
+            records.append("\t".join(["support" if package in ("check", "btf-probe") else fmt, architecture, package, filename, hashlib.sha256(content).hexdigest(), version]))
         self.write("/assets/manifest.tsv", "# daed-openwrt-manifest-v1\n" + "\n".join(records) + "\n")
 
     def run_router(self, *args, input=None):
-        return subprocess.run(["chroot", str(self.root), *args], input=input, capture_output=True, text=True, env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}, timeout=60)
+        return subprocess.run(["chroot", str(self.root), *args], input=input, capture_output=True, text=True, env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "DAED_BTF_PROBE": "/fixtures/btf-probe"}, timeout=60)
 
     def install(self, *args):
         return self.run_router("/bin/sh", "/installer/install.sh", "--asset-dir", "/assets", *args)
@@ -134,9 +142,13 @@ esac''')
 case "$1" in
 --version) if [ -e /tmp/apk-version ]; then cat /tmp/apk-version; else echo 'apk-tools 3.0.5'; fi ;;
 --print-arch) cat /tmp/arch ;;
-info) [ -f "/tmp/installed-$3" ] ;;
+info)
+ if [ "$#" -gt 1 ]; then [ -f "/tmp/installed-$3" ]; else
+  for p in /tmp/installed-*; do [ ! -f "$p" ] || echo "${p##*/installed-}"; done
+ fi ;;
 update) exit 0 ;;
-add) /fixtures/install ;;
+add) if [ "$2" = --no-network ]; then exit 0; else /fixtures/install; fi ;;
+del) shift; /fixtures/remove "$@" ;;
 *) exit 1 ;;
 esac''')
         self.assets("apk", architecture)
@@ -292,6 +304,117 @@ esac''')
         self.write("/var/log/daed/daed.log", "x" * (1024 * 1024))
         result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "logs")
         self.assertLessEqual(len(json.loads(result.stdout)["logs"]), 32768)
+
+    def legacy(self):
+        self.write("/tmp/installed-daed", "1")
+        self.write("/tmp/installed-luci-app-daed", "1")
+        self.write("/tmp/installed-luci-i18n-daed-zh-cn", "1")
+        self.write("/tmp/installed-vmlinux-btf", "1")
+        self.write("/etc/init.d/daed", (self.root / "fixtures/daed-init").read_bytes(), True)
+        self.write("/usr/bin/daed", "old binary fixture", True)
+        self.write("/etc/config/daed", "config daed 'config'\n option enabled '1'\n")
+        self.write("/etc/daed/wing.db", "old database")
+        self.write("/etc/daed/wing.db-wal", "old WAL")
+        self.write("/tmp/daemon-running", "1")
+        self.write("/tmp/autostart", "1")
+
+    def test_external_btf_symlink_matches_current_kernel_and_parser_is_required(self):
+        (self.root / "sys/kernel/btf/vmlinux").unlink()
+        self.write("/tmp/kernel", "6.12.94\n")
+        path = self.write("/usr/lib/debug/boot/vmlinux", "external parser fixture")
+        (path.parent / "vmlinux-6.12.94").symlink_to("vmlinux")
+        result = self.check("--check")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        btf_check = next(row for row in json.loads(result.stdout)["checks"] if row["name"] == "btf")
+        self.assertIn("/usr/lib/debug/boot/vmlinux-6.12.94", btf_check["message"])
+        self.write("/tmp/btf-bad", "1")
+        self.assertNotEqual(self.check("--check").returncode, 0)
+        (self.root / "tmp/btf-bad").unlink()
+        self.write("/tmp/kernel", "6.12.95\n")
+        self.assertNotEqual(self.check("--check").returncode, 0)
+
+    def test_btf_parser_hash_is_checked_before_execution(self):
+        path = self.root / "assets/btf-probe-x86_64"
+        path.write_text('#!/bin/sh\ntouch /tmp/executed-bad-parser\n')
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Checksum mismatch", result.stderr)
+        self.assertFalse((self.root / "tmp/executed-bad-parser").exists())
+
+    def test_uninstall_ipk_and_apk_back_up_wal_and_retain_btf(self):
+        for fmt in ("ipk", "apk"):
+            if fmt == "apk": self.use_apk()
+            self.legacy()
+            (self.root / "sys/kernel/btf/vmlinux").unlink(missing_ok=True)
+            result = self.install("--uninstall")
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertFalse((self.root / "etc/daed").exists())
+            self.assertFalse((self.root / "etc/config/daed").exists())
+            self.assertFalse((self.root / "tmp/installed-daed").exists())
+            self.assertFalse((self.root / "tmp/installed-luci-i18n-daed-zh-cn").exists())
+            self.assertTrue((self.root / "tmp/installed-vmlinux-btf").exists())
+            self.assertFalse((self.root / "tmp/daemon-running").exists())
+            backups = sorted((self.root / "root/daed-backups").glob("*.tar.gz"))
+            with tarfile.open(backups[-1]) as archive:
+                self.assertEqual(archive.extractfile("etc/daed/wing.db-wal").read(), b"old WAL")
+                self.assertEqual(archive.extractfile("usr/bin/daed").read(), b"old binary fixture")
+            self.assertEqual(backups[-1].stat().st_mode & 0o777, 0o600)
+
+    def test_reinstall_verifies_assets_before_removing_legacy_and_starts_fresh(self):
+        self.legacy()
+        original = (self.root / "assets/runtime.ipk").read_bytes()
+        self.write("/assets/runtime.ipk", "bad download")
+        result = self.install("--reinstall")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+        self.assertEqual((self.root / "etc/daed/wing.db").read_text(), "old database")
+        self.write("/assets/runtime.ipk", original)
+        result = self.install("--reinstall")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertTrue((self.root / "tmp/installed-daed-router").exists())
+        self.assertFalse((self.root / "etc/daed/wing.db").exists())
+        self.assertEqual(self.run_router("uci", "-q", "get", "daed.main.enabled").stdout.strip(), "1")
+
+    def test_uninstall_dry_run_and_repeated_uninstall_are_safe(self):
+        self.legacy()
+        result = self.install("--uninstall", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+        self.assertFalse((self.root / "root/daed-backups").exists())
+        self.assertEqual(self.install("--uninstall").returncode, 0)
+        count = len(list((self.root / "root/daed-backups").glob("*.tar.gz")))
+        self.assertEqual(self.install("--uninstall").returncode, 0)
+        self.assertEqual(len(list((self.root / "root/daed-backups").glob("*.tar.gz"))), count)
+
+    def test_uninstall_failure_retains_data_and_symlinked_data_is_refused(self):
+        self.legacy()
+        self.write("/tmp/remove-fail", "1")
+        result = self.install("--uninstall")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.root / "etc/daed/wing.db").read_text(), "old database")
+        self.assertTrue(list((self.root / "root/daed-backups").glob("*.tar.gz")))
+        shutil.move(self.root / "etc/daed", self.root / "etc/daed-outside")
+        (self.root / "etc/daed").symlink_to("daed-outside")
+        result = self.install("--uninstall")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlinked", result.stderr)
+        self.assertTrue((self.root / "etc/daed-outside/wing.db").exists())
+
+    def test_failed_backup_never_removes_packages_or_data(self):
+        self.legacy()
+        self.script("/bin/tar", "exit 17")
+        result = self.install("--uninstall")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / "tmp/installed-daed").exists())
+        self.assertEqual((self.root / "etc/daed/wing.db").read_text(), "old database")
+
+    def test_installed_setup_can_uninstall_itself(self):
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.run_router("/bin/sh", "/usr/sbin/daed-router-setup", "--uninstall")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertFalse((self.root / "usr/sbin/daed-router-setup").exists())
+        self.assertFalse((self.root / "tmp/installed-daed-router").exists())
 
 
 if __name__ == "__main__":

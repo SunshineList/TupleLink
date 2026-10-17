@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.1.0)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.1.1)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -15,7 +15,7 @@ define Package/daed-router
   CATEGORY:=Network
   TITLE:=Daed router runtime
   URL:=https://github.com/slobys/daed
-  DEPENDS:=+ca-bundle +jshn +jsonfilter +uclient-fetch +kmod-sched-core +kmod-sched-bpf +v2ray-geoip +v2ray-geosite
+  DEPENDS:=+ca-bundle +jshn +jsonfilter +uclient-fetch +kmod-sched-core +kmod-sched-bpf +kmod-veth +v2ray-geoip +v2ray-geosite
   CONFLICTS:=daed
   PKGARCH:=$(if $(DAED_PKGARCH),$(DAED_PKGARCH),$(ARCH_PACKAGES))
 endef
@@ -38,6 +38,8 @@ define Build/Prepare
 	$(INSTALL_DIR) $(PKG_BUILD_DIR)
 	test -n "$(DAED_BINARY)" && test -f "$(DAED_BINARY)"
 	$(CP) "$(DAED_BINARY)" $(PKG_BUILD_DIR)/daed
+	test -n "$(DAED_BTF_PROBE)" && test -f "$(DAED_BTF_PROBE)"
+	$(CP) "$(DAED_BTF_PROBE)" $(PKG_BUILD_DIR)/btf-probe
 endef
 
 define Build/Configure
@@ -48,10 +50,13 @@ endef
 define Package/daed-router/install
 	$(INSTALL_DIR) $(1)/usr/bin $(1)/etc/init.d $(1)/etc/config
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/daed $(1)/usr/bin/daed
+	$(INSTALL_DIR) $(1)/usr/sbin
+	$(INSTALL_BIN) ./install.sh $(1)/usr/sbin/daed-router-setup
 	$(INSTALL_BIN) ./files/daed.init $(1)/etc/init.d/daed
 	$(INSTALL_CONF) ./files/daed.config $(1)/etc/config/daed
 	$(INSTALL_DIR) $(1)/usr/libexec/daed $(1)/usr/share/daed-router
 	$(INSTALL_BIN) ./files/daed-check $(1)/usr/libexec/daed/check
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/btf-probe $(1)/usr/libexec/daed/btf-probe
 	echo '$(PKG_VERSION)-$(PKG_RELEASE)' > $(1)/usr/share/daed-router/version
 	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
 	$(INSTALL_DATA) ./files/keep-daed $(1)/lib/upgrade/keep.d/daed-router

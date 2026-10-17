@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.1.0'
+        default: '0.1.1'
         required: true
 
 permissions:
@@ -102,7 +102,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends clang llvm
           mkdir -p .build/runtime
           make -C wing APPNAME=daed VERSION="$VERSION" WEB_DIST="$PWD/dist" OUTPUT="$PWD/.build/runtime/daed" bundle
+          (cd wing && go build -trimpath -ldflags='-s -w' -o "$GITHUB_WORKSPACE/.build/runtime/btf-probe" "$GITHUB_WORKSPACE/openwrt/btf-probe.go")
           python3 -c 'import sys; sys.path.insert(0,"openwrt"); from build import verify_elf; verify_elf(".build/runtime/daed", sys.argv[1])' '${{ matrix.cpu }}'
+      - name: BTF parser tests
+        if: matrix.cpu == 'x86_64'
+        run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
       - name: amd64 startup smoke test (API only)
         if: matrix.cpu == 'x86_64'
         run: |
@@ -154,7 +158,15 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends build-essential gawk gettext libncurses-dev libssl-dev python3 rsync unzip zstd
-          python3 openwrt/build.py --target '${{ matrix.target }}' --binary .build/runtime/daed --version "$VERSION" --work /tmp/daed-sdk --output .build/packages
+          python3 openwrt/build.py --target '${{ matrix.target }}' --binary .build/runtime/daed --btf-probe .build/runtime/btf-probe --version "$VERSION" --work /tmp/daed-sdk --output .build/packages
+      - name: Real APK uninstall and dependency retention
+        if: matrix.target == 'apk-x86_64'
+        run: |
+          curl -fL --proto '=https' -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
+          echo 'e7f8ab84eef55c7eb23492de7b0517dbc23fbedaa4abbb680fe64720c309dc03  /tmp/daed-rootfs.tar.gz' | sha256sum -c -
+          mkdir /tmp/daed-rootfs
+          sudo tar -xzf /tmp/daed-rootfs.tar.gz -C /tmp/daed-rootfs
+          sudo env DAED_TEST_ROOTFS=/tmp/daed-rootfs DAED_TEST_APK=/tmp/daed-sdk/apk-x86_64/staging_dir/host/bin/apk python3 -m unittest discover -s tests/openwrt -p test_apk_uninstall.py -v
       - uses: actions/upload-artifact@v7
         with:
           name: openwrt-packages-${{ matrix.target }}

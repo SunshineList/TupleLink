@@ -5,21 +5,23 @@
 APK 包使用 OpenWrt 的 APK v3 格式，安装器要求 apk-tools 3.x。
 
 当前为待实机验收的第一期测试版，发行标签为
-[openwrt-v0.1.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.0)。
+[openwrt-v0.1.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.1.1)。
 工作流只生成构建产物，不自动发布；测试发行由维护者上传完整资产。
 
 ## 使用前提
 
 - 已安装固件自带的现代 JavaScript LuCI、rpcd、UCI、jshn、jsonfilter。
-- Linux 5.17+，并具备 dae 所需 BPF 功能及原生 `/sys/kernel/btf/vmlinux`。
+- Linux 5.17+，并具备 dae 所需 BPF 功能。支持原生 BTF，或底层加载器
+  搜索路径中对应当前内核版本的外部 BTF/vmlinux（包括符号链接）。
+  随包静态解析器检查 BTF 格式、ELF 架构和必要网络类型。
   内核配置不可读取时会显示待核验，实际 eBPF 加载仍须测试。
 - 管理页面默认绑定 `lan` 逻辑网络的运行时 IPv4 地址，端口 2023。
   主路由和旁路由都应确认正确的 LAN 网络名称；不要求改动 LAN/WAN。
 - 固件原有软件源能提供匹配本机内核 ABI 的 `kmod-sched-core`、
-  `kmod-sched-bpf`，以及 `ca-bundle`、`v2ray-geoip`、`v2ray-geosite`。
+  `kmod-sched-bpf`、`kmod-veth`，以及 `ca-bundle`、`v2ray-geoip`、`v2ray-geosite`。
 - 有足够的 `/tmp` 空间暂存两个安装包、overlay 空间安装程序。
 
-系统名称不等于兼容性证明。第一期不自动刷机，不猜测外部 BTF 文件，
+系统名称不等于兼容性证明。第一期不自动刷机，不自动下载或替换 BTF 文件，
 不更换软件源、不强制忽略 kmod 依赖，不修改其他代理、DNS 或防火墙。
 IPv6 透明代理由原有内核及面板配置负责；本期自动面板入口需要 LAN IPv4。
 
@@ -31,7 +33,7 @@ IPv6 透明代理由原有内核及面板配置负责；本期自动面板入口
 
 - `daed-router-版本-架构.ipk/apk`：静态运行程序、服务、兼容检查。
 - `luci-app-daed-router-版本.ipk/apk`：LuCI 页面与受 ACL 保护的 RPC。
-- `manifest.tsv`、`SHA256SUMS`、`daed-check`、`install.sh`。
+- `manifest.tsv`、`SHA256SUMS`、`daed-check`、`install.sh`、两架构 `btf-probe`。
 - 对应源码和主仓库、子模块提交记录。
 
 ARM64 包覆盖清单中的 generic、a35、a53、a55、a72、a73、a75、a76
@@ -47,7 +49,7 @@ ARM64 包覆盖清单中的 generic、a35、a53、a55、a72、a73、a75、a76
 在路由器 SSH 中以 root 执行：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.1.0/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.1.0
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.1.1/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.1.1
 ```
 
 仅预检时，在末尾追加 `--check`；选包并校验但不安装时追加 `--dry-run`。
@@ -91,7 +93,7 @@ dae 留出清理时间，不删除其他程序的网络命名空间或刷新全�
 ## 已有安装、升级与卸载
 
 检测到原版 `daed` / `luci-app-daed` 包、未受本项目包管理的二进制或
-数据目录时拒绝覆盖。第一期尚未提供原版安装的自动接管/数据库迁移。
+数据目录时拒绝覆盖。需要全新安装时，显式使用 `--reinstall`。不自动迁移原版数据库。
 
 升级本项目安装前先停止管理服务，确认进程退出，再将 `/etc/daed`
 （含 SQLite WAL）、UCI 配置及版本记录备份到 `/root/daed-backups`。
@@ -100,20 +102,41 @@ dae 留出清理时间，不删除其他程序的网络命名空间或刷新全�
 自动回滚。需要恢复时先安装先前版本的软件包，再在停止状态下恢复备份。
 备份可能包含节点凭据、账户和密钥，请妥善保存。
 
-卸载使用本机包管理器，先在 LuCI 停止服务并关闭自启。不要主动删除
-`/etc/daed`；确认备份后再决定是否清除数据。`keep.d` 声明供固件标准
-sysupgrade 备份流程收集数据，跨固件/数据库版本恢复仍需单独验证。
+脚本提供独立卸载和一步重装：
+
+```sh
+# 下载本发行的 install.sh 后执行，卸载不依赖下载其他发行文件
+sh /tmp/daed-install.sh --uninstall
+# 已有原版时，先核验新资产，再备份、卸载并全新安装
+sh /tmp/daed-install.sh --reinstall
+```
+
+安装成功后，脚本同时保存在 `/usr/sbin/daed-router-setup`。后续可直接执行
+`daed-router-setup --uninstall`，无需再次下载脚本。
+
+这两个显式操作会先停止 Daed 并等待进程退出，将配置、数据库（含 WAL）、
+服务脚本及旧二进制备份到 `/root/daed-backups/uninstall-*.tar.gz`，核验归档
+后移除 Daed 的软件包（包括语言包）和原配置/数据。备份失败或包移除失败
+时退出并保留数据；不跟随符号链接清理数据目录。单独卸载不要求 BTF、现代
+LuCI 或网络可用，支持重复执行。`--dry-run` 可与卸载或重装组合。
+
+APK 会自动移除孤立依赖，因此卸载前会将已安装的 BTF、内核模块和必要运行
+依赖保留在 world 中；不执行依赖升级或下载。opkg 不启用自动依赖清理。
+`--reinstall` 启动的是全新管理服务，旧账户、节点和规则需要重新配置，
+备份不会自动导入。`keep.d` 支持固件标准 sysupgrade 备份，跨版本恢复仍须验证。
 
 ## 开发与验证
 
-没有新增 npm 或 Go 依赖。插件使用 LuCI 自带 JS、BusyBox shell 和
+没有新增 npm 或 Go 依赖。BTF 解析器复用 wing 已有的 cilium/ebpf v0.20.0。插件使用 LuCI 自带 JS、BusyBox shell 和
 固件原生 JSON 工具；SDK 打包工具使用 Python 标准库。
 
 ```sh
-# Linux 构建主机，提供已经编译好的真实静态 Daed 程序
-python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --version 0.1.0 --work /path/to/sdk-cache --output /path/to/packages
+# Linux 构建主机；解析器从 wing/ 构建，复用其依赖
+(cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../btf-probe ../openwrt/btf-probe.go)
+# 提供同架构的真实静态 Daed 程序和解析器
+python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --version 0.1.1 --work /path/to/sdk-cache --output /path/to/packages
 # 其余 target：ipk-arm64 / apk-x86_64 / apk-arm64
-python3 openwrt/manifest.py /path/to/packages --version 0.1.0
+python3 openwrt/manifest.py /path/to/packages --version 0.1.1
 node --test tests/openwrt/ui.test.cjs
 ```
 

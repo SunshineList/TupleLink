@@ -19,6 +19,8 @@ class ManifestTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name)
         self.rows = []
+        for cpu in ("x86_64", "arm64"):
+            (self.directory / ("btf-probe-" + cpu)).write_bytes(b"non-executable parser fixture")
         for target in json.loads((OPENWRT / "sdk-matrix.json").read_text()):
             packages = [(arch, "daed-router") for arch in target["architectures"]]
             if target["cpu"] == "x86_64":

@@ -84,10 +84,29 @@ case "$major.$minor" in
 			add_check kernel error 'LAN/WAN transparent proxy requires Linux 5.17 or later.'
 		fi ;;
 esac
-if [ -r /sys/kernel/btf/vmlinux ]; then
-	add_check btf ok 'Native kernel BTF is available.'
+# Match cilium/ebpf v0.20.0's search order. An existing but invalid first file
+# must not be skipped: the runtime would fail on the same file.
+btf_path=''
+for candidate in /sys/kernel/btf/vmlinux \
+	"/boot/vmlinux-$kernel" "/lib/modules/$kernel/vmlinux-$kernel" \
+	"/lib/modules/$kernel/build/vmlinux" "/usr/lib/modules/$kernel/kernel/vmlinux" \
+	"/usr/lib/debug/boot/vmlinux-$kernel" "/usr/lib/debug/boot/vmlinux-$kernel.debug" \
+	"/usr/lib/debug/lib/modules/$kernel/vmlinux"; do
+	if [ -e "$candidate" ]; then btf_path=$candidate; break; fi
+done
+probe=${DAED_BTF_PROBE:-/usr/libexec/daed/btf-probe}
+if [ -z "$btf_path" ]; then
+	add_check btf error 'No native BTF or current-kernel vmlinux file was found. Existing external BTF packages are supported; no firmware or BTF is downloaded automatically.'
+elif [ -x "$probe" ]; then
+	if probe_result=$("$probe" --file "$btf_path" 2>&1); then
+		add_check btf ok "BTF parsed: $btf_path. Required network types exist; actual eBPF loading still needs validation."
+	else
+		add_check btf error "BTF cannot be parsed at $btf_path: $probe_result"
+	fi
+elif [ "$btf_path" = /sys/kernel/btf/vmlinux ] && [ -r "$btf_path" ]; then
+	add_check btf warning 'Native BTF exists; source-only check has no parser. Use the release installer for full BTF parsing.'
 else
-	add_check btf error 'Native kernel BTF is missing. Use firmware built with BTF; this installer does not flash firmware or guess external BTF files.'
+	add_check btf error "External BTF found at $btf_path, but the parser is missing. Use the release installer or repair daed-router."
 fi
 
 kernel_config=''
