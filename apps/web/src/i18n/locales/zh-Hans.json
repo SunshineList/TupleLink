@@ -480,6 +480,13 @@
       "min": "最低延迟",
       "random": "随机节点",
       "fixed": "固定节点"
-    }
+    },
+    "nodeDetails": "节点详情",
+    "moreActions": "更多操作",
+    "nodeList": "节点列表",
+    "filteredNodes": "共 {{total}} 个，当前匹配 {{count}} 个",
+    "viewSubscriptionNodes": "查看节点",
+    "protocol": "协议",
+    "nodeLatency": "延迟"
   }
 }

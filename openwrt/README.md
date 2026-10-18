@@ -19,10 +19,10 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 
 ## 安装和保留数据升级
 
-以 root 在路由器 SSH 中执行，已有本项目 0.1.x / 0.2.x 安装时使用同一条命令升级：
+以 root 在路由器 SSH 中执行，已有本项目 0.1.x / 0.2.x / 0.3.x 安装时使用同一条命令升级：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.3.2/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.4.0/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
@@ -59,6 +59,19 @@ sh /tmp/daed-install.sh --reinstall
 单独卸载不依赖 BTF、LuCI 或网络，支持 `--uninstall --dry-run` 和重复执行。
 APK 会保留已经安装的 BTF、相关内核模块及必要依赖，避免被自动当作孤立依赖移除。
 备份可能包含密钥，目录权限 0700、归档权限 0600。
+
+## 0.4.0 常用工作区
+
+桌面端保留群组、节点、订阅三栏，按照可用视口限制区域高度，节点和侧栏分别
+滚动；节点搜索、来源、排序和结果数量位于固定工具栏。节点使用紧凑行和带
+预留行的窗口化列表，订阅规模增加不会无限拉长页面或一次挂载全部节点。
+点击节点名称打开详情抽屉；二维码、编辑、删除位于更多菜单，删除仍需确认。
+订阅节点保留只读限制，加入群组、编辑、导入和定时更新沿用原有接口及权限。
+
+订阅“查看节点”筛选统一节点列表，不再在订阅卡片中铺开全部成员。窄屏使用
+群组、节点、订阅标签页，切换时保持组件和筛选状态；触摸设备可使用加入群组
+按钮。桌面仍支持节点、订阅和群组拖拽，拖动至收起群组可自动展开成员区。
+此次升级不变更数据库结构或既有配置，原排序、主题和群组绑定继续保留。
 
 ## 规则库路径修复
 

@@ -360,6 +360,8 @@ export function GroupResource({
       onCreate={openCreateGroupFormModal}
       highlight={highlight}
       bordered
+      className="panel-side-section"
+      contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-contain panel-side-scroll"
     >
       <Droppable droppableId={GROUP_DROPPABLE_ID} type="GROUP">
         {(provided) => (

@@ -92,6 +92,8 @@ def main():
                 self.send_error(503)
                 return
             links = ["vless://11111111-1111-4111-8111-111111111111@192.0.2.10:443?encryption=none&security=tls&type=tcp#Subscription-HK", "vless://22222222-2222-4222-8222-222222222222@192.0.2.11:443?encryption=none&security=tls&type=tcp#Subscription-JP"]
+            if self.path.startswith("/sub-large"):
+                links = [f"vless://44444444-4444-4444-8444-{index:012d}@192.0.2.12:443?encryption=none&security=tls&type=tcp#Workspace-{index:04d}-Long-node-name-for-layout-testing" for index in range(1000)]
             body = base64.b64encode("\n".join(links).encode())
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")

@@ -1,12 +1,13 @@
+import type { DraggableProvided, DraggableStateSnapshot } from '@hello-pangea/dnd'
 import type { NodeLatencyProbeResult } from '~/apis'
 import type { QRCodeModalRef } from '~/components/QRCodeModal'
 import type { LibraryNode, NodeFilters } from '~/utils/node-library'
-import { Droppable } from '@hello-pangea/dnd'
-import { Cloud, CloudUpload, Eye, FileInput, Pencil, Search } from 'lucide-react'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Draggable, Droppable } from '@hello-pangea/dnd'
+import { Cloud, CloudUpload, Eye, FileInput, GripVertical, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useImportNodesMutation, useRemoveNodesMutation } from '~/apis'
-import { ConfigureNodeFormModal, SortableNodeCard } from '~/components'
+import { ConfigureNodeFormModal } from '~/components/ConfigureNodeFormModal'
 import { EditNodeFormModal } from '~/components/EditNodeFormModal'
 import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
 import { QRCodeModal } from '~/components/QRCodeModal'
@@ -14,14 +15,135 @@ import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Section } from '~/components/Section'
 import { Button } from '~/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '~/components/ui/sheet'
 import { SimpleTooltip } from '~/components/ui/tooltip'
 import { cn } from '~/lib/utils'
+import { getInstantDropStyle } from '~/utils'
 import { formatLatencyLabel } from '~/utils/latency'
 import { defaultNodeFilters } from '~/utils/node-library'
+import { NODE_ROW_HEIGHT, nodeWindow } from '~/utils/node-window'
 
 export const NODE_DROPPABLE_ID = 'node-list'
 
+type NodeAction = 'details' | 'edit' | 'qr' | 'remove' | 'join'
+
+function NodeRow({
+  entry,
+  provided,
+  snapshot,
+  latency,
+  onAction,
+}: {
+  entry: LibraryNode
+  provided: DraggableProvided
+  snapshot: DraggableStateSnapshot
+  latency?: NodeLatencyProbeResult
+  onAction: (entry: LibraryNode, action: NodeAction) => void
+}) {
+  const { t } = useTranslation()
+  const { node, sources, editable } = entry
+  const name = node.tag || node.name || node.id
+  return (
+    <div
+      ref={provided.innerRef}
+      {...provided.draggableProps}
+      style={getInstantDropStyle(provided, snapshot)}
+      className={cn('panel-node-row', snapshot.isDragging && 'panel-node-dragging')}
+      data-node-id={node.id}
+      role="listitem"
+    >
+      <div
+        {...provided.dragHandleProps}
+        className="panel-node-handle"
+        aria-label={`${t('a11y.dragToReorder')} ${name}`}
+      >
+        <GripVertical aria-hidden="true" className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <button
+          type="button"
+          className="block w-full truncate text-left text-sm font-medium hover:text-primary"
+          title={name}
+          aria-label={`${t('panel.nodeDetails')} ${name}`}
+          data-node-details={node.id}
+          onClick={() => onAction(entry, 'details')}
+        >
+          {name}
+        </button>
+        <p
+          className="mt-1 truncate text-xs text-muted-foreground"
+          title={sources.map((source) => source.name).join(' · ')}
+        >
+          <span className="font-medium">{node.protocol}</span>
+          {' · '}
+          {sources.length ? sources.map((source) => source.name).join(' · ') : t('panel.manual')}
+        </p>
+      </div>
+      <span
+        className="truncate text-right text-xs tabular-nums"
+        title={latency?.testedAt ? new Date(latency.testedAt).toLocaleString() : undefined}
+      >
+        {formatLatencyLabel(latency, t) || t('panel.notTested')}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        className="panel-node-join"
+        aria-label={t('panel.addToGroup')}
+        onClick={() => onAction(entry, 'join')}
+      >
+        <span className="hidden min-[480px]:inline">{t('panel.addToGroup')}</span>
+        <span className="min-[480px]:hidden">{t('panel.join')}</span>
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="panel-node-more"
+            aria-label={`${t('panel.moreActions')} ${name}`}
+          >
+            <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => onAction(entry, 'details')}>
+            <Eye aria-hidden="true" />
+            {t('panel.nodeDetails')}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onAction(entry, 'qr')}>
+            <Eye aria-hidden="true" />
+            {t('actions.viewQRCode')}
+          </DropdownMenuItem>
+          {editable && (
+            <DropdownMenuItem onSelect={() => onAction(entry, 'edit')}>
+              <Pencil aria-hidden="true" />
+              {t('actions.edit')}
+            </DropdownMenuItem>
+          )}
+          {editable && <DropdownMenuSeparator />}
+          {editable && (
+            <DropdownMenuItem variant="destructive" onSelect={() => onAction(entry, 'remove')}>
+              <Trash2 aria-hidden="true" />
+              {t('actions.remove')}
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}
+
 export function NodeResource({
+  library,
   nodes,
   totalCount,
   filters,
@@ -34,6 +156,7 @@ export function NodeResource({
   onRetry,
   dragging,
 }: {
+  library: LibraryNode[]
   nodes: LibraryNode[]
   totalCount: number
   filters: NodeFilters
@@ -47,10 +170,15 @@ export function NodeResource({
   dragging: boolean
 }) {
   const { t } = useTranslation()
-  const [limit, setLimit] = useState(6)
-  useEffect(() => {
-    setLimit(6)
-  }, [filters])
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(456)
+  const [focusedId, setFocusedId] = useState<string | null>(null)
+  const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
+  const detailNode = detailNodeId ? library.find(({ node }) => node.id === detailNodeId) || null : null
+  const [showLink, setShowLink] = useState(false)
+  const detailOriginRef = useRef<HTMLElement | null>(null)
+  const [removingNode, setRemovingNode] = useState<LibraryNode | null>(null)
   const [openedQRCodeModal, setOpenedQRCodeModal] = useState(false)
   const [openedImportNodeFormModal, setOpenedImportNodeFormModal] = useState(false)
   const [openedConfigureNodeFormModal, setOpenedConfigureNodeFormModal] = useState(false)
@@ -60,195 +188,335 @@ export function NodeResource({
   const qrCodeModalRef = useRef<QRCodeModalRef>(null)
   const removeNodesMutation = useRemoveNodesMutation()
   const importNodesMutation = useImportNodesMutation()
+  const filterKey = `${filters.search}\n${filters.source}\n${filters.sort}`
+  useLayoutEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+    const observer = new ResizeObserver(() => setViewportHeight(element.clientHeight))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [loading, error])
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+    setScrollTop(0)
+    setFocusedId(null)
+  }, [filterKey])
+  const range = nodeWindow(nodes.length, scrollTop, viewportHeight)
+  // Retain the focused row while scrolling, so windowing cannot discard keyboard focus.
+  const indices = Array.from({ length: range.end - range.start }, (_, offset) => range.start + offset)
+  const focusedIndex = focusedId ? nodes.findIndex(({ node }) => node.id === focusedId) : -1
+  if (focusedIndex >= 0 && !indices.includes(focusedIndex)) indices.push(focusedIndex)
+  indices.sort((a, b) => a - b)
+  const onAction = (entry: LibraryNode, action: NodeAction) => {
+    const { node } = entry
+    const name = node.tag || node.name || ''
+    if (action === 'details') {
+      detailOriginRef.current = document.activeElement as HTMLElement | null
+      setShowLink(false)
+      setDetailNodeId(entry.node.id)
+    } else if (action === 'edit') {
+      setEditingNode({ id: node.id, link: node.link, tag: node.tag || '', name: node.name || '' })
+      setOpenedEditNodeFormModal(true)
+    } else if (action === 'qr') {
+      qrCodeModalRef.current?.setProps({ name, link: node.link })
+      setOpenedQRCodeModal(true)
+    } else if (action === 'remove') {
+      removeNodesMutation.reset()
+      setRemovingNode(entry)
+    } else setAddingNode({ id: node.id, name, type: 'node' })
+  }
   return (
-    <Section
-      title={t('node')}
-      count={totalCount}
-      createLabel={t('panel.importNode')}
-      icon={<Cloud className="h-5 w-5" />}
-      iconPlus={<CloudUpload className="h-4 w-4" />}
-      onCreate={() => setOpenedImportNodeFormModal(true)}
-      loading={loading}
-      error={error}
-      onRetry={onRetry}
-      bordered
-      highlight={highlight}
-      actions={
-        <SimpleTooltip label={t('actions.configureNode')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={t('actions.configureNode')}
-            onClick={() => setOpenedConfigureNodeFormModal(true)}
-          >
-            <FileInput aria-hidden="true" className="h-4 w-4" />
-          </Button>
-        </SimpleTooltip>
-      }
-    >
-      {totalCount > 0 && (
-        <div className="space-y-2">
-          <label className="flex items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
-            <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="sr-only">{t('panel.searchNodes')}</span>
-            <input
-              type="search"
-              autoComplete="off"
-              spellCheck={false}
-              name="node-search"
-              value={filters.search}
-              disabled={dragging}
-              onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
-              placeholder={t('panel.searchPlaceholder')}
-              className="h-10 w-full min-w-0 bg-transparent text-sm outline-none"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <label className="min-w-0">
-              <span className="sr-only">{t('panel.source')}</span>
-              <select
-                className="panel-select"
-                value={filters.source}
+    <>
+      <Section
+        title={t('node')}
+        count={totalCount}
+        createLabel={t('panel.importNode')}
+        icon={<Cloud className="h-5 w-5" />}
+        iconPlus={<CloudUpload className="h-4 w-4" />}
+        onCreate={() => setOpenedImportNodeFormModal(true)}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        bordered
+        highlight={highlight}
+        className="panel-node-section"
+        contentClassName="min-h-0 flex-1"
+        actions={
+          <SimpleTooltip label={t('actions.configureNode')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t('actions.configureNode')}
+              onClick={() => setOpenedConfigureNodeFormModal(true)}
+            >
+              <FileInput aria-hidden="true" className="h-4 w-4" />
+            </Button>
+          </SimpleTooltip>
+        }
+      >
+        {totalCount > 0 && (
+          <div className="shrink-0 space-y-2" data-node-toolbar>
+            <label className="flex items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
+              <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="sr-only">{t('panel.searchNodes')}</span>
+              <input
+                type="search"
+                autoComplete="off"
+                spellCheck={false}
+                name="node-search"
+                value={filters.search}
                 disabled={dragging}
-                onChange={(event) => onFiltersChange({ ...filters, source: event.target.value })}
-              >
-                <option value="all">{t('panel.allSources')}</option>
-                <option value="manual">{t('panel.manual')}</option>
-                {sources.map((source) => (
-                  <option key={source.id} value={source.id}>
-                    {source.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+                placeholder={t('panel.searchPlaceholder')}
+                className="h-10 w-full min-w-0 bg-transparent text-sm outline-none"
+              />
             </label>
-            <label className="min-w-0">
-              <span className="sr-only">{t('panel.sort')}</span>
-              <select
-                className="panel-select"
-                value={filters.sort}
-                disabled={dragging}
-                onChange={(event) => onFiltersChange({ ...filters, sort: event.target.value as NodeFilters['sort'] })}
-              >
-                <option value="custom">{t('panel.defaultSort')}</option>
-                <option value="latency">{t('panel.latencySort')}</option>
-              </select>
-            </label>
-          </div>
-          {filters.sort === 'latency' && <p className="text-xs text-muted-foreground">{t('panel.filtersReorder')}</p>}
-        </div>
-      )}
-      <Droppable droppableId={NODE_DROPPABLE_ID} type="NODE">
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={cn('flex min-h-24 flex-col gap-3', snapshot.isDraggingOver && 'rounded-lg bg-primary/5')}
-          >
-            {nodes
-              .slice(0, limit)
-              .map(({ node: { id, name, tag, protocol, link }, sources: nodeSources, editable }, index) => (
-                <SortableNodeCard
-                  key={id}
-                  id={`node-${id}`}
-                  index={index}
-                  name={tag || name}
-                  leftSection={protocol}
-                  actions={
-                    <Fragment>
-                      {editable && (
-                        <SimpleTooltip label={t('actions.edit')}>
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            aria-label={`${t('actions.edit')} ${tag || name}`}
-                            className="h-7 w-7 p-0 text-muted-foreground"
-                            onClick={() => {
-                              setEditingNode({ id, link, tag: tag || '', name: name || '' })
-                              setOpenedEditNodeFormModal(true)
-                            }}
-                          >
-                            <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
-                          </Button>
-                        </SimpleTooltip>
-                      )}
-                      <SimpleTooltip label={t('actions.viewQRCode')}>
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          aria-label={`${t('actions.viewQRCode')} ${tag || name}`}
-                          className="h-7 w-7 p-0 text-muted-foreground"
-                          onClick={() => {
-                            qrCodeModalRef.current?.setProps({ name: tag || name || '', link })
-                            setOpenedQRCodeModal(true)
-                          }}
-                        >
-                          <Eye aria-hidden="true" className="h-3.5 w-3.5" />
-                        </Button>
-                      </SimpleTooltip>
-                    </Fragment>
-                  }
-                  onRemove={editable ? () => removeNodesMutation.mutate([id]) : undefined}
+            <div className="grid grid-cols-2 gap-2">
+              <label className="min-w-0">
+                <span className="sr-only">{t('panel.source')}</span>
+                <select
+                  className="panel-select"
+                  value={filters.source}
+                  disabled={dragging}
+                  onChange={(event) => onFiltersChange({ ...filters, source: event.target.value })}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span
-                      className="min-w-0 truncate text-muted-foreground"
-                      title={nodeSources.map((source) => source.name).join(' · ')}
-                    >
-                      {nodeSources.length ? nodeSources.map((source) => source.name).join(' · ') : t('panel.manual')}
-                    </span>
-                    <span
-                      className="font-medium tabular-nums"
-                      title={
-                        nodeLatencies?.[id]?.testedAt
-                          ? t('panel.sampleTime', { time: new Date(nodeLatencies[id].testedAt).toLocaleString() })
-                          : undefined
-                      }
-                    >
-                      {formatLatencyLabel(nodeLatencies?.[id], t) || t('panel.notTested')}
-                    </span>
-                  </div>
-                  {tag && name && name !== tag && (
-                    <p className="mt-1 truncate text-xs text-muted-foreground" title={name}>
-                      {name}
-                    </p>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <Spoiler label={link} showLabel={t('actions.show sensitive')} hideLabel={t('actions.hide')} />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAddingNode({ id, name: tag || name || '', type: 'node' })}
-                    >
-                      {t('panel.addToGroup')}
-                    </Button>
-                  </div>
-                </SortableNodeCard>
-              ))}
-            {!loading && !error && !totalCount && (
-              <ResourceEmpty
-                title={t('panel.noNodes')}
-                description={t('panel.noNodesDescription')}
-                action={t('panel.importNode')}
-                onAction={() => setOpenedImportNodeFormModal(true)}
-              />
-            )}
-            {!loading && totalCount > 0 && !nodes.length && (
-              <ResourceEmpty
-                title={t('panel.noMatches')}
-                description={t('panel.noMatchesDescription')}
-                action={t('panel.clearFilters')}
-                onAction={() => onFiltersChange(defaultNodeFilters)}
-              />
-            )}
-            {provided.placeholder}
+                  <option value="all">{t('panel.allSources')}</option>
+                  <option value="manual">{t('panel.manual')}</option>
+                  {sources.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="min-w-0">
+                <span className="sr-only">{t('panel.sort')}</span>
+                <select
+                  className="panel-select"
+                  value={filters.sort}
+                  disabled={dragging}
+                  onChange={(event) => onFiltersChange({ ...filters, sort: event.target.value as NodeFilters['sort'] })}
+                >
+                  <option value="custom">{t('panel.defaultSort')}</option>
+                  <option value="latency">{t('panel.latencySort')}</option>
+                </select>
+              </label>
+            </div>
+            <div
+              className="flex flex-wrap justify-between gap-1 text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              <span>{t('panel.filteredNodes', { count: nodes.length, total: totalCount })}</span>
+              {nodes.length > 0 && (filters.search || filters.source !== 'all') ? (
+                <button
+                  type="button"
+                  className="text-primary hover:underline"
+                  onClick={() => onFiltersChange(defaultNodeFilters)}
+                >
+                  {t('panel.clearFilters')}
+                </button>
+              ) : null}
+            </div>
+            {filters.sort === 'latency' && <p className="text-xs text-muted-foreground">{t('panel.filtersReorder')}</p>}
           </div>
         )}
-      </Droppable>
-      {nodes.length > limit && (
-        <Button variant="outline" disabled={dragging} onClick={() => setLimit((value) => value + 6)}>
-          {t('panel.showMore', { count: nodes.length - limit })}
-        </Button>
-      )}
+        <Droppable
+          droppableId={NODE_DROPPABLE_ID}
+          type="NODE"
+          mode="virtual"
+          renderClone={(provided, snapshot, rubric) => (
+            <NodeRow
+              entry={nodes[rubric.source.index]}
+              provided={provided}
+              snapshot={snapshot}
+              latency={nodeLatencies?.[nodes[rubric.source.index].node.id]}
+              onAction={onAction}
+            />
+          )}
+        >
+          {(provided, snapshot) => (
+            <div
+              ref={(element) => {
+                provided.innerRef(element)
+                scrollRef.current = element
+              }}
+              {...provided.droppableProps}
+              data-workspace-scroll
+              data-node-scroll
+              role="list"
+              aria-label={t('panel.nodeList')}
+              tabIndex={0}
+              onScroll={(event) => {
+                if (event.currentTarget.clientHeight) setScrollTop(event.currentTarget.scrollTop)
+              }}
+              onFocusCapture={(event) =>
+                setFocusedId(
+                  (event.target as HTMLElement).closest('[data-node-id]')?.getAttribute('data-node-id') || null,
+                )
+              }
+              className={cn(
+                'min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg outline-offset-2',
+                snapshot.isDraggingOver && 'bg-primary/5',
+              )}
+            >
+              <div
+                className="relative"
+                style={{ height: (nodes.length + (snapshot.isUsingPlaceholder ? 1 : 0)) * NODE_ROW_HEIGHT }}
+              >
+                {indices.map((index) => (
+                  <div
+                    key={nodes[index].node.id}
+                    className="absolute inset-x-0"
+                    style={{ top: index * NODE_ROW_HEIGHT, height: NODE_ROW_HEIGHT }}
+                  >
+                    <Draggable draggableId={`node-${nodes[index].node.id}`} index={index}>
+                      {(rowProvided, rowSnapshot) => (
+                        <NodeRow
+                          entry={nodes[index]}
+                          provided={rowProvided}
+                          snapshot={rowSnapshot}
+                          latency={nodeLatencies?.[nodes[index].node.id]}
+                          onAction={onAction}
+                        />
+                      )}
+                    </Draggable>
+                  </div>
+                ))}
+              </div>
+              {!loading && !error && !totalCount && (
+                <ResourceEmpty
+                  title={t('panel.noNodes')}
+                  description={t('panel.noNodesDescription')}
+                  action={t('panel.importNode')}
+                  onAction={() => setOpenedImportNodeFormModal(true)}
+                />
+              )}
+              {!loading && !error && totalCount > 0 && !nodes.length && (
+                <ResourceEmpty
+                  title={t('panel.noMatches')}
+                  description={t('panel.noMatchesDescription')}
+                  action={t('panel.clearFilters')}
+                  onAction={() => onFiltersChange(defaultNodeFilters)}
+                />
+              )}
+            </div>
+          )}
+        </Droppable>
+      </Section>
+      <Sheet
+        open={!!detailNode}
+        onOpenChange={(open) => {
+          if (!open) setDetailNodeId(null)
+        }}
+      >
+        <SheetContent
+          className="w-full overflow-y-auto overscroll-contain sm:max-w-lg"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            if (detailOriginRef.current?.isConnected) detailOriginRef.current.focus({ preventScroll: true })
+            else scrollRef.current?.focus({ preventScroll: true })
+          }}
+        >
+          <SheetHeader className="pr-12">
+            <SheetTitle>{t('panel.nodeDetails')}</SheetTitle>
+            <SheetDescription className="break-words">{detailNode?.node.tag || detailNode?.node.name}</SheetDescription>
+          </SheetHeader>
+          {detailNode && (
+            <div className="space-y-5 px-4 pb-6">
+              <dl className="space-y-4 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">{t('name')}</dt>
+                  <dd className="mt-1 break-words">{detailNode.node.name}</dd>
+                </div>
+                {detailNode.node.tag && (
+                  <div>
+                    <dt className="text-muted-foreground">{t('tag')}</dt>
+                    <dd className="mt-1 break-words">{detailNode.node.tag}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-muted-foreground">{t('panel.protocol')}</dt>
+                  <dd className="mt-1">{detailNode.node.protocol}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('panel.source')}</dt>
+                  <dd className="mt-1 break-words">
+                    {detailNode.sources.map((source) => source.name).join(' · ') || t('panel.manual')}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t('panel.nodeLatency')}</dt>
+                  <dd className="mt-1">
+                    {formatLatencyLabel(nodeLatencies?.[detailNode.node.id], t) || t('panel.notTested')}
+                  </dd>
+                </div>
+              </dl>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => onAction(detailNode, 'join')}>
+                  {t('panel.addToGroup')}
+                </Button>
+                {detailNode.editable && (
+                  <Button variant="outline" onClick={() => onAction(detailNode, 'edit')}>
+                    {t('actions.edit')}
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => onAction(detailNode, 'qr')}>
+                  {t('actions.viewQRCode')}
+                </Button>
+              </div>
+              <div className="space-y-2">
+                <Button variant="ghost" onClick={() => setShowLink((value) => !value)} aria-expanded={showLink}>
+                  {showLink ? t('actions.hide') : t('actions.show sensitive')}
+                </Button>
+                {showLink && (
+                  <p className="break-all rounded-lg bg-muted p-3 font-mono text-xs">{detailNode.node.link}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+      <Dialog
+        open={!!removingNode}
+        onOpenChange={(open) => {
+          if (!open && !removeNodesMutation.isPending) setRemovingNode(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('actions.remove')} {removingNode?.node.tag || removingNode?.node.name}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t('confirmModal.removeConfirmDescription')}</p>
+          {removeNodesMutation.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              {t('panel.saveFailed')}
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" disabled={removeNodesMutation.isPending} onClick={() => setRemovingNode(null)}>
+              {t('confirmModal.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              loading={removeNodesMutation.isPending}
+              onClick={async () => {
+                if (!removingNode) return
+                try {
+                  await removeNodesMutation.mutateAsync([removingNode.node.id])
+                  setRemovingNode(null)
+                } catch {
+                  /* Keep confirmation open for retry. */
+                }
+              }}
+            >
+              {t('confirmModal.confirm')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <ResourceGroupPicker resource={addingNode} onClose={() => setAddingNode(null)} />
       <QRCodeModal ref={qrCodeModalRef} opened={openedQRCodeModal} onClose={() => setOpenedQRCodeModal(false)} />
       <ImportResourceFormModal
@@ -268,19 +536,6 @@ export function NodeResource({
         onClose={() => setOpenedEditNodeFormModal(false)}
         node={editingNode}
       />
-    </Section>
-  )
-}
-
-function Spoiler({ label, showLabel, hideLabel }: { label: string; showLabel: string; hideLabel: string }) {
-  const [show, setShow] = useState(false)
-
-  return (
-    <div>
-      {show && <p className="text-sm break-all">{label}</p>}
-      <button type="button" className="text-xs text-primary hover:underline" onClick={() => setShow(!show)}>
-        {show ? hideLabel : showLabel}
-      </button>
-    </div>
+    </>
   )
 }

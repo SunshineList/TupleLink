@@ -187,13 +187,8 @@ export function DroppableGroupCard({
           )}
         </div>
 
-        {collapsed && onToggleCollapsed && (
-          <Button variant="ghost" size="sm" className="justify-start px-0 text-xs" onClick={onToggleCollapsed}>
-            {t('panel.manageMembers')}
-            <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
-          </Button>
-        )}
-        {children && <div>{children}</div>}
+        {/* Keep drop targets registered before their member draggables mount. */}
+        {children && <div hidden={collapsed}>{children}</div>}
       </Card>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

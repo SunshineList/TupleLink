@@ -35,6 +35,7 @@ async function login(page, url = base) {
     page = await context.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error' && /@hello-pangea\/dnd|Invariant failed|nested scroll/.test(message.text())) errors.push(message.text()); });
     const frame = await login(page);
     await frame.getByRole('button', { name: '启动代理', exact: true }).waitFor({ timeout: 45000 });
     async function gql(query, variables = {}) {
@@ -83,7 +84,6 @@ async function login(page, url = base) {
     await frame.locator('button[aria-controls="panel-advanced-content"]').click();
     const source = nodes.getByRole('combobox', { name: '节点来源' });
     await source.selectOption('manual');
-    await nodes.getByRole('button', { name: /显示更多/ }).click();
     assert.equal(await nodes.locator('[data-rfd-draggable-id]').count(), 7);
     await source.selectOption(subscriptionId);
     assert.equal(await nodes.locator('[data-rfd-draggable-id]').count(), 2);
@@ -92,7 +92,7 @@ async function login(page, url = base) {
     const search = nodes.getByRole('searchbox', { name: '搜索节点' });
     await search.fill('missing-node');
     await nodes.getByRole('heading', { name: '没有匹配的节点' }).waitFor();
-    await nodes.getByRole('button', { name: '清除筛选' }).click();
+    await nodes.getByRole('button', { name: '清除筛选' }).first().click();
     await search.fill('Legacy manual 2');
     await nodes.getByRole('button', { name: '加入群组', exact: true }).click();
     const dialog = frame.getByRole('dialog');
@@ -122,6 +122,26 @@ async function login(page, url = base) {
     assert.equal(order[0], nodeIds[0]);
     assert.equal(order[1], nodeIds[1]);
     console.log('PASS: native keyboard drag after filtering preserves hidden node order');
+
+    await search.fill('Legacy manual 3');
+    const mouseHandle = nodes.locator(`[data-rfd-drag-handle-draggable-id="node-${nodeIds[2]}"]`);
+    const groupCard = sections.nth(0).locator('[data-group-card-id]').filter({ hasText: 'LegacyGroup' });
+    await groupCard.scrollIntoViewIfNeeded();
+    const from = await mouseHandle.boundingBox(), to = await groupCard.boundingBox();
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2 + 10, from.y + from.height / 2, { steps: 5 });
+    await page.mouse.move(to.x + to.width / 2, to.y + Math.min(60, to.height / 2), { steps: 20 });
+    await page.waitForTimeout(250);
+    const expandedBox = await groupCard.boundingBox();
+    const groupViewport = await sections.nth(0).locator('.panel-side-scroll').boundingBox();
+    await page.mouse.move(expandedBox.x + expandedBox.width / 2,
+      (Math.max(expandedBox.y, groupViewport.y) + Math.min(expandedBox.y + expandedBox.height, groupViewport.y + groupViewport.height)) / 2,
+      { steps: 5 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    assert.ok((await gql('query {groups{id nodes{id}}}')).groups.find(item => item.id === groupId).nodes.some(item => item.id === nodeIds[2]));
+    console.log('PASS: pointer drag from virtual list into a collapsed group expands and binds the node through the real API');
 
     await control('subscription_fail', { enabled: true });
     const originalSubNodes = (await gql('query {subscriptions{id nodes{edges{id name}}}}')).subscriptions;
@@ -175,7 +195,8 @@ async function login(page, url = base) {
     await dialog.waitFor({ state: 'hidden' });
     assert.ok((await gql('query {groups{name}}')).groups.some(group => group.name === 'NewGroup'));
     await search.fill('Legacy manual 1');
-    await nodes.getByRole('button', { name: /^编辑 / }).click();
+    await nodes.getByRole('button', { name: /^更多操作 / }).click();
+    await frame.getByRole('menuitem', { name: '编辑', exact: true }).click();
     assert.equal(await dialog.getByRole('textbox', { name: /标签/ }).inputValue(), 'Legacy manual 1');
     await dialog.getByRole('textbox', { name: /标签/ }).fill('Edited manual');
     await dialog.getByRole('button', { name: '提交', exact: true }).click();
@@ -183,18 +204,97 @@ async function login(page, url = base) {
     assert.ok((await gql('query {nodes{edges{tag link}}}')).nodes.edges.some(node => node.tag === 'Edited manual' && node.link.includes('192.0.2.20')));
     console.log('PASS: failed group creation retains input; valid group and node edits persist through real API');
 
+    await search.fill('Edited manual');
+    await nodes.locator('[data-node-details]').click();
+    const sheet = frame.getByRole('dialog');
+    await sheet.getByRole('button', { name: '编辑', exact: true }).click();
+    const nestedEditor = frame.getByRole('dialog').filter({ has: frame.getByRole('textbox', { name: /标签/ }) });
+    await nestedEditor.getByRole('textbox', { name: /标签/ }).fill('Edited in drawer');
+    await nestedEditor.getByRole('button', { name: '提交', exact: true }).click();
+    await nestedEditor.waitFor({ state: 'hidden' });
+    await sheet.getByText('Edited in drawer', { exact: true }).first().waitFor();
+    await page.keyboard.press('Escape');
+    await sheet.waitFor({ state: 'hidden' });
+    console.log('PASS: editing inside node details updates the open drawer from current data without losing search state');
+
     await search.fill('');
     await source.selectOption('all');
+    const large = await gql('mutation {importSubscription(rollbackError:true,arg:{tag:"Workspace 1000",link:"http://127.0.0.1:18081/sub-large"}){sub{id} nodeImportResult{node{id}}}}');
+    assert.equal(large.importSubscription.nodeImportResult.length, 1000);
+    const largeId = large.importSubscription.sub.id;
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await source.selectOption('manual');
+    await page.waitForTimeout(100);
+    const beforeLargeHeight = (await frame.locator('#panel-common').boundingBox()).height;
+    await source.selectOption(largeId);
+    await page.waitForTimeout(100);
+    const scroll = nodes.locator('[data-node-scroll]');
+    assert.ok(await scroll.locator('[data-node-id]').count() < 30, 'Large list must mount a bounded number of rows');
+    const afterLargeHeight = (await frame.locator('#panel-common').boundingBox()).height;
+    assert.ok(Math.abs(afterLargeHeight - beforeLargeHeight) < 3, `1000 nodes must not grow the page: ${beforeLargeHeight} -> ${afterLargeHeight}`);
+    const toolbarY = (await nodes.locator('[data-node-toolbar]').boundingBox()).y;
+    await scroll.evaluate(element => { element.scrollTop = 76 * 400; });
+    await page.waitForTimeout(150);
+    assert.ok(await scroll.locator('[data-node-id]').count() < 30);
+    assert.equal((await nodes.locator('[data-node-toolbar]').boundingBox()).y, toolbarY);
+    // Pick a row that intersects the viewport; overscanned rows are intentionally mounted too.
+    const visibleId = await scroll.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      return [...element.querySelectorAll('[data-node-details]')].find(row => {
+        const box = row.getBoundingClientRect(); return box.top >= bounds.top && box.bottom <= bounds.bottom;
+      }).getAttribute('data-node-details');
+    });
+    const position = await scroll.evaluate(element => element.scrollTop);
+    await scroll.locator(`[data-node-details="${visibleId}"]`).click();
+    await frame.getByRole('dialog').getByText('节点详情', { exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await frame.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(await scroll.evaluate(element => element.scrollTop), position);
+    const row = scroll.locator(`[data-node-id="${visibleId}"]`);
+    await row.getByRole('button', { name: /^更多操作 / }).click();
+    assert.equal(await frame.getByRole('menuitem', { name: '编辑', exact: true }).count(), 0);
+    assert.equal(await frame.getByRole('menuitem', { name: '移除', exact: true }).count(), 0);
+    await frame.getByRole('menuitem', { name: /二维码/ }).click();
+    await frame.getByRole('dialog').locator('canvas').waitFor();
+    await page.keyboard.press('Escape');
+    await frame.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(await scroll.evaluate(element => element.scrollTop), position);
+    await search.fill('Workspace-0999');
+    assert.equal(await scroll.locator('[data-node-id]').count(), 1, 'Search must cover unmounted nodes');
+    await search.fill('');
+    await source.selectOption('manual');
+    const largeCard = subscriptions.locator('[data-rfd-draggable-id]').filter({ hasText: 'Workspace 1000' });
+    await largeCard.getByRole('button', { name: /查看节点/ }).click();
+    assert.equal(await source.inputValue(), largeId);
+    assert.equal(await subscriptions.locator('[data-node-id]').count(), 0, 'Subscription content must not duplicate the node list');
+    console.log('PASS: actual 1000-node subscription, bounded row mounts/page height, full-library search, stationary toolbar, drawer focus/scroll restoration and unified subscription view');
     await frame.getByRole('button', { name: '查看流量趋势', exact: true }).click();
     await frame.locator('#panel-traffic-trends svg.recharts-surface').first().waitFor();
     for (const name of ['10 分钟', '30 分钟', '1 小时']) await frame.getByRole('button', { name, exact: true }).click();
     await frame.getByRole('button', { name: '收起流量趋势', exact: true }).click();
     await frame.getByRole('button', { name: '常用功能', exact: true }).click();
-    for (const width of [390, 768, 1600]) {
+    for (const width of [320, 390, 768, 1024, 1600]) {
       await page.setViewportSize({ width, height: 1100 });
       await page.waitForTimeout(150);
       assert.ok(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Horizontal overflow at ' + width);
       assert.deepEqual(await sections.locator(':scope > div:first-child h2').allTextContents(), ['群组', '节点', '订阅']);
+      if (await frame.getByRole('tablist', { name: '常用功能' }).isVisible()) {
+        const tabs = frame.getByRole('tablist', { name: '常用功能' });
+        await scroll.evaluate(element => { element.scrollTop = 76 * 200; });
+        await page.waitForTimeout(100);
+        const savedPosition = await scroll.evaluate(element => element.scrollTop);
+        await tabs.getByRole('tab', { name: /群组/ }).click();
+        assert.equal(await nodes.isVisible(), false);
+        assert.equal(await sections.nth(0).isVisible(), true);
+        await tabs.getByRole('tab', { name: /节点/ }).click();
+        await page.waitForTimeout(100);
+        assert.equal(await source.inputValue(), largeId);
+        assert.equal(await scroll.evaluate(element => element.scrollTop), savedPosition);
+        await tabs.getByRole('tab', { name: /订阅/ }).click();
+        await largeCard.getByRole('button', { name: /查看节点/ }).click();
+        assert.equal(await tabs.getByRole('tab', { name: /节点/ }).getAttribute('aria-selected'), 'true');
+        assert.equal(await source.inputValue(), largeId);
+      }
       await page.screenshot({ path: path.join(output, 'native-' + width + '.png'), fullPage: true });
     }
     // Fault injection tests control states only. Run is NEVER forwarded to the daemon.
@@ -240,7 +340,7 @@ async function login(page, url = base) {
     assert.ok(!(await frame.locator('body').innerText()).includes('欢迎来到 daed'));
     assert.deepEqual(errors, []);
     console.log('PASS: retained traffic ranges/charts, responsive views and no page exceptions');
-    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, dataTables: baseline.tables, widths: [390, 768, 1600] }, null, 2));
+    fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ passed: true, dataTables: baseline.tables, widths: [320, 390, 768, 1024, 1600] }, null, 2));
     await context.close();
     const secureContext = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'zh-CN' });
     const securePage = await secureContext.newPage();
@@ -250,6 +350,26 @@ async function login(page, url = base) {
     assert.ok(cookie && cookie.secure && cookie.httpOnly);
     await secureContext.close();
     console.log('PASS: HTTPS native LuCI single-session panel with Secure/HttpOnly cookie');
+    const touchContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'zh-CN' });
+    const touchPage = await touchContext.newPage();
+    const touchFrame = await login(touchPage);
+    await touchFrame.locator('[data-node-scroll]').waitFor();
+    const touchTabs = touchFrame.getByRole('tablist', { name: '常用功能' });
+    await touchTabs.getByRole('tab', { name: /订阅/ }).tap();
+    const touchSubscription = touchFrame.locator('#workspace-subscriptions [data-rfd-draggable-id]').filter({ hasText: 'Workspace 1000' });
+    await touchSubscription.getByRole('button', { name: /查看节点/ }).tap();
+    const touchNodes = touchFrame.locator('#workspace-nodes');
+    await touchNodes.getByRole('searchbox', { name: '搜索节点' }).fill('Workspace-0999');
+    await touchNodes.locator('[data-node-details]').tap();
+    assert.ok(await touchFrame.getByRole('dialog').getByText('节点详情', { exact: true }).isVisible());
+    await touchPage.waitForTimeout(550);
+    const touchBounds = await touchPage.locator('iframe').boundingBox();
+    const drawerBounds = await touchFrame.getByRole('dialog').boundingBox();
+    assert.ok(Math.abs(drawerBounds.width - touchBounds.width) < 2, 'Mobile drawer must occupy the full panel width');
+    assert.ok(await touchFrame.locator('body').evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    await touchPage.screenshot({ path: path.join(output, 'native-touch-dark.png'), fullPage: true });
+    await touchContext.close();
+    console.log('PASS: touch-enabled mobile dark theme, subscription-to-node navigation, long names and full-width detail drawer');
   } catch (error) {
     if (page && !page.isClosed()) {
       await page.screenshot({ path: path.join(output, 'failure.png'), fullPage: true }).catch(() => {});

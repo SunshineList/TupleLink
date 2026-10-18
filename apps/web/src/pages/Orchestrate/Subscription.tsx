@@ -16,7 +16,6 @@ import {
   useUpdateSubscriptionLinkMutation,
   useUpdateSubscriptionsMutation,
 } from '~/apis'
-import { DraggableResourceBadge } from '~/components/DraggableResourceBadge'
 import { EditSubscriptionFormModal } from '~/components/EditSubscriptionFormModal'
 import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
 import { QRCodeModal } from '~/components/QRCodeModal'
@@ -24,13 +23,11 @@ import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Section } from '~/components/Section'
 import { SortableSubscriptionCard } from '~/components/SortableSubscriptionCard'
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '~/components/ui/accordion'
 import { Button } from '~/components/ui/button'
 import { SimpleTooltip } from '~/components/ui/tooltip'
 import { UpdateSubscriptionAction } from '~/components/UpdateSubscriptionAction'
 import { useDisclosure } from '~/hooks'
 import { cn } from '~/lib/utils'
-import { formatLatencyLabel } from '~/utils/latency'
 
 export function SubscriptionResource({
   sortedSubscriptions,
@@ -38,12 +35,14 @@ export function SubscriptionResource({
   testingLatencies,
   lastLatencyProbeAt,
   onTestAllNodeLatencies,
+  onViewNodes,
 }: {
   sortedSubscriptions: SubscriptionsQuery['subscriptions']
   nodeLatencies?: Record<string, NodeLatencyProbeResult>
   testingLatencies?: boolean
   lastLatencyProbeAt?: string | null
   onTestAllNodeLatencies: () => Promise<void>
+  onViewNodes: (id: string) => void
 }) {
   const { t } = useTranslation()
   const [addingSubscription, setAddingSubscription] = useState<{
@@ -93,6 +92,8 @@ export function SubscriptionResource({
       iconPlus={<CloudUpload className="h-4 w-4" />}
       onCreate={openImportSubscriptionFormModal}
       bordered
+      className="panel-side-section"
+      contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-contain panel-side-scroll"
       actions={
         <Fragment>
           {sortedSubscriptions.length > 0 && (
@@ -232,37 +233,15 @@ export function SubscriptionResource({
                   </div>
                   <Spoiler label={link} showLabel={t('actions.show sensitive')} hideLabel={t('actions.hide')} />
 
-                  <Accordion type="single" collapsible className="w-full mt-2">
-                    <AccordionItem value="node" className="border-none">
-                      <AccordionTrigger className="text-xs py-1 hover:no-underline">
-                        {t('actions.show content')}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <Droppable droppableId={`subscription-${subscriptionID}-nodes`} type="NODE" isDropDisabled>
-                          {(droppableProvided) => (
-                            <div
-                              ref={droppableProvided.innerRef}
-                              {...droppableProvided.droppableProps}
-                              className="flex flex-wrap gap-2 pt-2"
-                            >
-                              {nodes.edges.map(({ id, name }, nodeIndex) => (
-                                <DraggableResourceBadge
-                                  key={id}
-                                  id={`subscription-node-${id}`}
-                                  index={nodeIndex}
-                                  name={name}
-                                  meta={formatLatencyLabel(nodeLatencies?.[id], t)}
-                                >
-                                  {name}
-                                </DraggableResourceBadge>
-                              ))}
-                              {droppableProvided.placeholder}
-                            </div>
-                          )}
-                        </Droppable>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full justify-between"
+                    onClick={() => onViewNodes(subscriptionID)}
+                  >
+                    {t('panel.viewSubscriptionNodes')}
+                    <span className="tabular-nums text-muted-foreground">{nodes.edges.length}</span>
+                  </Button>
                 </SortableSubscriptionCard>
               ))}
             {!subscriptionsRequest.isPending && !subscriptionsRequest.isError && !sortedSubscriptions.length && (

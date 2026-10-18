@@ -10,9 +10,10 @@ import {
   orderNodeLibrary,
   reorderVisibleNodes,
 } from '~/utils/node-library'
+import type { LibraryNode } from '~/utils/node-library'
 import { DragDropContext } from '@hello-pangea/dnd'
 import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   useConfigsQuery,
   useGroupAddNodesMutation,
@@ -48,6 +49,28 @@ export function OrchestratePage() {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [activeArea, setActiveArea] = useState('panel-common')
   const [nodeFilters, setNodeFilters] = useState(defaultNodeFilters)
+  const [mobilePanel, setMobilePanel] = useState('nodes')
+  const workspaceRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const element = workspaceRef.current
+    if (!element) return
+    const resize = () => {
+      const top = element.getBoundingClientRect().top + window.scrollY
+      const height = `${Math.max(320, Math.min(760, window.innerHeight - top - 24))}px`
+      if (element.style.getPropertyValue('--workspace-height') !== height)
+        element.style.setProperty('--workspace-height', height)
+    }
+    const observer = new ResizeObserver(resize)
+    observer.observe(element.parentElement!)
+    const header = document.querySelector('header')
+    if (header) observer.observe(header)
+    window.addEventListener('resize', resize)
+    resize()
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', resize)
+    }
+  }, [])
   const scrollToArea = (id: string) => {
     if (id === 'panel-advanced') setAdvancedOpen(true)
     setActiveArea(id)
@@ -74,12 +97,13 @@ export function OrchestratePage() {
 
   const [draggingResource, setDraggingResource] = useState<DraggingResource | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [dragNodes, setDragNodes] = useState<LibraryNode[] | null>(null)
   const [dragDestinationDroppableId, setDragDestinationDroppableId] = useState<string | null>(null)
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null)
   const autoScrollFrameRef = useRef<number | null>(null)
   const draggingActiveRef = useRef(false)
   const edgeAutoScrollEnabledRef = useRef(false)
-  const dragPointerRef = useRef<{ y: number } | null>(null)
+  const dragPointerRef = useRef<{ x: number; y: number } | null>(null)
   const hoveredGroupIdRef = useRef<string | null>(null)
 
   // Use persistent store for sort order
@@ -152,10 +176,11 @@ export function OrchestratePage() {
     [nodes, subscriptions, nodeSortOrder],
   )
   const sortedNodeIds = useMemo(() => nodeLibrary.map((entry) => entry.node.id), [nodeLibrary])
-  const visibleNodes = useMemo(
+  const filteredNodes = useMemo(
     () => filterNodeLibrary(nodeLibrary, nodeFilters, nodeLatencies),
     [nodeLibrary, nodeFilters, nodeLatencies],
   )
+  const visibleNodes = dragNodes || filteredNodes
 
   // Get sorted subscription IDs
   const sortedSubscriptionIds = useMemo(() => {
@@ -258,22 +283,28 @@ export function OrchestratePage() {
 
     if (!draggingActiveRef.current || !edgeAutoScrollEnabledRef.current || !dragPointerRef.current) return
 
-    const viewportHeight = window.innerHeight
-    const threshold = Math.min(320, Math.max(180, Math.round(viewportHeight * 0.3)))
-    const pointerY = dragPointerRef.current.y
+    const { x, y: pointerY } = dragPointerRef.current
+    const target = document
+      .elementFromPoint(x, pointerY)
+      ?.closest('[data-node-scroll], .panel-side-scroll') as HTMLElement | null
+    const bounds = target?.getBoundingClientRect()
+    const top = bounds?.top ?? 0
+    const bottom = bounds?.bottom ?? window.innerHeight
+    const threshold = Math.min(64, Math.max(24, (bottom - top) * 0.15))
     let delta = 0
 
-    if (pointerY < threshold) {
-      const intensity = Math.min(1, (threshold - pointerY) / threshold)
-      delta = -Math.round(24 + intensity * intensity * 176)
-    } else if (pointerY > viewportHeight - threshold) {
-      const intensity = Math.min(1, (pointerY - (viewportHeight - threshold)) / threshold)
-      delta = Math.round(24 + intensity * intensity * 176)
+    if (pointerY < top + threshold) {
+      const intensity = Math.min(1, (top + threshold - pointerY) / threshold)
+      delta = -Math.round(4 + intensity * intensity * 20)
+    } else if (pointerY > bottom - threshold) {
+      const intensity = Math.min(1, (pointerY - (bottom - threshold)) / threshold)
+      delta = Math.round(4 + intensity * intensity * 20)
     }
 
     if (delta === 0) return
 
-    window.scrollBy(0, delta)
+    if (target) target.scrollBy(0, delta)
+    else window.scrollBy(0, delta)
     autoScrollFrameRef.current = window.requestAnimationFrame(tickEdgeAutoScroll)
   }, [])
 
@@ -298,6 +329,7 @@ export function OrchestratePage() {
 
     const handlePointerMove = (event: MouseEvent | PointerEvent) => {
       dragPointerRef.current = {
+        x: event.clientX,
         y: event.clientY,
       }
 
@@ -330,7 +362,9 @@ export function OrchestratePage() {
     const droppableId = start.source.droppableId
 
     setIsDragging(true)
+    setDragNodes(filteredNodes)
     setDragDestinationDroppableId(null)
+    dragPointerRef.current = null
     hoveredGroupIdRef.current = null
     setHoveredGroupId(null)
     edgeAutoScrollEnabledRef.current = true
@@ -379,9 +413,16 @@ export function OrchestratePage() {
 
   const onDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result
-    const fallbackGroupId = hoveredGroupIdRef.current
+    const pointer = dragPointerRef.current
+    const fallbackGroupId = pointer
+      ? document
+          .elementFromPoint(pointer.x, pointer.y)
+          ?.closest('[data-group-card-id]')
+          ?.getAttribute('data-group-card-id') || null
+      : hoveredGroupIdRef.current
 
     setIsDragging(false)
+    setDragNodes(null)
     setDraggingResource(null)
     setDragDestinationDroppableId(null)
     setHoveredGroupId(null)
@@ -399,7 +440,13 @@ export function OrchestratePage() {
       return
     }
 
-    if (!destination) {
+    // A collapsed target can retain its pre-expansion dimensions in the drag
+    // engine. Prefer the card actually under the pointer over that stale result.
+    const pointerTargetsGroup =
+      fallbackGroupId &&
+      sourceDroppableId !== 'group-list' &&
+      !destination?.droppableId.startsWith(`${fallbackGroupId}-`)
+    if (!destination || pointerTargetsGroup) {
       if (fallbackGroupId) {
         if (sourceDroppableId === 'subscription-list') {
           const subId = draggableId.replace('subscription-', '')
@@ -658,42 +705,112 @@ export function OrchestratePage() {
           <p className="mt-1 text-sm text-muted-foreground">{t('panel.commonDescription')}</p>
         </div>
         <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 items-start gap-4 min-[900px]:grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_minmax(0,1fr)]">
-            <GroupResource
-              highlight={!!draggingResource}
-              draggingResource={draggingResource}
-              dragDestinationDroppableId={dragDestinationDroppableId}
-              hoveredGroupId={hoveredGroupId}
-              nodeLatencies={nodeLatencies}
-            />
-            <NodeResource
-              nodes={visibleNodes}
-              totalCount={nodeLibrary.length}
-              filters={nodeFilters}
-              onFiltersChange={setNodeFilters}
-              sources={subscriptions.map((subscription) => ({
-                id: subscription.id,
-                name: subscription.tag || subscription.id,
-              }))}
-              loading={nodesRequest.isPending || subscriptionsRequest.isPending}
-              error={nodesRequest.isError || subscriptionsRequest.isError}
-              onRetry={() => {
-                nodesRequest.refetch()
-                subscriptionsRequest.refetch()
-              }}
-              dragging={isDragging}
-              highlight={draggingResource?.type === DraggableResourceType.groupNode}
-              nodeLatencies={nodeLatencies}
-            />
-            <SubscriptionResource
-              sortedSubscriptions={sortedSubscriptions}
-              nodeLatencies={nodeLatencies}
-              testingLatencies={testNodeLatenciesMutation.isPending}
-              lastLatencyProbeAt={lastLatencyProbeAt}
-              onTestAllNodeLatencies={async () => {
-                await testNodeLatenciesMutation.mutateAsync(undefined)
-              }}
-            />
+          <div className="panel-mobile-tabs" role="tablist" aria-label={t('panel.common')}>
+            {[
+              ['groups', t('group'), groups.length],
+              ['nodes', t('node'), nodeLibrary.length],
+              ['subscriptions', t('subscription'), subscriptions.length],
+            ].map(([id, label, count], index) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`workspace-tab-${id}`}
+                aria-controls={`workspace-${id}`}
+                aria-selected={mobilePanel === id}
+                tabIndex={mobilePanel === id ? 0 : -1}
+                onClick={() => setMobilePanel(String(id))}
+                onKeyDown={(event) => {
+                  const keys = ['groups', 'nodes', 'subscriptions']
+                  const next =
+                    event.key === 'ArrowRight'
+                      ? (index + 1) % 3
+                      : event.key === 'ArrowLeft'
+                        ? (index + 2) % 3
+                        : event.key === 'Home'
+                          ? 0
+                          : event.key === 'End'
+                            ? 2
+                            : -1
+                  if (next < 0) return
+                  event.preventDefault()
+                  setMobilePanel(keys[next])
+                  document.getElementById(`workspace-tab-${keys[next]}`)?.focus()
+                }}
+              >
+                {label} <span className="tabular-nums">{count}</span>
+              </button>
+            ))}
+          </div>
+          <div className="panel-common-grid" ref={workspaceRef}>
+            <div
+              id="workspace-groups"
+              className="panel-resource-pane"
+              data-active={mobilePanel === 'groups'}
+              role="region"
+              aria-label={t('group')}
+            >
+              <GroupResource
+                highlight={!!draggingResource}
+                draggingResource={draggingResource}
+                dragDestinationDroppableId={dragDestinationDroppableId}
+                hoveredGroupId={hoveredGroupId}
+                nodeLatencies={nodeLatencies}
+              />
+            </div>
+            <div
+              id="workspace-nodes"
+              className="panel-resource-pane"
+              data-active={mobilePanel === 'nodes'}
+              role="region"
+              aria-label={t('node')}
+              tabIndex={-1}
+            >
+              <NodeResource
+                library={nodeLibrary}
+                nodes={visibleNodes}
+                totalCount={nodeLibrary.length}
+                filters={nodeFilters}
+                onFiltersChange={setNodeFilters}
+                sources={subscriptions.map((subscription) => ({
+                  id: subscription.id,
+                  name: subscription.tag || subscription.id,
+                }))}
+                loading={nodesRequest.isPending || subscriptionsRequest.isPending}
+                error={nodesRequest.isError || subscriptionsRequest.isError}
+                onRetry={() => {
+                  nodesRequest.refetch()
+                  subscriptionsRequest.refetch()
+                }}
+                dragging={isDragging}
+                highlight={draggingResource?.type === DraggableResourceType.groupNode}
+                nodeLatencies={nodeLatencies}
+              />
+            </div>
+            <div
+              id="workspace-subscriptions"
+              className="panel-resource-pane"
+              data-active={mobilePanel === 'subscriptions'}
+              role="region"
+              aria-label={t('subscription')}
+            >
+              <SubscriptionResource
+                sortedSubscriptions={sortedSubscriptions}
+                nodeLatencies={nodeLatencies}
+                testingLatencies={testNodeLatenciesMutation.isPending}
+                lastLatencyProbeAt={lastLatencyProbeAt}
+                onTestAllNodeLatencies={async () => {
+                  await testNodeLatenciesMutation.mutateAsync(undefined)
+                }}
+                onViewNodes={(id) => {
+                  setNodeFilters((current) => ({ ...current, source: id, search: '' }))
+                  setMobilePanel('nodes')
+                  requestAnimationFrame(() =>
+                    document.getElementById('workspace-nodes')?.focus({ preventScroll: true }),
+                  )
+                }}
+              />
+            </div>
           </div>
         </DragDropContext>
       </section>

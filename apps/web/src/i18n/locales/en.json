@@ -480,6 +480,13 @@
       "min": "Lowest latency",
       "random": "Random",
       "fixed": "Fixed node"
-    }
+    },
+    "nodeDetails": "Node details",
+    "moreActions": "More actions",
+    "nodeList": "Node list",
+    "filteredNodes": "{{count}} of {{total}} nodes",
+    "viewSubscriptionNodes": "View nodes",
+    "protocol": "Protocol",
+    "nodeLatency": "Latency"
   }
 }

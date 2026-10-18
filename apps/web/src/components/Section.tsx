@@ -19,6 +19,8 @@ export function Section({
   loading,
   error,
   onRetry,
+  className,
+  contentClassName,
   children,
 }: {
   title: string
@@ -34,6 +36,8 @@ export function Section({
   loading?: boolean
   error?: boolean
   onRetry?: () => void
+  className?: string
+  contentClassName?: string
   children: React.ReactNode
 }) {
   const { t } = useTranslation()
@@ -45,6 +49,7 @@ export function Section({
         'panel-section min-w-0 flex flex-col gap-4',
         bordered && 'rounded-2xl border bg-card p-4 shadow-sm',
         highlight && 'border-primary/60 bg-primary/5',
+        className,
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -89,7 +94,7 @@ export function Section({
           ))}
         </div>
       ) : (
-        <div className="flex min-w-0 flex-col gap-3">{children}</div>
+        <div className={cn('flex min-w-0 flex-col gap-3', contentClassName)}>{children}</div>
       )}
     </div>
   )
