@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.1.3)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.2.0)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -40,6 +40,8 @@ define Build/Prepare
 	$(CP) "$(DAED_BINARY)" $(PKG_BUILD_DIR)/daed
 	test -n "$(DAED_BTF_PROBE)" && test -f "$(DAED_BTF_PROBE)"
 	$(CP) "$(DAED_BTF_PROBE)" $(PKG_BUILD_DIR)/btf-probe
+	test -n "$(DAED_LUCI_PROXY)" && test -f "$(DAED_LUCI_PROXY)"
+	$(CP) "$(DAED_LUCI_PROXY)" $(PKG_BUILD_DIR)/luci-proxy
 endef
 
 define Build/Configure
@@ -57,6 +59,7 @@ define Package/daed-router/install
 	$(INSTALL_DIR) $(1)/usr/libexec/daed $(1)/usr/share/daed-router
 	$(INSTALL_BIN) ./files/daed-check $(1)/usr/libexec/daed/check
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/btf-probe $(1)/usr/libexec/daed/btf-probe
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/luci-proxy $(1)/usr/libexec/daed/luci-proxy
 	echo '$(PKG_VERSION)-$(PKG_RELEASE)' > $(1)/usr/share/daed-router/version
 	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
 	$(INSTALL_DATA) ./files/keep-daed $(1)/lib/upgrade/keep.d/daed-router
@@ -69,6 +72,8 @@ define Package/luci-app-daed-router/install
 	$(INSTALL_DATA) ./files/menu.json $(1)/usr/share/luci/menu.d/luci-app-daed-router.json
 	$(INSTALL_DATA) ./files/acl.json $(1)/usr/share/rpcd/acl.d/luci-app-daed-router.json
 	$(INSTALL_BIN) ./files/rpcd-daed $(1)/usr/libexec/rpcd/daed-router
+	$(INSTALL_DIR) $(1)/www/cgi-bin
+	$(INSTALL_BIN) ./files/luci-cgi $(1)/www/cgi-bin/daed-router
 endef
 
 define Package/luci-app-daed-router/postinst

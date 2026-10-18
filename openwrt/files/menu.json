@@ -5,24 +5,14 @@
     "action": { "type": "firstchild" },
     "depends": { "acl": ["luci-app-daed-router"], "uci": { "daed": true } }
   },
-  "admin/services/daed/overview": {
-    "title": "运行状态",
-    "order": 10,
-    "action": { "type": "view", "path": "daed-router/overview" }
-  },
-  "admin/services/daed/settings": {
-    "title": "服务设置",
-    "order": 20,
-    "action": { "type": "view", "path": "daed-router/settings" }
-  },
   "admin/services/daed/dashboard": {
     "title": "管理面板",
-    "order": 30,
+    "order": 10,
     "action": { "type": "view", "path": "daed-router/dashboard" }
   },
   "admin/services/daed/logs": {
     "title": "运行日志",
-    "order": 40,
+    "order": 20,
     "action": { "type": "view", "path": "daed-router/logs" }
   }
 }

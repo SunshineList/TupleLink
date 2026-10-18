@@ -14,20 +14,11 @@ config_value() {
 }
 
 listen_address() {
-	host=$(config_value listen_host lan)
+	# Browsers use the authenticated gateway, never the daemon port.
+	host=127.0.0.1
 	port=$(config_value listen_port 2023)
 	case "$port" in ''|*[!0-9]*) return 1 ;; esac
 	[ "$port" -ge 1 ] && [ "$port" -le 65535 ] || return 1
-	case "$host" in lan|127.0.0.1) ;; *) return 1 ;; esac
-	if [ "$host" = lan ]; then
-		network=$(config_value lan_network lan)
-		case "$network" in ''|*[!a-zA-Z0-9_]*) return 1 ;; esac
-		host=$(ubus call "network.interface.$network" status 2>/dev/null | \
-			jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null) || host=''
-	fi
-	# The LAN address must be an IPv4 literal; never accept a wildcard bind.
-	printf '%s\n' "$host" | awk -F. 'NF!=4 {exit 1} {for(i=1;i<=4;i++) if($i !~ /^[0-9]+$/ || $i>255) exit 1}' || return 1
-	[ "$host" != 0.0.0.0 ] || return 1
 	printf '%s:%s\n' "$host" "$port"
 }
 

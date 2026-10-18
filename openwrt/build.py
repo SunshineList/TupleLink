@@ -98,7 +98,8 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             verify_elf(root / "usr/bin/daed", cpu)
             expected = {"etc/init.d/daed": "files/daed.init", "usr/libexec/daed/check": "files/daed-check", "lib/upgrade/keep.d/daed-router": "files/keep-daed"}
             verify_elf(root / "usr/libexec/daed/btf-probe", cpu)
-            executables = ["usr/bin/daed", "etc/init.d/daed", "usr/libexec/daed/check", "usr/libexec/daed/btf-probe"]
+            verify_elf(root / "usr/libexec/daed/luci-proxy", cpu)
+            executables = ["usr/bin/daed", "etc/init.d/daed", "usr/libexec/daed/check", "usr/libexec/daed/btf-probe", "usr/libexec/daed/luci-proxy"]
             installer = (HERE / "install.sh").read_text()
             installer = re.sub(r"^release=openwrt-v\d+\.\d+\.\d+$", "release=openwrt-v" + version, installer, flags=re.MULTILINE)
             if (root / "usr/sbin/daed-router-setup").read_text() != installer:
@@ -108,6 +109,11 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             expected = {"usr/share/luci/menu.d/luci-app-daed-router.json": "files/menu.json", "usr/share/rpcd/acl.d/luci-app-daed-router.json": "files/acl.json", "usr/libexec/rpcd/daed-router": "files/rpcd-daed"}
             expected.update({"www/luci-static/resources/view/daed-router/" + path.name: "htdocs/" + path.name for path in (HERE / "htdocs").glob("*.js")})
             executables = ["usr/libexec/rpcd/daed-router"]
+            expected["www/cgi-bin/daed-router"] = "files/luci-cgi"
+            executables.append("www/cgi-bin/daed-router")
+            for obsolete in ("overview.js", "settings.js"):
+                if (root / "www/luci-static/resources/view/daed-router" / obsolete).exists():
+                    raise ValueError("Obsolete LuCI page remains in package")
         for installed, source in expected.items():
             if (root / installed).read_bytes() != (HERE / source).read_bytes():
                 raise ValueError("Package payload differs from its source: " + installed)
@@ -121,6 +127,7 @@ def main():
     parser.add_argument("--target", required=True)
     parser.add_argument("--binary", type=Path, required=True)
     parser.add_argument("--btf-probe", type=Path, required=True)
+    parser.add_argument("--luci-proxy", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--work", type=Path, required=True, help="Dedicated SDK/cache directory")
     parser.add_argument("--output", type=Path, required=True)
@@ -135,6 +142,8 @@ def main():
     verify_elf(args.binary, target["cpu"])
     args.btf_probe = args.btf_probe.resolve(strict=True)
     verify_elf(args.btf_probe, target["cpu"])
+    args.luci_proxy = args.luci_proxy.resolve(strict=True)
+    verify_elf(args.luci_proxy, target["cpu"])
     args.work = args.work.resolve()
     args.output = args.output.resolve()
     args.work.mkdir(parents=True, exist_ok=True)
@@ -155,9 +164,11 @@ def main():
     installer = re.sub(r"^release=openwrt-v\d+\.\d+\.\d+$", "release=openwrt-v" + args.version, installer, flags=re.MULTILINE)
     (package / "install.sh").write_text(installer)
     for directory in ("files", "htdocs"):
+        if (package / directory).exists():
+            shutil.rmtree(package / directory)
         shutil.copytree(HERE / directory, package / directory, dirs_exist_ok=True)
     env = os.environ.copy()
-    env.update(DAED_BINARY=str(args.binary), DAED_BTF_PROBE=str(args.btf_probe), DAED_VERSION=args.version)
+    env.update(DAED_BINARY=str(args.binary), DAED_BTF_PROBE=str(args.btf_probe), DAED_LUCI_PROXY=str(args.luci_proxy), DAED_VERSION=args.version)
     # The SDK pins packages/LuCI, but its base feed follows a branch. Pin that
     # feed to the matching firmware release as well, using a shallow checkout.
     feeds = (sdk / "feeds.conf.default").read_text()

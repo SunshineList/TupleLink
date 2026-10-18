@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.1.3'
+        default: '0.2.0'
         required: true
 
 permissions:
@@ -57,6 +57,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm --dir apps/web build
+        env:
+          VITE_OPENWRT: '1'
       - run: pnpm --dir apps/web test
       - run: pnpm --dir apps/web check-types
       - uses: actions/upload-artifact@v7
@@ -103,10 +106,14 @@ jobs:
           mkdir -p .build/runtime
           make -C wing APPNAME=daed VERSION="$VERSION" WEB_DIST="$PWD/dist" OUTPUT="$PWD/.build/runtime/daed" bundle
           (cd wing && go build -trimpath -ldflags='-s -w' -o "$GITHUB_WORKSPACE/.build/runtime/btf-probe" "$GITHUB_WORKSPACE/openwrt/btf-probe.go")
+          (cd wing && go build -trimpath -ldflags='-s -w' -o "$GITHUB_WORKSPACE/.build/runtime/luci-proxy" "$GITHUB_WORKSPACE/openwrt/luci-proxy.go")
           python3 -c 'import sys; sys.path.insert(0,"openwrt"); from build import verify_elf; verify_elf(".build/runtime/daed", sys.argv[1])' '${{ matrix.cpu }}'
       - name: BTF parser tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
+      - name: LuCI gateway authentication and upgrade tests
+        if: matrix.cpu == 'x86_64'
+        run: cd wing && go test ../openwrt/luci-proxy.go ../openwrt/luci-proxy_test.go
       - name: amd64 startup smoke test (API only)
         if: matrix.cpu == 'x86_64'
         run: |
@@ -158,7 +165,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends build-essential gawk gettext libncurses-dev libssl-dev python3 rsync unzip zstd
-          python3 openwrt/build.py --target '${{ matrix.target }}' --binary .build/runtime/daed --btf-probe .build/runtime/btf-probe --version "$VERSION" --work /tmp/daed-sdk --output .build/packages
+          python3 openwrt/build.py --target '${{ matrix.target }}' --binary .build/runtime/daed --btf-probe .build/runtime/btf-probe --luci-proxy .build/runtime/luci-proxy --version "$VERSION" --work /tmp/daed-sdk --output .build/packages
       - name: Real APK architecture, preflight and uninstall tests
         if: matrix.target == 'apk-x86_64'
         run: |
@@ -166,7 +173,7 @@ jobs:
           echo 'e7f8ab84eef55c7eb23492de7b0517dbc23fbedaa4abbb680fe64720c309dc03  /tmp/daed-rootfs.tar.gz' | sha256sum -c -
           mkdir /tmp/daed-rootfs
           sudo tar -xzf /tmp/daed-rootfs.tar.gz -C /tmp/daed-rootfs
-          sudo env DAED_TEST_ROOTFS=/tmp/daed-rootfs DAED_TEST_APK=/tmp/daed-sdk/apk-x86_64/staging_dir/host/bin/apk python3 -m unittest discover -s tests/openwrt -p test_apk_uninstall.py -v
+          sudo env DAED_TEST_ROOTFS=/tmp/daed-rootfs DAED_TEST_APK=/tmp/daed-sdk/apk-x86_64/staging_dir/host/bin/apk DAED_TEST_LUCI_PROXY="$PWD/.build/runtime/luci-proxy" python3 -m unittest discover -s tests/openwrt -v
       - uses: actions/upload-artifact@v7
         with:
           name: openwrt-packages-${{ matrix.target }}

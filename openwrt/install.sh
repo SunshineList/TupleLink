@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.1.3
+release=openwrt-v0.2.0
 asset_dir=''
 mode=install
 action=install
@@ -166,6 +166,7 @@ uninstall_daed() {
 	rm -rf /etc/daed
 	rm -f /etc/config/daed /etc/config/daed.apk-new /etc/config/daed.opkg-dist /etc/init.d/daed /usr/bin/daed /usr/sbin/daed-router-setup
 	rm -f /usr/libexec/daed/check /usr/libexec/daed/btf-probe /usr/share/daed-router/version
+	rm -f /usr/libexec/daed/luci-proxy /www/cgi-bin/daed-router
 	for link in /etc/rc.d/[SK][0-9][0-9]daed; do [ ! -L "$link" ] || rm -f "$link"; done
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || :
 	printf 'Daed: Uninstalled. Configuration/database backup: %s. Existing BTF retained.\n' "${backup:-no existing data}"
@@ -297,7 +298,8 @@ else
 	opkg install "$stage/$runtime_file" "$stage/$plugin_file"
 fi
 if ! installed daed-router || ! installed luci-app-daed-router; then fail 'Native packages were not both installed.'; fi
-if [ ! -x /usr/bin/daed ] || [ ! -x /usr/libexec/daed/check ]; then fail 'Installed runtime is incomplete.'; fi
+if [ ! -x /usr/bin/daed ] || [ ! -x /usr/libexec/daed/check ] || \
+	[ ! -x /usr/libexec/daed/luci-proxy ] || [ ! -x /www/cgi-bin/daed-router ]; then fail 'Installed runtime or LuCI gateway is incomplete.'; fi
 if [ "$managed" = 0 ]; then
 	uci set daed.main.enabled=1
 	uci commit daed

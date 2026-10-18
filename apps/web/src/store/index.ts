@@ -3,6 +3,7 @@ import { persistentAtom, persistentMap } from '@nanostores/persistent'
 import { atom, map } from 'nanostores'
 
 import { COLS_PER_ROW, DEFAULT_ENDPOINT_URL, DEFAULT_THEME_ID } from '~/constants'
+import { routerEndpoint, routerMode } from '~/utils/router-mode'
 
 export type ColorScheme = 'light' | 'dark'
 export type ThemeMode = 'system' | 'light' | 'dark'
@@ -47,8 +48,11 @@ export type AppState = {
 } & PersistentSortableKeys
 
 export const modeAtom = persistentAtom<MODE>('mode')
-export const tokenAtom = persistentAtom<string>('token')
-export const endpointURLAtom = persistentAtom<string>('endpointURL', DEFAULT_ENDPOINT_URL)
+export const tokenAtom = routerMode ? atom('luci-session') : persistentAtom<string>('token')
+export const endpointURLAtom = routerMode
+  ? atom(routerEndpoint())
+  : persistentAtom<string>('endpointURL', DEFAULT_ENDPOINT_URL)
+export const routerSessionExpiredAtom = atom(false)
 export const appStateAtom = persistentMap<AppState>(
   'APP_STATE',
   {

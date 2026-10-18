@@ -84,6 +84,9 @@ esac''')
         self.write("/installer/install.sh", (OPENWRT / "install.sh").read_bytes(), True)
         self.script("/fixtures/install", '''[ ! -e /tmp/pm-fail ] || exit 17
 mkdir -p /usr/libexec/daed /usr/share/daed-router /etc/daed
+mkdir -p /www/cgi-bin
+cp /fixtures/btf-probe /usr/libexec/daed/luci-proxy
+cp /fixtures/btf-probe /www/cgi-bin/daed-router
 cp /fixtures/check /usr/libexec/daed/check
 cp /fixtures/btf-probe /usr/libexec/daed/btf-probe
 cp /installer/install.sh /usr/sbin/daed-router-setup
@@ -246,11 +249,11 @@ esac''')
         self.assertNotIn("update", (self.root / "tmp/pm-calls").read_text())
         self.assertFalse(list((self.root / "tmp").glob("daed-install.*")))
 
-    def test_wildcard_management_bind_is_rejected(self):
+    def test_legacy_listen_settings_cannot_expose_management_port(self):
         self.managed(False)
         self.run_router("/sbin/uci", "set", "daed.main.listen_host=0.0.0.0")
         self.run_router("/sbin/uci", "commit", "daed")
-        self.assertNotEqual(self.check("--check").returncode, 0)
+        self.assertEqual(self.check("--listen").stdout.strip(), "127.0.0.1:2023")
 
     def test_installer_ipk_and_apk_paths(self):
         result = self.install()

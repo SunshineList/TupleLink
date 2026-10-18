@@ -7,7 +7,8 @@ import { createContext, use, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 
 import { isMockMode, MockGraphQLClient } from '~/mocks'
-import { endpointURLAtom, tokenAtom } from '~/store'
+import { endpointURLAtom, routerSessionExpiredAtom, tokenAtom } from '~/store'
+import { routerMode } from '~/utils/router-mode'
 
 // Define a common interface for GraphQL clients
 export interface GQLClientInterface {
@@ -71,17 +72,21 @@ export function QueryProvider({ children, colorScheme, themeMode, setThemeMode }
     }
 
     return new GraphQLClient(endpointURL, {
+      credentials: routerMode ? 'same-origin' : undefined,
       headers: {
         authorization: `Bearer ${token}`,
       },
       responseMiddleware: (response) => {
+        const status = (response as ClientError).response?.status
+        if (routerMode && (status === 401 || status === 403)) routerSessionExpiredAtom.set(true)
         const error = (response as ClientError).response?.errors?.[0]
 
         if (error) {
           toast.error(error.message)
 
           if (error.message === 'access denied') {
-            tokenAtom.set('')
+            if (routerMode) routerSessionExpiredAtom.set(true)
+            else tokenAtom.set('')
           }
         }
       },

@@ -9,9 +9,13 @@ const htdocs = path.join(__dirname, '../../openwrt/htdocs');
 function load(name, protocol = 'http:') {
   const polls = [];
   const calls = [];
+  const fetchCalls = [];
+  let authorized = true;
   let result = { running: true, listen: '192.168.8.1:9080', checks: [] };
   const context = vm.createContext({
     window: { location: { protocol } },
+    L: { env: { sessionid: '1234567890abcdef1234567890abcdef' } },
+    fetch: async (url, options) => { fetchCalls.push([url, options]); return {ok: authorized}; },
     view: { extend: value => value },
     rpc: { declare: spec => async (...args) => { calls.push([spec.method, ...args]); return result; } },
     poll: { add: fn => polls.push(fn) },
@@ -21,7 +25,7 @@ function load(name, protocol = 'http:') {
   });
   vm.runInContext("String.prototype.format = function(...args) { let i=0; return this.replace(/%s/g, () => args[i++]); };", context);
   const view = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, name + '.js'), 'utf8') + '\n})()', context);
-  return { view, polls, calls, setResult: value => { result = value; } };
+  return { view, polls, calls, fetchCalls, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; } };
 }
 
 function elements(node, tag) {
@@ -33,41 +37,45 @@ test('all LuCI modules parse in the actual function-wrapper convention', () => {
   for (const file of fs.readdirSync(htdocs)) new Function(fs.readFileSync(path.join(htdocs, file), 'utf8'));
 });
 
-test('HTTP dashboard uses the actual LAN address and custom port', () => {
-  const { view } = load('dashboard');
-  const tree = view.render({ running: true, listen: '192.168.8.1:9080' });
-  assert.equal(elements(tree, 'iframe')[0].attrs.src, 'http://192.168.8.1:9080/');
-  assert.equal(elements(tree, 'a')[0].attrs.rel, 'noopener noreferrer');
+test('Daed menu only has dashboard and logs, defaulting to dashboard', () => {
+  const menu = JSON.parse(fs.readFileSync(path.join(__dirname, '../../openwrt/files/menu.json')));
+  assert.deepEqual(Object.keys(menu).sort(), ['admin/services/daed', 'admin/services/daed/dashboard', 'admin/services/daed/logs']);
+  assert.ok(menu['admin/services/daed/dashboard'].order < menu['admin/services/daed/logs'].order);
 });
 
-test('HTTPS LuCI never embeds mixed-content HTTP', () => {
-  const { view } = load('dashboard', 'https:');
-  const tree = view.render({ running: true, listen: '192.168.8.1:2023' });
-  assert.equal(elements(tree, 'iframe').length, 0);
-  assert.equal(elements(tree, 'a').length, 1);
-});
-
-test('stopped, loopback and malformed endpoints do not create an iframe or unsafe link', () => {
-  const { view } = load('dashboard');
-  for (const data of [
-    { running: false, listen: '192.168.8.1:2023' },
-    { running: true, listen: '127.0.0.1:2023' },
-    { running: true, listen: 'javascript:alert(1)' },
-  ]) {
-    assert.equal(elements(view.render(data), 'iframe').length, 0);
-    assert.equal(elements(view.render(data), 'a').length, 0);
+test('HTTP and HTTPS dashboards embed the authenticated same-origin gateway', () => {
+  for (const protocol of ['http:', 'https:']) {
+    const { view } = load('dashboard', protocol);
+    const tree = view.render({ running: true, authorized: true });
+    assert.equal(elements(tree, 'iframe')[0].attrs.src, '/cgi-bin/daed-router/');
+    assert.equal(elements(tree, 'a').length, 0);
+    assert.equal(elements(tree, 'h2').length, 0);
   }
 });
 
-test('overview renders capability results and invokes only a fixed service action', async () => {
-  const module = load('overview');
-  const tree = module.view.render();
-  module.setResult({ firmware: 'iStoreOS', release: 'test', architecture: 'aarch64', kernel: '6.6', version: '0.1.0', running: false, checks: [{ name: 'btf', status: 'error', message: 'missing' }] });
-  await module.polls[0]();
-  assert.ok(elements(tree, 'td').some(node => node.children === '不满足'));
-  module.setResult({ success: true, checks: [] });
-  await elements(tree, 'button')[1].attrs.click();
-  assert.ok(module.calls.some(call => call[0] === 'action' && call[1] === 'stop'));
+test('stopped services and expired sessions never embed a bypass URL', () => {
+  const { view } = load('dashboard');
+  for (const data of [{ running: false }, { running: true, authorized: false }]) {
+    assert.equal(elements(view.render(data), 'iframe').length, 0);
+  }
+});
+
+test('dashboard authorizes using the LuCI session in a same-origin POST body', async () => {
+  const module = load('dashboard');
+  const data = await module.view.load();
+  assert.equal(data.authorized, true);
+  const [url, options] = module.fetchCalls[0];
+  assert.equal(url, '/cgi-bin/daed-router/session');
+  assert.equal(options.credentials, 'same-origin');
+  assert.equal(options.method, 'POST');
+  assert.equal(JSON.parse(options.body).session, '1234567890abcdef1234567890abcdef');
+});
+
+test('rejected bootstrap cannot render the management iframe', async () => {
+  const module = load('dashboard');
+  module.setAuthorized(false);
+  const data = await module.view.load();
+  assert.equal(elements(module.view.render(data), 'iframe').length, 0);
 });
 
 test('logs are rendered as text instead of executable HTML', async () => {

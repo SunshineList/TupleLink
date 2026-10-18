@@ -25,14 +25,6 @@ return view.extend({
           output.textContent = '日志读取失败：' + error.message
         })
     }, 5)
-    return E('div', {}, [
-      E('h2', {}, 'Daed 运行日志'),
-      E(
-        'p',
-        {},
-        '显示最近 120 行（最多读取 32 KB），日志保存在内存目录并限制大小。链接和常见凭据字段已遮盖，分享前仍请检查内容。',
-      ),
-      output,
-    ])
+    return E('div', {}, [E('h2', {}, 'Daed 运行日志'), output])
   },
 })
