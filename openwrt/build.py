@@ -111,7 +111,14 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             executables = ["usr/libexec/rpcd/daed-router"]
             expected["www/cgi-bin/daed-router"] = "files/luci-cgi"
             executables.append("www/cgi-bin/daed-router")
-            for obsolete in ("overview.js", "settings.js"):
+            menu = json.loads((root / "usr/share/luci/menu.d/luci-app-daed-router.json").read_text())
+            for entry in menu.values():
+                action = entry.get("action", {})
+                if action.get("type") == "view":
+                    module = root / "www/luci-static/resources/view" / (action["path"] + ".js")
+                    if not module.is_file():
+                        raise ValueError("LuCI menu references a missing view: " + action["path"])
+            for obsolete in ("overview.js", "settings.js", "dashboard.js"):
                 if (root / "www/luci-static/resources/view/daed-router" / obsolete).exists():
                     raise ValueError("Obsolete LuCI page remains in package")
         for installed, source in expected.items():

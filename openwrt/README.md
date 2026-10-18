@@ -1,7 +1,7 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.2.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.2.0)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.2.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.2.1)。
 
 ## 使用
 
@@ -19,16 +19,20 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 
 ## 安装和保留数据升级
 
-以 root 在路由器 SSH 中执行，已有本项目 0.1.x 安装时使用同一条命令升级：
+以 root 在路由器 SSH 中执行，已有本项目 0.1.x / 0.2.0 安装时使用同一条命令升级：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.2.0/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.2.1/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
 `/root/daed-backups`，然后更新程序；保留既有节点、规则、账户数据和自启选择。
 新入口复用原用户的面板存储；没有用户时自动准备本地服务身份。
 不需要删除旧版或重新建立账户。失败时提示备份位置，不自动回滚。
+
+0.2.1 修复升级后仍加载旧页面、只显示“服务仅监听本机”提示的问题：新版面板
+使用独立的 LuCI 模块地址，安装时清理传统和 ucode 菜单缓存。升级后刷新后台，
+再进入 **服务 → Daed**；仍显示旧内容时按 `Ctrl+F5`。无需把监听地址改为 LAN。
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
 软件源索引模拟依赖。预检失败不会停止或卸载现有 Daed。正式安装会先更新
@@ -81,12 +85,14 @@ CGI 网关通过 rpcd 校验当前 LuCI 会话对 `luci-app-daed-router` 的管�
 
 ```sh
 # 在已有工作区依赖构建后，生成路由器专用前端
-VITE_OPENWRT=1 pnpm --dir apps/web build
+pnpm --dir apps/web build:openwrt
+# 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
+CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.2.1 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
 # 从 wing/ 构建，复用已锁定的 Go 依赖
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../btf-probe ../openwrt/btf-probe.go)
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../luci-proxy ../openwrt/luci-proxy.go)
-python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.2.0 --work /path/to/sdk-cache --output /path/to/packages
-python3 openwrt/manifest.py /path/to/packages --version 0.2.0
+python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.2.1 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/manifest.py /path/to/packages --version 0.2.1
 node --test tests/openwrt/ui.test.cjs
 ```
 

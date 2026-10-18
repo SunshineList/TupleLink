@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.2.0)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.2.1)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -79,7 +79,7 @@ endef
 define Package/luci-app-daed-router/postinst
 #!/bin/sh
 if [ -z "$$IPKG_INSTROOT" ]; then
-	rm -f /tmp/luci-indexcache
+	rm -f /tmp/luci-indexcache /tmp/luci-indexcache.*.json
 	rm -rf /tmp/luci-modulecache
 	/etc/init.d/rpcd reload
 fi

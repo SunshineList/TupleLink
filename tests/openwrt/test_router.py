@@ -480,6 +480,19 @@ esac''')
         self.assertFalse((self.root / "usr/sbin/daed-router-setup").exists())
         self.assertFalse((self.root / "tmp/installed-daed-router").exists())
 
+    def test_luci_postinst_clears_legacy_and_ucode_caches(self):
+        recipe = (OPENWRT / "Makefile").read_text()
+        script = recipe.split("define Package/luci-app-daed-router/postinst\n", 1)[1].split("\nendef", 1)[0].replace("$$", "$")
+        self.write("/postinst", script)
+        for name in ("luci-indexcache", "luci-indexcache.1234abcd.json", "luci-modulecache/old-view"):
+            self.write("/tmp/" + name, "cached old page")
+        self.write("/tmp/unrelated.json", "keep")
+        result = self.run_router("/bin/sh", "/postinst")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(list((self.root / "tmp").glob("luci-indexcache*")))
+        self.assertFalse((self.root / "tmp/luci-modulecache").exists())
+        self.assertEqual((self.root / "tmp/unrelated.json").read_text(), "keep")
+
 
 if __name__ == "__main__":
     unittest.main()

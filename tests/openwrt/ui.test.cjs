@@ -5,13 +5,15 @@ const vm = require('node:vm');
 const { test } = require('node:test');
 
 const htdocs = path.join(__dirname, '../../openwrt/htdocs');
+const menu = JSON.parse(fs.readFileSync(path.join(__dirname, '../../openwrt/files/menu.json')));
+const panelModule = menu['admin/services/daed/dashboard'].action.path.split('/').pop();
 
 function load(name, protocol = 'http:') {
   const polls = [];
   const calls = [];
   const fetchCalls = [];
   let authorized = true;
-  let result = { running: true, listen: '192.168.8.1:9080', checks: [] };
+  let result = { running: true, listen: '127.0.0.1:2023', checks: [] };
   const context = vm.createContext({
     window: { location: { protocol } },
     L: { env: { sessionid: '1234567890abcdef1234567890abcdef' } },
@@ -38,14 +40,22 @@ test('all LuCI modules parse in the actual function-wrapper convention', () => {
 });
 
 test('Daed menu only has dashboard and logs, defaulting to dashboard', () => {
-  const menu = JSON.parse(fs.readFileSync(path.join(__dirname, '../../openwrt/files/menu.json')));
   assert.deepEqual(Object.keys(menu).sort(), ['admin/services/daed', 'admin/services/daed/dashboard', 'admin/services/daed/logs']);
   assert.ok(menu['admin/services/daed/dashboard'].order < menu['admin/services/daed/logs'].order);
 });
 
+test('upgraded menu bypasses the cached pre-gateway dashboard and resolves every view', () => {
+  assert.notEqual(menu['admin/services/daed/dashboard'].action.path, 'daed-router/dashboard');
+  for (const entry of Object.values(menu)) {
+    if (entry.action.type !== 'view') continue;
+    assert.equal(entry.action.path.split('/')[0], 'daed-router');
+    assert.ok(fs.existsSync(path.join(htdocs, entry.action.path.split('/')[1] + '.js')));
+  }
+});
+
 test('HTTP and HTTPS dashboards embed the authenticated same-origin gateway', () => {
   for (const protocol of ['http:', 'https:']) {
-    const { view } = load('dashboard', protocol);
+    const { view } = load(panelModule, protocol);
     const tree = view.render({ running: true, authorized: true });
     assert.equal(elements(tree, 'iframe')[0].attrs.src, '/cgi-bin/daed-router/');
     assert.equal(elements(tree, 'a').length, 0);
@@ -54,14 +64,14 @@ test('HTTP and HTTPS dashboards embed the authenticated same-origin gateway', ()
 });
 
 test('stopped services and expired sessions never embed a bypass URL', () => {
-  const { view } = load('dashboard');
+  const { view } = load(panelModule);
   for (const data of [{ running: false }, { running: true, authorized: false }]) {
     assert.equal(elements(view.render(data), 'iframe').length, 0);
   }
 });
 
 test('dashboard authorizes using the LuCI session in a same-origin POST body', async () => {
-  const module = load('dashboard');
+  const module = load(panelModule);
   const data = await module.view.load();
   assert.equal(data.authorized, true);
   const [url, options] = module.fetchCalls[0];
@@ -72,7 +82,7 @@ test('dashboard authorizes using the LuCI session in a same-origin POST body', a
 });
 
 test('rejected bootstrap cannot render the management iframe', async () => {
-  const module = load('dashboard');
+  const module = load(panelModule);
   module.setAuthorized(false);
   const data = await module.view.load();
   assert.equal(elements(module.view.render(data), 'iframe').length, 0);

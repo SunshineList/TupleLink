@@ -6,6 +6,7 @@
   "description": "A Web Dashboard For dae",
   "scripts": {
     "build": "vite build",
+    "build:openwrt": "vite build --mode openwrt --outDir dist-openwrt",
     "dev": "vite dev",
     "test": "vitest run",
     "check-types": "tsc --noEmit"

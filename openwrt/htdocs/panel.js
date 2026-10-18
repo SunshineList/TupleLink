@@ -3,6 +3,7 @@
 'require rpc'
 'require ui'
 
+// Keep a distinct module URL from the pre-gateway dashboard cached by LuCI.
 var status = rpc.declare({ object: 'daed-router', method: 'status', expect: {} })
 var action = rpc.declare({ object: 'daed-router', method: 'action', params: ['action'], expect: {} })
 var panel = '/cgi-bin/daed-router/'
