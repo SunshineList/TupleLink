@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.3.0)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.3.1)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -58,6 +58,7 @@ define Package/daed-router/install
 	$(INSTALL_CONF) ./files/daed.config $(1)/etc/config/daed
 	$(INSTALL_DIR) $(1)/usr/libexec/daed $(1)/usr/share/daed-router
 	$(INSTALL_BIN) ./files/daed-check $(1)/usr/libexec/daed/check
+	$(INSTALL_BIN) ./files/subscription-proxy $(1)/usr/libexec/daed/subscription-proxy
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/btf-probe $(1)/usr/libexec/daed/btf-probe
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/luci-proxy $(1)/usr/libexec/daed/luci-proxy
 	echo '$(PKG_VERSION)-$(PKG_RELEASE)' > $(1)/usr/share/daed-router/version

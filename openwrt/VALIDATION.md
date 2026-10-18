@@ -1,3 +1,46 @@
+# 0.3.1 验证记录
+
+日期：2026-10-18。工作分支：`codex/openwrt-plugin`。
+测试发行：[openwrt-v0.3.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.1)。
+精确源提交与固定子模块见随发行的 `SOURCE_COMMIT.txt`。
+
+## 订阅下载修复
+
+用户路由器只读诊断：同一条订阅，系统路径的 Daed / PassWall 请求头均得到
+403 / AUTH_FAIL，经已运行 PassWall 的本机 SOCKS 则得到 HTTP 200、Base64、
+72 条节点链接；另一条订阅在三种路径下均成功。这定位到可用下载出口差异，
+并不表明改 User-Agent 就能修复。
+
+新增自动回退，沿用原有系统路径和 dae 路由，失败后读取 PassWall 当前的回环
+SOCKS 地址重试。DNS 由 SOCKS 出口处理，HTTPS 保留证书验证。可选 `passwall`
+模式只用该出口，`off` 保留原路径。没有 PassWall 时不影响原本成功的下载。
+不修改数据库结构、订阅链接或其他代理服务配置，无新增 npm / Go 依赖。
+
+## 自动化与原生验证
+
+- 6 项后端测试（另含地址校验子用例）：真实本地 SOCKS5 协议与远程域名解析、
+  自动回退/原路径优先、强制代理失败不切换出口、动态读取端口、重定向 cookie、
+  请求头、环境代理不干扰、错误凭据遮盖、TLS 校验和 4 MiB 响应上限。
+  通过真实 SQLite 执行新增、手动更新和已注册的定时更新任务，失败时核对旧节点。
+- 56 项 Python 测试：隔离 OpenWrt rootfs 内运行真实 BusyBox/UCI/jsonfilter/
+  ucode/rpcd/APK。新增 5 项下载出口发现测试；ShellCheck 与 8 项 LuCI 脚本测试。
+- x86_64 / ARM64 静态程序；22 个原生 IPK/APK，检查每个包的架构、依赖、脚本、
+  权限和新下载助手文件。R4S APK 使用 `aarch64_generic`，不强制忽略内核 ABI。
+- 原生 LuCI / rpcd / uhttpd 浏览器回归：旧版数据升级、群组绑定、节点操作、
+  失败重试、响应式布局及 HTTP/HTTPS 会话。新增真实订阅导入弹窗验证：模拟
+  直连 AUTH_FAIL，经动态发现的 SOCKS 成功，出口故障时保留节点，恢复后可重试。
+  代理启停仍用故障注入，不在宿主环境加载 eBPF。
+
+源代码以固定子模块加 `openwrt/wing/` 增量保存，构建时先执行
+`python3 openwrt/prepare-wing.py wing`。工具校验原文件哈希，记录生成文件摘要，
+支持重复执行并拒绝覆盖未知修改；不依赖本地未发布的子模块提交。
+
+此版本仍是测试版。隔离测试没有访问用户真实订阅，也未远程修改用户路由器。
+R4S 上真实订阅的最终导入、真实 eBPF / LAN IPv4/IPv6 / DNS 流量、重启和长期
+稳定性仍需用户升级后实机验收。下面保留 0.3.0 改版回归基线。
+
+---
+
 # 0.3.0 验证记录
 
 日期：2026-10-18。工作分支：`codex/openwrt-plugin`。

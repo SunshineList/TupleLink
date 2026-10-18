@@ -18,6 +18,8 @@ import threading
 import time
 import urllib.request
 
+from socks_fixture import serve_socks
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -48,6 +50,7 @@ def main():
         "www/cgi-bin/daed-router": project / "openwrt/files/luci-cgi",
         "usr/libexec/rpcd/daed-router": project / "openwrt/files/rpcd-daed",
         "usr/libexec/daed/luci-proxy": args.proxy,
+        "usr/libexec/daed/subscription-proxy": project / "openwrt/files/subscription-proxy",
         "usr/share/rpcd/acl.d/luci-app-daed-router.json": project / "openwrt/files/acl.json",
         "usr/share/luci/menu.d/luci-app-daed-router.json": project / "openwrt/files/menu.json",
     }
@@ -74,10 +77,17 @@ def main():
     rpcd_config.write_text(rpcd_config.read_text().replace("option timeout 30", "option timeout 3600"))
     subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=localhost", "-keyout", str(root / "etc/smoke.key"), "-out", str(root / "etc/smoke.crt"), "-days", "1"], check=True, capture_output=True)
 
-    state = {"fail": False}
+    state = {"fail": False, "proxy_down": False, "proxy_requests": 0}
 
     class SubscriptionHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
+            if self.path.startswith("/requires-socks") and self.server.server_port == 18081:
+                body = b'{"code":"AUTH_FAIL","error":"private-fixture-token"}'
+                self.send_response(403)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if state["fail"] and self.path.startswith("/sub-a"):
                 self.send_error(503)
                 return
@@ -95,12 +105,24 @@ def main():
     feed = http.server.ThreadingHTTPServer(("127.0.0.1", 18081), SubscriptionHandler)
     feed_thread = threading.Thread(target=feed.serve_forever, daemon=True)
     feed_thread.start()
+    proxy_feed = http.server.ThreadingHTTPServer(("127.0.0.1", 18082), SubscriptionHandler)
+    threading.Thread(target=proxy_feed.serve_forever, daemon=True).start()
+    socks = serve_socks(18082, state)
+    (root / "tmp/passwall-socks").write_text("127.0.0.1:" + str(socks.server_address[1]))
+    lua = root / "bin/lua"
+    lua.unlink(missing_ok=True)
+    lua.write_text('#!/bin/sh\ncase "$2" in *GLOBAL_SOCKS_server*) cat /tmp/passwall-socks ;; *) echo 26.10.1 ;; esac\n')
+    lua.chmod(0o755)
+    helper = args.workspace / "discover-proxy"
+    helper.write_text('#!/bin/sh\nexec chroot "' + str(root) + '" /usr/libexec/daed/subscription-proxy\n')
+    helper.chmod(0o755)
     streams = [(args.workspace / name).open("w") for name in ("ubusd.log", "rpcd.log", "daemon.log", "uhttpd.log")]
     processes = []
     daemon = None
 
     def start_daemon(binary):
-        process = subprocess.Popen([str(binary), "run", "--api-only", "--config", str(root / "etc/daed"), "--listen", "127.0.0.1:12025"], stdout=streams[2], stderr=subprocess.STDOUT)
+        env = dict(os.environ, DAED_SUBSCRIPTION_PROXY_HELPER=str(helper))
+        process = subprocess.Popen([str(binary), "run", "--api-only", "--config", str(root / "etc/daed"), "--listen", "127.0.0.1:12025"], env=env, stdout=streams[2], stderr=subprocess.STDOUT)
         for _ in range(100):
             try:
                 with urllib.request.urlopen("http://127.0.0.1:12025/", timeout=1) as response:
@@ -158,6 +180,10 @@ def main():
                     answer["changed_tables"] = sorted(name for name in set(baseline) | set(after) if baseline.get(name) != after.get(name))
                 elif action == "subscription_fail":
                     state["fail"] = request["enabled"]
+                elif action == "proxy_state":
+                    if "down" in request:
+                        state["proxy_down"] = request["down"]
+                    answer["requests"] = state["proxy_requests"]
                 result.write_text(json.dumps(answer))
             time.sleep(0.1)
     finally:
@@ -171,6 +197,10 @@ def main():
         feed.shutdown()
         feed_thread.join()
         feed.server_close()
+        socks.shutdown()
+        socks.server_close()
+        proxy_feed.shutdown()
+        proxy_feed.server_close()
         for stream in streams:
             stream.close()
 

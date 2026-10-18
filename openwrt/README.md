@@ -1,7 +1,7 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.3.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.0)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.3.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.1)。
 
 ## 使用
 
@@ -22,7 +22,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目 0.1.x / 0.2.x 安装时使用同一条命令升级：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.3.0/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.3.1/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
@@ -59,6 +59,31 @@ sh /tmp/daed-install.sh --reinstall
 单独卸载不依赖 BTF、LuCI 或网络，支持 `--uninstall --dry-run` 和重复执行。
 APK 会保留已经安装的 BTF、相关内核模块及必要依赖，避免被自动当作孤立依赖移除。
 备份可能包含密钥，目录权限 0700、归档权限 0600。
+
+## 订阅通过本机 PassWall 出口下载
+
+0.3.1 默认使用自动模式：先尝试原来的系统路径与 dae 路由；失败后，读取已运行
+PassWall 的本机 SOCKS 出口再尝试下载。端口每次动态读取，不固定为 1070，
+仅接受回环地址。下载域名交给 SOCKS 出口解析，继续校验 HTTPS 证书。
+新增订阅、手动更新和定时更新使用相同逻辑，不修改订阅链接、节点或数据库结构。
+
+升级后无需额外设置；原配置缺少 `subscription_proxy` 时也按 `auto` 处理。
+对于“系统路径 AUTH_FAIL、PassWall SOCKS 成功”的订阅，添加/更新时保持
+PassWall 正常运行。它借用现有可用出口，无法使未获服务商授权的出口自动获得权限。
+没有 PassWall 时，原有可用下载路径仍正常使用；下载失败不会删除已有节点。
+
+可选的全局下载策略（立即对后续下载生效，无需重启）：
+
+```sh
+# auto：系统路径、dae 路由失败后尝试 PassWall（默认）
+# passwall：仅用 PassWall SOCKS，失败时不切换出口
+# off：只使用原有系统路径和 dae 路由
+uci set daed.main.subscription_proxy='auto'
+uci commit daed
+```
+
+不会启动、停止或修改 PassWall，也不会接管其他应用的下载。错误只报告状态和
+已知 `AUTH_FAIL` 代码，不输出订阅 URL、服务商响应正文或 cookie。
 
 ## 订阅下载诊断
 
@@ -100,7 +125,7 @@ CGI 网关通过 rpcd 校验当前 LuCI 会话对 `luci-app-daed-router` 的管�
 会话交接使用同源 POST，cookie 设置 HttpOnly / SameSite=Strict，并在 HTTPS 下
 设置 Secure。写请求检查 Origin；不在 URL、页面或浏览器存储中下发 Daed JWT。
 
-网关复用 wing 现有 SQLite 和 JWT 库生成短时本地授权，不修改 wing 子模块，
+网关复用 wing 现有 SQLite 和 JWT 库生成短时本地授权，保持 wing 子模块固定提交，
 不新增 npm 或 Go 依赖。私有服务凭据保存在 `/etc/daed/luci-session.json`，权限
 0600。首次启动前准备身份，之后 CGI 不直接读写数据库。
 只读 LuCI 账户可看日志，管理面板需要该 ACL 组的写权限。
@@ -110,15 +135,21 @@ CGI 网关通过 rpcd 校验当前 LuCI 会话对 `luci-app-daed-router` 的管�
 ```sh
 # 在已有工作区依赖构建后，生成路由器专用前端
 pnpm --dir apps/web build:openwrt
+# 应用主仓库中可审查的订阅下载补丁；子模块提交不变
+python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.3.0 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
+CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.3.1 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
 # 从 wing/ 构建，复用已锁定的 Go 依赖
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../btf-probe ../openwrt/btf-probe.go)
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../luci-proxy ../openwrt/luci-proxy.go)
-python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.3.0 --work /path/to/sdk-cache --output /path/to/packages
-python3 openwrt/manifest.py /path/to/packages --version 0.3.0
+python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.3.1 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/manifest.py /path/to/packages --version 0.3.1
 node --test tests/openwrt/ui.test.cjs
 ```
+
+订阅下载增量源码位于 `openwrt/wing/`，准备工具核对固定上游源文件哈希，
+拒绝覆盖未知修改，并支持重复执行。源码归档同时包含这些文件与原始子模块；
+构建前执行上述准备命令即可复现，不依赖未推送的子模块提交。
 
 其余 SDK 目标：`ipk-arm64`、`apk-x86_64`、`apk-arm64`。SDK URL、哈希和
 feed 提交固定在 `sdk-matrix.json`，原生打包后逐一验证文件、架构和权限。

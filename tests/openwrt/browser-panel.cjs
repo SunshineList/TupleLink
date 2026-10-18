@@ -70,7 +70,7 @@ async function login(page, url = base) {
     assert.deepEqual(after, before);
     const preferences = await frame.locator('body').evaluate(() => ({ order: localStorage.getItem('APP_STATEnodeSortableKeys'), cols: localStorage.getItem('APP_STATEcolsPerRow') }));
     assert.deepEqual(preferences, oldPreferences);
-    console.log('PASS: native 0.2.1 database upgrade retains all user-data table hashes, API resources, bindings, regex and UI preferences');
+    console.log('PASS: native previous-release database upgrade retains all user-data table hashes, API resources, bindings, regex and UI preferences');
 
     const sections = frame.locator('#panel-common [data-testid=section]');
     await sections.nth(2).getByRole('heading', { name: '订阅', exact: true }).waitFor();
@@ -132,6 +132,28 @@ async function login(page, url = base) {
     await subscriptions.getByRole('button', { name: '重试', exact: true }).click();
     await subscriptions.getByRole('button', { name: '更新订阅', exact: true }).waitFor();
     console.log('PASS: real failed subscription fetch retains nodes; retry succeeds');
+
+    const proxyBefore = (await control('proxy_state')).requests;
+    await subscriptions.getByRole('button', { name: /(?:导入|添加)\s*订阅/ }).click();
+    await dialog.getByRole('textbox', { name: /链接/ }).fill('http://127.0.0.1:18081/requires-socks?private=fixture-only');
+    await dialog.getByRole('textbox', { name: /标签/ }).fill('SOCKS subscription');
+    await dialog.getByRole('button', { name: '提交', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    const proxySubs = (await gql('query {subscriptions{id tag nodes{edges{id name}}}}')).subscriptions;
+    const proxied = proxySubs.find(item => item.tag === 'SOCKS subscription');
+    assert.equal(proxied?.nodes.edges.length, 2);
+    assert.ok((await control('proxy_state')).requests > proxyBefore);
+    await gql('mutation ProxyUpdate($id:ID!){updateSubscription(id:$id){id}}', { id: proxied.id });
+    await control('proxy_state', { down: true });
+    const failedUpdate = await context.request.post(base + '/cgi-bin/daed-router/graphql', { headers: { Origin: base }, data: { query: 'mutation ProxyUpdate($id:ID!){updateSubscription(id:$id){id}}', variables: { id: proxied.id } } });
+    const failureBody = await failedUpdate.json();
+    assert.ok(failureBody.errors?.length);
+    assert.ok(!JSON.stringify(failureBody.errors).includes('private=fixture-only'));
+    const retained = (await gql('query {subscriptions{id nodes{edges{id name}}}}')).subscriptions.find(item => item.id === proxied.id);
+    assert.deepEqual(retained.nodes.edges.map(item => item.name), proxied.nodes.edges.map(item => item.name));
+    await control('proxy_state', { down: false });
+    await gql('mutation ProxyRetry($id:ID!){updateSubscription(id:$id){id}}', { id: proxied.id });
+    console.log('PASS: native LuCI subscription dialog imports through discovered SOCKS after AUTH_FAIL; manual update, failed-exit preservation and retry use the real backend');
 
     await nodes.getByRole('button', { name: '导入节点', exact: true }).click();
     await dialog.getByRole('textbox', { name: /链接/ }).fill('not-a-node-link');

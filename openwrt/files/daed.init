@@ -21,6 +21,7 @@ start_service() {
 	procd_open_instance main
 	procd_set_param command /usr/bin/daed run --config /etc/daed --listen "$listen" \
 		--logfile /var/log/daed/daed.log --logfile-maxsize 1 --logfile-maxbackups 1
+	procd_set_param env DAED_SUBSCRIPTION_PROXY_HELPER=/usr/libexec/daed/subscription-proxy
 	# Give dae time to detach its own eBPF programs on SIGTERM.
 	procd_set_param term_timeout 30
 	procd_set_param respawn 3600 5 5

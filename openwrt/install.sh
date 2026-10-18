@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.3.0
+release=openwrt-v0.3.1
 asset_dir=''
 mode=install
 action=install

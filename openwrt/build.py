@@ -97,9 +97,11 @@ def verify_package(path, architecture, package, cpu, sdk, version):
         if package == "daed-router":
             verify_elf(root / "usr/bin/daed", cpu)
             expected = {"etc/init.d/daed": "files/daed.init", "usr/libexec/daed/check": "files/daed-check", "lib/upgrade/keep.d/daed-router": "files/keep-daed"}
+            expected["usr/libexec/daed/subscription-proxy"] = "files/subscription-proxy"
             verify_elf(root / "usr/libexec/daed/btf-probe", cpu)
             verify_elf(root / "usr/libexec/daed/luci-proxy", cpu)
             executables = ["usr/bin/daed", "etc/init.d/daed", "usr/libexec/daed/check", "usr/libexec/daed/btf-probe", "usr/libexec/daed/luci-proxy"]
+            executables.append("usr/libexec/daed/subscription-proxy")
             installer = (HERE / "install.sh").read_text()
             installer = re.sub(r"^release=openwrt-v\d+\.\d+\.\d+$", "release=openwrt-v" + version, installer, flags=re.MULTILINE)
             if (root / "usr/sbin/daed-router-setup").read_text() != installer:
