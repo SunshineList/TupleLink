@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.3.1)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.3.2)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -61,6 +61,10 @@ define Package/daed-router/install
 	$(INSTALL_BIN) ./files/subscription-proxy $(1)/usr/libexec/daed/subscription-proxy
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/btf-probe $(1)/usr/libexec/daed/btf-probe
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/luci-proxy $(1)/usr/libexec/daed/luci-proxy
+	# dae resolves assets under its application name; OpenWrt owns them in v2ray.
+	$(INSTALL_DIR) $(1)/usr/share/daed
+	$(LN) ../v2ray/geosite.dat $(1)/usr/share/daed/geosite.dat
+	$(LN) ../v2ray/geoip.dat $(1)/usr/share/daed/geoip.dat
 	echo '$(PKG_VERSION)-$(PKG_RELEASE)' > $(1)/usr/share/daed-router/version
 	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
 	$(INSTALL_DATA) ./files/keep-daed $(1)/lib/upgrade/keep.d/daed-router

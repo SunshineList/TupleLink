@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.3.1'
+        default: '0.3.2'
         required: true
 
 permissions:
@@ -116,6 +116,9 @@ jobs:
       - name: LuCI gateway authentication and upgrade tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/luci-proxy.go ../openwrt/luci-proxy_test.go
+      - name: Build test-only geodata finder and routing parser
+        if: matrix.cpu == 'x86_64'
+        run: cd wing && go build -trimpath -o "$GITHUB_WORKSPACE/.build/runtime/geodata-probe" "$GITHUB_WORKSPACE/tests/openwrt/geodata-probe.go"
       - name: amd64 startup smoke test (API only)
         if: matrix.cpu == 'x86_64'
         run: |
@@ -175,7 +178,7 @@ jobs:
           echo 'e7f8ab84eef55c7eb23492de7b0517dbc23fbedaa4abbb680fe64720c309dc03  /tmp/daed-rootfs.tar.gz' | sha256sum -c -
           mkdir /tmp/daed-rootfs
           sudo tar -xzf /tmp/daed-rootfs.tar.gz -C /tmp/daed-rootfs
-          sudo env DAED_TEST_ROOTFS=/tmp/daed-rootfs DAED_TEST_APK=/tmp/daed-sdk/apk-x86_64/staging_dir/host/bin/apk DAED_TEST_LUCI_PROXY="$PWD/.build/runtime/luci-proxy" python3 -m unittest discover -s tests/openwrt -v
+          sudo env DAED_TEST_ROOTFS=/tmp/daed-rootfs DAED_TEST_APK=/tmp/daed-sdk/apk-x86_64/staging_dir/host/bin/apk DAED_TEST_LUCI_PROXY="$PWD/.build/runtime/luci-proxy" DAED_TEST_GEODATA_PROBE="$PWD/.build/runtime/geodata-probe" python3 -m unittest discover -s tests/openwrt -v
       - uses: actions/upload-artifact@v7
         with:
           name: openwrt-packages-${{ matrix.target }}

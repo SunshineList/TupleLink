@@ -77,12 +77,16 @@ def verify_package(path, architecture, package, cpu, sdk, version):
                 data_name = next(name for name in outer.getnames() if name.endswith("data.tar.gz"))
                 with tarfile.open(fileobj=io.BytesIO(outer.extractfile(data_name).read())) as data:
                     for member in data.getmembers():
-                        if not member.isfile():
+                        if not member.isfile() and not member.issym():
                             continue
                         relative = member.name.removeprefix("./")
                         destination = (root / relative).resolve()
                         destination.relative_to(root)
                         destination.parent.mkdir(parents=True, exist_ok=True)
+                        if member.issym():
+                            (destination.parent / member.linkname).resolve().relative_to(root)
+                            destination.symlink_to(member.linkname)
+                            continue
                         destination.write_bytes(data.extractfile(member).read())
                         destination.chmod(member.mode)
         else:
@@ -95,6 +99,10 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             subprocess.run([str(apk), "verify", "--allow-untrusted", str(path)], check=True, stdout=subprocess.DEVNULL)
             subprocess.run([str(apk), "extract", "--allow-untrusted", "--no-chown", "--destination", str(root), str(path)], check=True, stdout=subprocess.DEVNULL)
         if package == "daed-router":
+            for name in ("geosite.dat", "geoip.dat"):
+                link = root / "usr/share/daed" / name
+                if not link.is_symlink() or link.readlink().as_posix() != "../v2ray/" + name:
+                    raise ValueError("Missing or incorrect packaged geodata link: " + name)
             verify_elf(root / "usr/bin/daed", cpu)
             expected = {"etc/init.d/daed": "files/daed.init", "usr/libexec/daed/check": "files/daed-check", "lib/upgrade/keep.d/daed-router": "files/keep-daed"}
             expected["usr/libexec/daed/subscription-proxy"] = "files/subscription-proxy"

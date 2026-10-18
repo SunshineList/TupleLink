@@ -1,7 +1,7 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.3.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.1)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.3.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.2)。
 
 ## 使用
 
@@ -22,7 +22,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目 0.1.x / 0.2.x 安装时使用同一条命令升级：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.3.1/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.3.2/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
@@ -59,6 +59,22 @@ sh /tmp/daed-install.sh --reinstall
 单独卸载不依赖 BTF、LuCI 或网络，支持 `--uninstall --dry-run` 和重复执行。
 APK 会保留已经安装的 BTF、相关内核模块及必要依赖，避免被自动当作孤立依赖移除。
 备份可能包含密钥，目录权限 0700、归档权限 0600。
+
+## 规则库路径修复
+
+0.3.2 修复点击启动代理时找不到 `geosite.dat` / `geoip.dat` 的问题。固件提供的
+`v2ray-geosite`、`v2ray-geoip` 将文件装在 `/usr/share/v2ray/`，而 Daed 默认
+搜索 `/usr/share/daed/`。运行包现在管理两条相对符号链接：
+
+- `/usr/share/daed/geosite.dat` → `../v2ray/geosite.dat`
+- `/usr/share/daed/geoip.dat` → `../v2ray/geoip.dat`
+
+不复制规则库，不改动其他代理使用的文件。升级固件规则包时链接继续生效。
+已有 `/etc/daed/` 自定义规则保持更高优先级。安装器完成安装后检查规则文件
+可读性；只读预检在规则缺失时提示警告，允许首次安装补齐固件依赖。
+
+若规则依赖本身损坏或缺失，请通过当前固件的软件源修复 `v2ray-geosite` 和
+`v2ray-geoip`，不要用空文件代替。卸载运行包会移除这两条链接，保留共享规则库。
 
 ## 订阅通过本机 PassWall 出口下载
 
@@ -138,12 +154,12 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.3.1 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
+CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.3.2 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
 # 从 wing/ 构建，复用已锁定的 Go 依赖
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../btf-probe ../openwrt/btf-probe.go)
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../luci-proxy ../openwrt/luci-proxy.go)
-python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.3.1 --work /path/to/sdk-cache --output /path/to/packages
-python3 openwrt/manifest.py /path/to/packages --version 0.3.1
+python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.3.2 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/manifest.py /path/to/packages --version 0.3.2
 node --test tests/openwrt/ui.test.cjs
 ```
 

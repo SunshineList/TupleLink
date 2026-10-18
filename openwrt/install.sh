@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.3.1
+release=openwrt-v0.3.2
 asset_dir=''
 mode=install
 action=install
@@ -300,6 +300,11 @@ fi
 if ! installed daed-router || ! installed luci-app-daed-router; then fail 'Native packages were not both installed.'; fi
 if [ ! -x /usr/bin/daed ] || [ ! -x /usr/libexec/daed/check ] || \
 	[ ! -x /usr/libexec/daed/luci-proxy ] || [ ! -x /www/cgi-bin/daed-router ]; then fail 'Installed runtime or LuCI gateway is incomplete.'; fi
+for asset in geosite.dat geoip.dat; do
+	if [ ! -s "/etc/daed/$asset" ] && [ ! -s "/usr/local/share/daed/$asset" ] && [ ! -s "/usr/share/daed/$asset" ]; then
+		fail "Installed rule data is unavailable: $asset. Repair the firmware's v2ray-geosite/v2ray-geoip packages and daed-router search-path links."
+	fi
+done
 if [ "$managed" = 0 ]; then
 	uci set daed.main.enabled=1
 	uci commit daed

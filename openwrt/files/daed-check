@@ -128,6 +128,22 @@ else
 fi
 
 services=$(ubus call service list 2>/dev/null) || services='{}'
+# Warnings do not block first install or configurations that do not use geodata.
+# The package provides /usr/share/daed links; /etc/daed custom data takes priority.
+for asset in geosite.dat geoip.dat; do
+	asset_path=''
+	for directory in /etc/daed /usr/local/share/daed /usr/share/daed; do
+		if [ -s "$directory/$asset" ]; then asset_path="$directory/$asset"; break; fi
+	done
+	if [ -n "$asset_path" ]; then
+		add_check "$asset" ok "Rule data is readable at $asset_path; rule parsing is verified when applying configuration."
+	elif [ -s "/usr/share/v2ray/$asset" ]; then
+		add_check "$asset" warning "OpenWrt rule data exists, but the Daed search-path link is missing. Upgrade or repair daed-router."
+	else
+		add_check "$asset" warning "Default rule data is missing. Install the firmware's v2ray-geosite/v2ray-geoip packages before using geodata rules."
+	fi
+done
+
 for other in dae passwall passwall2 openclash mihomo sing-box; do
 	active=$(printf '%s' "$services" | jsonfilter -e "@[\"$other\"].instances.*.running" 2>/dev/null) || active=''
 	case "$active" in

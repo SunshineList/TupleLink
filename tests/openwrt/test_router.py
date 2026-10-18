@@ -95,6 +95,16 @@ echo '#!/bin/sh' > /usr/bin/daed
 chmod +x /usr/bin/daed
 echo 0.1.0-1 > /usr/share/daed-router/version
 touch /tmp/installed-daed-router /tmp/installed-luci-app-daed-router''')
+        with open(self.root / "fixtures/install", "a") as stream:
+            stream.write('''
+if [ ! -e /tmp/no-geodata ]; then
+ mkdir -p /usr/share/daed /usr/share/v2ray
+ for asset in geosite.dat geoip.dat; do
+  echo 'package data fixture; parsing tested separately' > "/usr/share/v2ray/$asset"
+  ln -sf "../v2ray/$asset" "/usr/share/daed/$asset"
+ done
+fi
+''')
         self.script("/bin/opkg", '''echo "$*" >> /tmp/pm-calls
 case "$1" in
 print-architecture) echo 'arch all 1'; printf 'arch %s 10\\n' "$(cat /tmp/arch)" ;;

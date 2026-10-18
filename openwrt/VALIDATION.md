@@ -1,3 +1,40 @@
+# 0.3.2 验证记录
+
+日期：2026-10-18；分支：`codex/openwrt-plugin`。
+测试发行：[openwrt-v0.3.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.2)。
+源提交与固定子模块见 `SOURCE_COMMIT.txt`。
+
+## GeoSite / GeoIP 路径衔接
+
+用户点击启动代理时，后端报告在 `/etc/daed`、XDG 和 `/usr/share/daed` 找不到
+`geosite.dat`。固定 dae 源码的 `LocationFinder` 与固件 geodata 包安装定义确认：
+默认搜索目录按应用名取 `daed`，而规则文件实际装在 `/usr/share/v2ray`。
+
+运行包新增两条指向该目录的相对符号链接，保持 `/etc/daed` 自定义规则优先级；
+没有覆盖、复制或修改其他代理的规则库。安装器检查安装后的规则可读性，预检
+在缺失时给出警告，允许首次安装获取依赖。两种包格式均核对链接目标与包所有权。
+
+验证结果：
+
+- 用 dae 的真实 `LocationFinder`、protobuf 读取器和 `DatReaderOptimizer`，
+  在隔离 OpenWrt rootfs 中复现原报错，随后用最终 IPK 中的链接修复并解析。
+- 另下载 OpenWrt 25.12.5 / aarch64_generic 官方规则包，核验 APK 格式并解包，
+  得到相同的修复前失败；修复后展开 6,624 条域名规则和 15,365 条 IP 规则。
+  规则包版本：GeoSite 20261009101206-r1、GeoIP 202610050438-r1。
+- 61 项 Python 测试全部通过，新增 5 项检查：路径错误复现、规则展开、自定义
+  数据优先且不改写、依赖缺失预警、安装后缺规则不启动。原安装、备份、APK
+  架构、会话及订阅测试保留；ShellCheck、8 项 LuCI 脚本测试与工作区测试通过。
+- x86_64 / ARM64 程序与 22 个原生 IPK/APK；每包核对 GeoSite/GeoIP 相对链接，
+  并校验元数据、程序架构、权限和脚本。R4S 使用 `aarch64_generic` APK。
+- 最终 IPK 原生 LuCI / rpcd / uhttpd 升级回归保留数据及订阅 SOCKS 测试。
+
+测试探针 `tests/openwrt/geodata-probe.go` 仅用于验证，不随用户安装包交付。
+复现时在 wing 中编译，设置 `DAED_TEST_GEODATA_PROBE` 后运行 Python 测试。
+规则解析验证没有创建控制平面，也没有加载 eBPF 或改变宿主网络。
+R4S 上的真实 eBPF、DNS、LAN 流量及长期运行仍待升级后实机验收。
+
+---
+
 # 0.3.1 验证记录
 
 日期：2026-10-18。工作分支：`codex/openwrt-plugin`。
