@@ -1,14 +1,14 @@
 import type { NodeLatencyProbeResult } from '~/apis'
 import { Droppable } from '@hello-pangea/dnd'
-import { ChevronDown, Plus } from 'lucide-react'
 import { useStore } from '@nanostores/react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SortableResourceBadge } from '~/components/SortableResourceBadge'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
-import { formatLatencyLabel } from '~/utils/latency'
 import { groupSortOrdersAtom } from '~/store'
+import { formatLatencyLabel } from '~/utils/latency'
 
 interface GroupNode {
   id: string
@@ -126,7 +126,11 @@ function GroupDropZone({
                   </Button>
                 </div>
 
-                {children.length > 0 ? children : <p className="py-3 text-center text-xs text-muted-foreground">{emptyLabel}</p>}
+                {children.length > 0 ? (
+                  children
+                ) : (
+                  <p className="py-3 text-center text-xs text-muted-foreground">{emptyLabel}</p>
+                )}
                 {provided.placeholder}
               </>
             )}
@@ -222,7 +226,7 @@ export function SortableGroupContent({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={cn(collapsed ? 'grid grid-cols-2 gap-2' : 'flex flex-col gap-3')}>
       <GroupDropZone
         droppableId={`${groupId}-nodes`}
         type="NODE"
@@ -230,7 +234,10 @@ export function SortableGroupContent({
         count={nodes.length}
         collapsed={collapsed}
         open={effectiveExpandedSections.includes('node')}
-        onOpen={onExpand}
+        onOpen={() => {
+          onExpand()
+          setExpandedSections((current) => (current.includes('node') ? current : [...current, 'node']))
+        }}
         onToggle={() => toggleSection('node')}
         addButtonLabel={t('groupPicker.openNodePicker')}
         onAdd={onOpenAddNodes}
@@ -259,7 +266,10 @@ export function SortableGroupContent({
         count={subscriptions.length}
         collapsed={collapsed}
         open={effectiveExpandedSections.includes('subscription')}
-        onOpen={onExpand}
+        onOpen={() => {
+          onExpand()
+          setExpandedSections((current) => (current.includes('subscription') ? current : [...current, 'subscription']))
+        }}
         onToggle={() => toggleSection('subscription')}
         addButtonLabel={t('groupPicker.openSubscriptionPicker')}
         onAdd={onOpenAddSubscriptions}
@@ -282,7 +292,10 @@ export function SortableGroupContent({
               {nameFilterRegex && <span>{t('groupPicker.subscriptionRegexTooltip', { regex: nameFilterRegex })}</span>}
               {matchedNodes.length > 0 && (
                 <span className="opacity-80">
-                  {matchedNodes.slice(0, 5).map((node) => node.name).join(', ')}
+                  {matchedNodes
+                    .slice(0, 5)
+                    .map((node) => node.name)
+                    .join(', ')}
                   {matchedNodes.length > 5 && ` +${matchedNodes.length - 5}`}
                 </span>
               )}

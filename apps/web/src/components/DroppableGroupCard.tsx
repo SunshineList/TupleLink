@@ -79,11 +79,11 @@ export function DroppableGroupCard({
 
   return (
     <>
-      <Card withBorder shadow="sm" padding="sm">
+      <Card withBorder shadow="none" padding="sm" className="gap-3 rounded-xl">
         <div className="border-b pb-2">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
             {isEditing ? (
-              <div className="flex-1 flex items-center gap-2 mr-2">
+              <div className="flex w-full min-w-0 items-center gap-2">
                 <Input
                   ref={inputRef}
                   value={editValue}
@@ -93,7 +93,13 @@ export function DroppableGroupCard({
                   className="h-7 text-sm font-semibold"
                 />
                 <SimpleTooltip label={t('actions.confirm')}>
-                  <Button variant="ghost" size="xs" onClick={handleSaveEdit} className="shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleSaveEdit}
+                    className="shrink-0"
+                    aria-label={t('actions.confirm')}
+                  >
                     <Check className="h-4 w-4 text-primary" />
                   </Button>
                 </SimpleTooltip>
@@ -101,6 +107,7 @@ export function DroppableGroupCard({
                   <Button
                     variant="ghost"
                     size="xs"
+                    aria-label={t('actions.cancel')}
                     onClick={handleCancelEdit}
                     onMouseDown={(e) => e.preventDefault()}
                     className="shrink-0"
@@ -110,13 +117,14 @@ export function DroppableGroupCard({
                 </SimpleTooltip>
               </div>
             ) : (
-              <div className="min-w-0 flex-1">
-                <h5 className="truncate font-semibold">{name}</h5>
-                {summary && <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{summary}</div>}
+              <div className="min-w-0 w-full">
+                <h3 className="truncate text-sm font-semibold" title={name}>
+                  {name}
+                </h3>
               </div>
             )}
 
-            <div className="flex items-center gap-1">
+            <div className="flex w-full flex-wrap items-center justify-end gap-1">
               {!isEditing && dragHandleProps && (
                 <SimpleTooltip label={t('a11y.dragToReorder')}>
                   <div
@@ -132,7 +140,12 @@ export function DroppableGroupCard({
               )}
               {!isEditing && onRename && (
                 <SimpleTooltip label={t('actions.rename')}>
-                  <Button variant="ghost" size="xs" onClick={handleStartEdit}>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleStartEdit}
+                    aria-label={`${t('actions.rename')} ${name}`}
+                  >
                     <Type className="h-4 w-4" />
                   </Button>
                 </SimpleTooltip>
@@ -140,7 +153,13 @@ export function DroppableGroupCard({
               {actions}
               {!isEditing && onToggleCollapsed && (
                 <SimpleTooltip label={collapsed ? t('actions.expand') : t('collapse')}>
-                  <Button variant="ghost" size="xs" onClick={onToggleCollapsed}>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={onToggleCollapsed}
+                    aria-expanded={!collapsed}
+                    aria-label={`${t('panel.manageMembers')} ${name}`}
+                  >
                     <ChevronDown className={cn('h-4 w-4 transition-transform', collapsed && '-rotate-90')} />
                   </Button>
                 </SimpleTooltip>
@@ -153,6 +172,7 @@ export function DroppableGroupCard({
                     size="xs"
                     className="text-destructive hover:text-destructive"
                     onClick={() => setConfirmOpen(true)}
+                    aria-label={`${t('actions.remove')} ${name}`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -160,9 +180,20 @@ export function DroppableGroupCard({
               )}
             </div>
           </div>
+          {summary && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground [&>span]:whitespace-nowrap">
+              {summary}
+            </div>
+          )}
         </div>
 
-        {children && <div className="pt-2">{children}</div>}
+        {collapsed && onToggleCollapsed && (
+          <Button variant="ghost" size="sm" className="justify-start px-0 text-xs" onClick={onToggleCollapsed}>
+            {t('panel.manageMembers')}
+            <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {children && <div>{children}</div>}
       </Card>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

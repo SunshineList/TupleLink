@@ -88,7 +88,8 @@ export function generateV2rayLink(data: V2rayFormValues): string {
       host,
       headerType: type,
       sni,
-      flow,
+      // The form's "none" choice means no XTLS flow; dae rejects flow=none.
+      flow: flow === 'none' ? undefined : flow,
       allowInsecure,
     }
 

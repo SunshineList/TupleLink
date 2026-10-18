@@ -13,6 +13,12 @@ export function Section({
   onCreate,
   actions,
   highlight,
+  count,
+  createLabel,
+  primary,
+  loading,
+  error,
+  onRetry,
   children,
 }: {
   title: string
@@ -22,6 +28,12 @@ export function Section({
   onCreate: () => void
   actions?: React.ReactNode
   highlight?: boolean
+  count?: number
+  createLabel?: string
+  primary?: boolean
+  loading?: boolean
+  error?: boolean
+  onRetry?: () => void
   children: React.ReactNode
 }) {
   const { t } = useTranslation()
@@ -30,28 +42,55 @@ export function Section({
     <div
       data-testid="section"
       className={cn(
-        'flex flex-col gap-2',
-        bordered && 'border rounded-sm p-2 shadow-md transition-colors',
-        highlight && 'bg-primary/20',
+        'panel-section min-w-0 flex flex-col gap-4',
+        bordered && 'rounded-2xl border bg-card p-4 shadow-sm',
+        highlight && 'border-primary/60 bg-primary/5',
       )}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {icon}
-          <h4 className="text-lg font-semibold text-primary">{title}</h4>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span aria-hidden="true" className="text-muted-foreground">
+            {icon}
+          </span>
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          {count !== undefined && (
+            <span className="rounded bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">{count}</span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           {actions}
-          <SimpleTooltip label={t('actions.add')}>
-            <Button variant="ghost" size="icon" onClick={onCreate}>
-              {iconPlus || <Plus className="h-4 w-4" />}
+          <SimpleTooltip label={createLabel || `${t('actions.add')} ${title}`}>
+            <Button
+              variant={primary ? 'default' : 'outline'}
+              size="sm"
+              onClick={onCreate}
+              aria-label={createLabel || `${t('actions.add')} ${title}`}
+            >
+              <span aria-hidden="true">{iconPlus || <Plus className="h-4 w-4" />}</span>
+              {createLabel || t('actions.add')}
             </Button>
           </SimpleTooltip>
         </div>
       </div>
 
-      <div className="flex flex-col gap-2">{children}</div>
+      {error && (
+        <div role="status" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+          <p>{t('panel.loadFailed')}</p>
+          <Button variant="outline" size="sm" onClick={onRetry} className="mt-2">
+            {t('panel.retry')}
+          </Button>
+        </div>
+      )}
+      {loading ? (
+        <div role="status" aria-label={t('panel.loading')} className="space-y-3 motion-safe:animate-pulse">
+          {[1, 2, 3].map((key) => (
+            <div key={key} className="h-20 rounded-lg bg-muted" />
+          ))}
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-3">{children}</div>
+      )}
     </div>
   )
 }

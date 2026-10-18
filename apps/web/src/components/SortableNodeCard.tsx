@@ -24,7 +24,7 @@ export function SortableNodeCard({
   index: number
   name: React.ReactNode
   leftSection?: React.ReactNode
-  onRemove: () => void
+  onRemove?: () => void
   actions?: React.ReactNode
   children: React.ReactNode
 }) {
@@ -42,7 +42,7 @@ export function SortableNodeCard({
             className={cn(
               'group relative bg-card rounded-xl border',
               'transition-[shadow,border-color,opacity] duration-200',
-              'hover:shadow-md hover:border-primary/30',
+              'hover:border-primary/30',
               snapshot.isDragging && 'opacity-90 shadow-lg z-50',
             )}
           >
@@ -51,7 +51,10 @@ export function SortableNodeCard({
               className="absolute left-2 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing touch-none"
               {...provided.dragHandleProps}
             >
-              <GripVertical className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+              <GripVertical
+                aria-hidden="true"
+                className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors"
+              />
             </div>
 
             <div className="p-3 pl-8">
@@ -63,22 +66,27 @@ export function SortableNodeCard({
                       {leftSection}
                     </Badge>
                   )}
-                  <h4 className="font-semibold text-sm truncate">{name}</h4>
+                  <h3 className="font-semibold text-sm truncate" title={typeof name === 'string' ? name : undefined}>
+                    {name}
+                  </h3>
                 </div>
 
                 {/* Actions - always visible on mobile, hover on desktop */}
-                <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
+                <div className="flex shrink-0 items-center gap-1">
                   {actions}
-                  <SimpleTooltip label={t('actions.remove')}>
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => setConfirmOpen(true)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </SimpleTooltip>
+                  {onRemove && (
+                    <SimpleTooltip label={t('actions.remove')}>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setConfirmOpen(true)}
+                        aria-label={`${t('actions.remove')} ${name}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </SimpleTooltip>
+                  )}
                 </div>
               </div>
 
@@ -102,7 +110,7 @@ export function SortableNodeCard({
             <Button
               variant="destructive"
               onClick={() => {
-                onRemove()
+                onRemove?.()
                 setConfirmOpen(false)
               }}
             >

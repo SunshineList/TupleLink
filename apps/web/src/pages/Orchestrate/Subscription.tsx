@@ -1,3 +1,4 @@
+import type { NodeLatencyProbeResult } from '~/apis'
 import type { QRCodeModalRef } from '~/components/QRCodeModal'
 import type { SubscriptionsQuery } from '~/schemas/gql/graphql'
 import { Droppable } from '@hello-pangea/dnd'
@@ -7,7 +8,6 @@ import { Fragment, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
-  type NodeLatencyProbeResult,
   useImportSubscriptionsMutation,
   useRemoveSubscriptionsMutation,
   useSubscriptionsQuery,
@@ -20,6 +20,8 @@ import { DraggableResourceBadge } from '~/components/DraggableResourceBadge'
 import { EditSubscriptionFormModal } from '~/components/EditSubscriptionFormModal'
 import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
 import { QRCodeModal } from '~/components/QRCodeModal'
+import { ResourceEmpty } from '~/components/ResourceEmpty'
+import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Section } from '~/components/Section'
 import { SortableSubscriptionCard } from '~/components/SortableSubscriptionCard'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '~/components/ui/accordion'
@@ -44,6 +46,12 @@ export function SubscriptionResource({
   onTestAllNodeLatencies: () => Promise<void>
 }) {
   const { t } = useTranslation()
+  const [addingSubscription, setAddingSubscription] = useState<{
+    id: string
+    name: string
+    type: 'subscription'
+  } | null>(null)
+  const [limit, setLimit] = useState(30)
 
   const [openedQRCodeModal, { open: openQRCodeModal, close: closeQRCodeModal }] = useDisclosure(false)
   const [
@@ -62,7 +70,8 @@ export function SubscriptionResource({
     cronEnable: boolean
   }>()
   const qrCodeModalRef = useRef<QRCodeModalRef>(null)
-  const { refetch: refetchSubscriptions } = useSubscriptionsQuery()
+  const subscriptionsRequest = useSubscriptionsQuery()
+  const refetchSubscriptions = subscriptionsRequest.refetch
   const removeSubscriptionsMutation = useRemoveSubscriptionsMutation()
   const importSubscriptionsMutation = useImportSubscriptionsMutation()
   const updateSubscriptionsMutation = useUpdateSubscriptionsMutation()
@@ -74,6 +83,12 @@ export function SubscriptionResource({
   return (
     <Section
       title={t('subscription')}
+      count={sortedSubscriptions.length}
+      createLabel={t('panel.addSubscription')}
+      primary
+      loading={subscriptionsRequest.isPending}
+      error={subscriptionsRequest.isError}
+      onRetry={() => refetchSubscriptions()}
       icon={<CloudCog className="h-5 w-5" />}
       iconPlus={<CloudUpload className="h-4 w-4" />}
       onCreate={openImportSubscriptionFormModal}
@@ -100,13 +115,14 @@ export function SubscriptionResource({
                     toast.error(error instanceof Error ? error.message : t('latency.unavailable'))
                   })
                 }}
+                aria-label={t('latency.testAllNodes')}
                 loading={testingLatencies}
               >
                 <Gauge className="h-4 w-4" />
               </Button>
             </SimpleTooltip>
           )}
-          {sortedSubscriptions.length > 2 && (
+          {sortedSubscriptions.length > 0 && (
             <SimpleTooltip label={t('actions.updateAll')}>
               <Button
                 variant="ghost"
@@ -114,6 +130,7 @@ export function SubscriptionResource({
                 onClick={() => {
                   updateSubscriptionsMutation.mutate(sortedSubscriptions.map(({ id }) => id))
                 }}
+                aria-label={t('panel.updateAll')}
                 loading={updateSubscriptionsMutation.isPending}
               >
                 <Download className="h-4 w-4" />
@@ -130,8 +147,9 @@ export function SubscriptionResource({
             {...provided.droppableProps}
             className={cn('flex flex-col gap-3 min-h-[100px]', snapshot.isDraggingOver && 'bg-primary/5 rounded-lg')}
           >
-            {sortedSubscriptions.map(
-              ({ id: subscriptionID, tag, link, updatedAt, cronExp, cronEnable, nodes }, index) => (
+            {sortedSubscriptions
+              .slice(0, limit)
+              .map(({ id: subscriptionID, tag, link, updatedAt, cronExp, cronEnable, nodes, status }, index) => (
                 <SortableSubscriptionCard
                   key={subscriptionID}
                   id={`subscription-${subscriptionID}`}
@@ -145,6 +163,7 @@ export function SubscriptionResource({
                           variant="ghost"
                           size="xs"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                          aria-label={`${t('actions.edit')} ${tag || t('subscription')}`}
                           onClick={() => {
                             setEditingSubscription({
                               id: subscriptionID,
@@ -164,6 +183,7 @@ export function SubscriptionResource({
                           variant="ghost"
                           size="xs"
                           className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                          aria-label={`${t('actions.viewQRCode')} ${tag || t('subscription')}`}
                           onClick={() => {
                             qrCodeModalRef.current?.setProps({
                               name: tag!,
@@ -175,21 +195,41 @@ export function SubscriptionResource({
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
                       </SimpleTooltip>
-                      <UpdateSubscriptionAction id={subscriptionID} loading={updateSubscriptionsMutation.isPending} />
                     </Fragment>
                   }
                   onRemove={() => removeSubscriptionsMutation.mutate([subscriptionID])}
                 >
                   <div className="flex flex-wrap items-center gap-2 text-xs opacity-70">
-                    <span>{dayjs(updatedAt).format('YYYY-MM-DD HH:mm:ss')}</span>
+                    <span>
+                      {t('panel.lastUpdated')}：{dayjs(updatedAt).format('YYYY-MM-DD HH:mm:ss')}
+                    </span>
+                    {status === 'ok' && (
+                      <span className="text-emerald-700 dark:text-emerald-400">{t('panel.updateSuccess')}</span>
+                    )}
                     {cronEnable && (
                       <span className="inline-flex items-center gap-1 text-primary">
-                        <span>⏱</span>
+                        <span>{t('panel.autoUpdate')}</span>
                         <span>{cronExp}</span>
                       </span>
                     )}
                   </div>
 
+                  <div className="my-3 flex flex-wrap items-start justify-between gap-2">
+                    <UpdateSubscriptionAction id={subscriptionID} loading={updateSubscriptionsMutation.isPending} />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setAddingSubscription({
+                          id: subscriptionID,
+                          name: tag || t('subscription'),
+                          type: 'subscription',
+                        })
+                      }
+                    >
+                      {t('panel.addToGroup')}
+                    </Button>
+                  </div>
                   <Spoiler label={link} showLabel={t('actions.show sensitive')} hideLabel={t('actions.hide')} />
 
                   <Accordion type="single" collapsible className="w-full mt-2">
@@ -224,13 +264,31 @@ export function SubscriptionResource({
                     </AccordionItem>
                   </Accordion>
                 </SortableSubscriptionCard>
-              ),
+              ))}
+            {!subscriptionsRequest.isPending && !subscriptionsRequest.isError && !sortedSubscriptions.length && (
+              <ResourceEmpty
+                title={t('panel.noSubscriptions')}
+                description={t('panel.noSubscriptionsDescription')}
+                action={t('panel.addSubscription')}
+                onAction={openImportSubscriptionFormModal}
+              />
             )}
             {provided.placeholder}
           </div>
         )}
       </Droppable>
 
+      {sortedSubscriptions.length > limit && (
+        <Button variant="outline" onClick={() => setLimit((value) => value + 30)}>
+          {t('panel.showMore', { count: sortedSubscriptions.length - limit })}
+        </Button>
+      )}
+      {updateSubscriptionsMutation.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {t('panel.updateFailed')}
+        </p>
+      )}
+      <ResourceGroupPicker resource={addingSubscription} onClose={() => setAddingSubscription(null)} />
       <QRCodeModal ref={qrCodeModalRef} opened={openedQRCodeModal} onClose={closeQRCodeModal} />
 
       <ImportResourceFormModal

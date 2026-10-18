@@ -1,0 +1,1230 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Daed 管理面板 · 交互设计预览</title>
+    <style>
+      :root {
+        --bg: #f7f7f4;
+        --card: #fffefa;
+        --text: #272923;
+        --muted: #74766c;
+        --line: #e5e6de;
+        --accent: #a36c00;
+        --fill: #edb83e;
+        --soft: #fff5d9;
+        --green: #247455;
+        --green-bg: #ecf6ef;
+        --shadow: 0 2px 5px #252c2210;
+        --radius: 14px;
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'Microsoft YaHei',
+          sans-serif;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button,
+      a,
+      input,
+      select {
+        touch-action: manipulation;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.6;
+      }
+      button,
+      a,
+      input,
+      select,
+      summary {
+        outline-offset: 4px;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid var(--accent);
+      }
+      button {
+        border: 0;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 24px;
+        letter-spacing: -0.6px;
+      }
+      h2 {
+        font-size: 17px;
+      }
+      h3 {
+        font-size: 15px;
+      }
+      small {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      svg {
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .between {
+        justify-content: space-between;
+      }
+      .wrap {
+        flex-wrap: wrap;
+      }
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+      .min {
+        min-width: 0;
+      }
+      .number {
+        font-variant-numeric: tabular-nums;
+      }
+      .hidden,
+      [hidden] {
+        display: none !important;
+      }
+      .truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .skip {
+        position: fixed;
+        top: -100px;
+        left: 20px;
+        background: var(--card);
+        padding: 12px;
+        z-index: 30;
+      }
+      .skip:focus {
+        top: 8px;
+      }
+      .reviewbar {
+        background: #30362f;
+        color: #fafbf8;
+        padding: 9px 24px;
+        font-size: 12px;
+      }
+      .reviewbar > div {
+        max-width: 1376px;
+        margin: auto;
+      }
+      .reviewbar button {
+        background: #ffffff14;
+        color: inherit;
+        padding: 5px 10px;
+        border-radius: 6px;
+      }
+      .reviewbar .hint {
+        color: #cbd2c7;
+      }
+      .reviewbar .row {
+        gap: 12px;
+      }
+      .shell {
+        max-width: 1424px;
+        margin: auto;
+        padding: 0 24px 50px;
+      }
+      .breadcrumb {
+        color: var(--muted);
+        font-size: 12px;
+        padding: 22px 0 10px;
+      }
+      .breadcrumb span {
+        padding: 0 8px;
+        color: #b3b6ab;
+      }
+      .page-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding-bottom: 22px;
+      }
+      .page-head p {
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--green-bg);
+        border-radius: 20px;
+        padding: 5px 10px;
+      }
+      .status.off {
+        background: #eeeee9;
+        color: var(--muted);
+      }
+      .dot {
+        height: 6px;
+        width: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 36px;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--card);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 550;
+        white-space: nowrap;
+        transition:
+          background-color 0.15s,
+          transform 0.15s;
+      }
+      .btn:hover {
+        background: #eeeee7;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn.primary {
+        background: var(--fill);
+        border-color: var(--fill);
+        color: #3e2a04;
+      }
+      .btn.primary:hover {
+        background: #e2a92c;
+      }
+      .btn.subtle {
+        border-color: transparent;
+        background: transparent;
+        color: var(--accent);
+      }
+      .btn.subtle:hover {
+        background: var(--soft);
+      }
+      .btn.small {
+        min-height: 30px;
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      .tabs {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 24px;
+      }
+      .tabs a {
+        padding: 10px 0 12px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .tabs a.active {
+        font-weight: 600;
+        color: var(--accent);
+        box-shadow: inset 0 -2px var(--accent);
+      }
+      .tabs a:hover {
+        color: var(--text);
+      }
+      .section-intro {
+        margin-bottom: 14px;
+      }
+      .section-intro p {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: 1.08fr 1.16fr 0.96fr;
+        gap: 18px;
+        align-items: start;
+      }
+      .card {
+        border: 1px solid var(--line);
+        background: var(--card);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+      .card-head {
+        padding: 17px 17px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .title > svg {
+        color: var(--muted);
+      }
+      .count {
+        font-size: 11px;
+        color: var(--muted);
+        background: #f0f0e9;
+        padding: 0 6px;
+        border-radius: 5px;
+        line-height: 21px;
+      }
+      .card-body {
+        padding: 0 14px 14px;
+      }
+      .group {
+        padding: 15px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin-bottom: 10px;
+      }
+      .group.active {
+        border-color: #d6b65e;
+        background: #fffbef;
+      }
+      .group:last-child {
+        margin-bottom: 0;
+      }
+      .group .current {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin: 13px 0 12px;
+        padding: 10px 11px;
+        border: 1px solid #eadbb2;
+        border-radius: 8px;
+        background: var(--card);
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 5px;
+        background: #f0f1e9;
+        color: #6c6f62;
+      }
+      .tag.gold {
+        background: var(--soft);
+        color: var(--accent);
+      }
+      .latency {
+        font-size: 12px;
+        color: var(--green);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .latency.slow {
+        color: #a77623;
+      }
+      .group-foot {
+        padding-top: 11px;
+        border-top: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .group-foot .btn {
+        margin-left: auto;
+      }
+      .group-description {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .filter {
+        padding: 0 17px 12px;
+      }
+      .search {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 10px;
+        background: var(--bg);
+      }
+      .search svg {
+        width: 16px;
+        color: var(--muted);
+      }
+      .search input {
+        padding: 9px 0;
+        border: 0;
+        background: transparent;
+        color: var(--text);
+        width: 100%;
+        min-width: 0;
+        font-size: 12px;
+      }
+      .search input:focus {
+        outline: none;
+      }
+      .search:focus-within {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .list-tools {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      select {
+        font-size: 11px;
+        background: var(--card);
+        color: var(--muted);
+        border: 0;
+        padding: 3px;
+        max-width: 110px;
+      }
+      .node {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 4px;
+        border-bottom: 1px solid var(--line);
+      }
+      .node:last-child {
+        border-bottom: 0;
+      }
+      .node .name {
+        font-size: 13px;
+        font-weight: 550;
+      }
+      .node .details {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 3px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .node-icon {
+        height: 32px;
+        width: 32px;
+        display: grid;
+        place-items: center;
+        border-radius: 9px;
+        background: #f0f1e9;
+        color: #6d7666;
+        flex-shrink: 0;
+      }
+      .node > .latency {
+        margin-left: auto;
+      }
+      .node .btn {
+        padding: 4px 7px;
+        min-height: 30px;
+      }
+      .sub {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 10px;
+      }
+      .sub:last-child {
+        margin-bottom: 0;
+      }
+      .sub .meta {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .sub .update-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 13px;
+      }
+      .quota {
+        height: 4px;
+        background: #eeeee6;
+        border-radius: 3px;
+        margin: 12px 0 5px;
+        overflow: hidden;
+      }
+      .quota > span {
+        display: block;
+        height: 100%;
+        background: #c8ad6e;
+        width: 32%;
+      }
+      .sub-foot {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .sub-help {
+        padding: 4px 3px;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .empty {
+        padding: 28px 14px 32px;
+        text-align: center;
+        color: var(--muted);
+        min-height: 200px;
+        display: grid;
+        align-content: center;
+        justify-items: center;
+        gap: 9px;
+      }
+      .empty strong {
+        color: var(--text);
+        font-size: 13px;
+      }
+      .empty p {
+        font-size: 12px;
+        max-width: 235px;
+        margin-bottom: 5px;
+      }
+      .empty > svg {
+        width: 26px;
+        height: 26px;
+        color: #a9ad9e;
+        margin-bottom: 4px;
+      }
+      .empty .btn {
+        margin-top: 2px;
+      }
+      #advanced,
+      #monitor {
+        scroll-margin-top: 20px;
+        margin-top: 26px;
+      }
+      .settings-summary {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 17px 19px;
+        cursor: pointer;
+        list-style: none;
+      }
+      .settings-summary::-webkit-details-marker {
+        display: none;
+      }
+      .settings-summary .description {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 2px;
+      }
+      .settings-summary > .chevron {
+        margin-left: auto;
+        transition: transform 0.15s;
+      }
+      details[open] .chevron {
+        transform: rotate(180deg);
+      }
+      .settings {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        border-top: 1px solid var(--line);
+        padding: 18px;
+        gap: 14px;
+      }
+      .setting {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 14px;
+      }
+      .setting .selected {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 5px 0 12px;
+      }
+      .monitor-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .metric {
+        padding: 16px 18px;
+      }
+      .metric .value {
+        font-size: 24px;
+        font-weight: 600;
+        margin-top: 3px;
+        letter-spacing: -0.5px;
+      }
+      .metric .unit {
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--muted);
+        margin-left: 3px;
+      }
+      .trend {
+        padding: 18px;
+        margin-top: 12px;
+      }
+      .trend svg {
+        width: 100%;
+        height: 100px;
+        stroke: var(--accent);
+      }
+      .trend .axis {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .footer-note {
+        color: var(--muted);
+        font-size: 11px;
+        margin-top: 20px;
+        text-align: center;
+      }
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2c342a;
+        color: #fff;
+        padding: 11px 18px;
+        border-radius: 10px;
+        box-shadow: 0 5px 20px #0002;
+        max-width: calc(100% - 28px);
+        z-index: 50;
+        font-size: 13px;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      dialog {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 0;
+        background: var(--card);
+        color: var(--text);
+        max-width: 440px;
+        width: calc(100% - 32px);
+        box-shadow: 0 20px 80px #0002;
+      }
+      dialog::backdrop {
+        background: #17201555;
+      }
+      dialog header {
+        padding: 20px 22px 13px;
+      }
+      dialog form {
+        padding: 0 22px 22px;
+      }
+      dialog label {
+        display: block;
+        font-size: 12px;
+        font-weight: 550;
+        margin: 12px 0 6px;
+      }
+      dialog input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--text);
+      }
+      dialog .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 22px;
+      }
+      dialog .notice {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      @media (max-width: 1099px) {
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+        .card-head {
+          padding: 17px;
+        }
+        .workspace .card-body {
+          padding: 0 17px 17px;
+        }
+        .settings {
+          grid-template-columns: 1fr;
+        }
+        .group {
+          margin-bottom: 10px;
+        }
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .workspace .card {
+          max-width: 100%;
+        }
+        .empty {
+          min-height: 185px;
+        }
+        .group .current {
+          margin: 10px 0;
+        }
+        .page-head {
+          align-items: flex-start;
+        }
+      }
+      button[data-add]:disabled {
+        cursor: default;
+        opacity: 1;
+        color: var(--muted);
+        border-color: transparent;
+        background: transparent;
+      }
+      @media (max-width: 599px) {
+        .workspace .btn,
+        .controls .btn {
+          min-height: 44px;
+        }
+        .shell {
+          padding: 0 16px 30px;
+        }
+        .reviewbar {
+          padding: 8px 16px;
+        }
+        .reviewbar .hint {
+          display: none;
+        }
+        .reviewbar .row {
+          gap: 8px;
+        }
+        .reviewbar .row > strong {
+          font-size: 11px;
+        }
+        .breadcrumb {
+          padding-top: 15px;
+        }
+        .page-head {
+          display: block;
+          padding-bottom: 16px;
+        }
+        .page-head .controls {
+          margin-top: 15px;
+          justify-content: space-between;
+        }
+        .page-head p {
+          font-size: 12px;
+        }
+        h1 {
+          font-size: 21px;
+        }
+        .tabs {
+          gap: 23px;
+          margin-bottom: 20px;
+        }
+        .workspace {
+          gap: 14px;
+        }
+        .metric {
+          padding: 13px;
+        }
+        .metric .value {
+          font-size: 21px;
+        }
+        .settings-summary {
+          padding: 16px;
+        }
+        .settings-summary .description {
+          max-width: 215px;
+        }
+        .node {
+          gap: 8px;
+        }
+        .card-head h2 {
+          font-size: 16px;
+        }
+        .toast {
+          width: max-content;
+        }
+        .metrics {
+          gap: 10px;
+        }
+        .sub-help {
+          font-size: 12px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a href="#frequent" class="skip">跳到常用功能</a>
+    <svg aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden">
+      <defs>
+        <symbol id="layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z M3 12l9 5 9-5 M3 16l9 5 9-5" /></symbol>
+        <symbol id="cloud" viewBox="0 0 24 24">
+          <path d="M6 18a5 5 0 0 1-.4-10A7 7 0 0 1 19 9a4.5 4.5 0 0 1 0 9H6Z" />
+        </symbol>
+        <symbol id="search" viewBox="0 0 24 24">
+          <circle cx="10" cy="10" r="6.5" />
+          <path d="m15 15 5 5" />
+        </symbol>
+        <symbol id="refresh" viewBox="0 0 24 24">
+          <path d="M20 10a8 8 0 0 0-14-5L3 8m0-5v5h5 M4 14a8 8 0 0 0 14 5l3-3m0 5v-5h-5" />
+        </symbol>
+        <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+        <symbol id="chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+        <symbol id="settings" viewBox="0 0 24 24"><path d="M5 5v14M12 5v14M19 5v14M2 9h6M9 15h6M16 8h6" /></symbol>
+        <symbol id="arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5" /></symbol>
+      </defs>
+    </svg>
+    <div class="reviewbar">
+      <div class="row between wrap">
+        <div class="row">
+          <strong>交互设计预览</strong><span class="hint">所有数据与操作均为示例，不连接路由器</span>
+        </div>
+        <button id="empty-toggle" type="button" aria-pressed="false">查看空状态</button>
+      </div>
+    </div>
+    <div class="shell">
+      <div class="breadcrumb">LuCI<span>/</span>服务<span>/</span>Daed</div>
+      <header class="page-head">
+        <div>
+          <h1>代理管理</h1>
+          <p>先选好节点与群组，再将配置应用到代理。</p>
+        </div>
+        <div class="row controls wrap">
+          <span class="status" id="run-status"><span class="dot"></span><span>代理运行中</span></span
+          ><button id="apply" type="button" class="btn primary hidden">应用配置</button
+          ><button id="run-toggle" type="button" class="btn">停止代理</button>
+        </div>
+      </header>
+      <nav class="tabs" aria-label="面板区域">
+        <a href="#frequent" class="active">常用功能</a><a href="#advanced">高级设置</a><a href="#monitor">运行概况</a>
+      </nav>
+      <main>
+        <section id="frequent" aria-label="群组、节点与订阅">
+          <div class="section-intro">
+            <h2>常用功能</h2>
+            <p>管理群组、选择节点和更新订阅，都在这里完成。</p>
+          </div>
+          <div class="workspace">
+            <section class="card" aria-labelledby="group-title">
+              <div class="card-head">
+                <div class="title">
+                  <svg aria-hidden="true"><use href="#layers" /></svg>
+                  <h2 id="group-title">群组</h2>
+                  <span class="count" id="group-count">2</span>
+                </div>
+                <button class="btn subtle small" type="button" data-import="group">
+                  <svg aria-hidden="true"><use href="#plus" /></svg>新建群组
+                </button>
+              </div>
+              <div class="card-body" id="groups"></div>
+            </section>
+            <section class="card" aria-labelledby="node-title">
+              <div class="card-head">
+                <div class="title">
+                  <svg aria-hidden="true"><use href="#cloud" /></svg>
+                  <h2 id="node-title">节点</h2>
+                  <span class="count" id="node-count">4</span>
+                </div>
+                <button class="btn small" type="button" data-import="node">导入节点</button>
+              </div>
+              <div class="filter" id="node-filter">
+                <label class="sr-only" for="node-search">搜索节点</label>
+                <div class="search">
+                  <svg aria-hidden="true"><use href="#search" /></svg
+                  ><input
+                    id="node-search"
+                    type="search"
+                    name="node-search"
+                    placeholder="搜索节点名称或协议…"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                </div>
+                <div class="list-tools">
+                  <span>选择节点后可直接加入群组</span><label for="node-sort" class="sr-only">节点排序</label
+                  ><select id="node-sort">
+                    <option value="default">默认排序</option>
+                    <option value="latency">延迟优先</option>
+                  </select>
+                </div>
+              </div>
+              <div class="card-body" id="nodes"></div>
+            </section>
+            <section class="card" aria-labelledby="sub-title">
+              <div class="card-head">
+                <div class="title">
+                  <svg aria-hidden="true"><use href="#refresh" /></svg>
+                  <h2 id="sub-title">订阅</h2>
+                  <span class="count" id="sub-count">2</span>
+                </div>
+                <button class="btn primary small" type="button" data-import="subscription">
+                  <svg aria-hidden="true"><use href="#plus" /></svg>添加订阅
+                </button>
+              </div>
+              <div class="card-body" id="subscriptions"></div>
+            </section>
+          </div>
+        </section>
+        <section id="advanced" aria-label="配置、DNS 和路由">
+          <details class="card">
+            <summary class="settings-summary">
+              <svg aria-hidden="true"><use href="#settings" /></svg>
+              <div>
+                <h2>高级设置</h2>
+                <p class="description">配置、DNS、路由 · 当前使用默认规则</p>
+              </div>
+              <svg aria-hidden="true" class="chevron"><use href="#chevron" /></svg>
+            </summary>
+            <div class="settings">
+              <div class="setting">
+                <h3>配置</h3>
+                <p class="selected">当前配置：global</p>
+                <button class="btn small" type="button" data-notice="这里打开原有配置编辑器">编辑配置</button>
+              </div>
+              <div class="setting">
+                <h3>DNS</h3>
+                <p class="selected">当前方案：default</p>
+                <button class="btn small" type="button" data-notice="这里打开原有 DNS 编辑器">编辑 DNS</button>
+              </div>
+              <div class="setting">
+                <h3>路由</h3>
+                <p class="selected">当前规则：default</p>
+                <button class="btn small" type="button" data-notice="这里打开原有路由编辑器">编辑路由</button>
+              </div>
+            </div>
+          </details>
+        </section>
+        <section id="monitor" aria-labelledby="monitor-title">
+          <div class="monitor-head">
+            <h2 id="monitor-title">运行概况</h2>
+            <button
+              class="btn subtle small"
+              type="button"
+              id="trend-toggle"
+              aria-expanded="false"
+              aria-controls="trend"
+            >
+              查看流量趋势<svg aria-hidden="true"><use href="#chevron" /></svg>
+            </button>
+          </div>
+          <div class="metrics">
+            <div class="card metric">
+              <small>上传速度</small>
+              <div class="value number">128<span class="unit">KB/s</span></div>
+            </div>
+            <div class="card metric">
+              <small>下载速度</small>
+              <div class="value number">2.4<span class="unit">MB/s</span></div>
+            </div>
+            <div class="card metric">
+              <small>活跃连接</small>
+              <div class="value number">36<span class="unit">个</span></div>
+            </div>
+            <div class="card metric">
+              <small>本次运行流量</small>
+              <div class="value number">1.28<span class="unit">GB</span></div>
+            </div>
+          </div>
+          <div class="card trend" id="trend" hidden>
+            <small>近 30 分钟下载趋势 · 示例数据</small
+            ><svg viewBox="0 0 900 100" role="img" aria-label="示例下载流量曲线">
+              <path d="M0 90H900" style="stroke: var(--line)" />
+              <path
+                d="M0 78 35 72 70 80 105 60 140 64 175 42 210 58 245 47 280 38 315 54 350 65 385 44 420 30 455 39 490 18 525 34 560 40 595 48 630 25 665 31 700 38 735 21 770 34 805 28 840 42 875 29 900 35"
+              />
+            </svg>
+            <div class="axis"><span>30 分钟前</span><span>现在</span></div>
+          </div>
+        </section>
+      </main>
+      <p class="footer-note">设计方案：常用操作优先，高级设置按需展开，运行信息保持轻量。</p>
+    </div>
+    <dialog id="import-dialog" aria-labelledby="dialog-title">
+      <header><h2 id="dialog-title">添加订阅</h2></header>
+      <form id="import-form">
+        <label for="resource-name" id="name-label">订阅名称</label
+        ><input id="resource-name" name="resource-name" required autocomplete="off" placeholder="例如：我的订阅…" />
+        <div id="url-field">
+          <label for="resource-url">链接</label
+          ><input
+            id="resource-url"
+            name="resource-url"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://example.com/sub…"
+          />
+        </div>
+        <p class="notice">这是交互预览。保存仅更新当前页面的示例数据，不会发送网络请求。</p>
+        <div class="actions">
+          <button class="btn" type="button" id="cancel-import">取消</button
+          ><button class="btn primary" type="submit" id="save-import">添加订阅</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <script>
+      const $ = (id) => document.getElementById(id)
+      const icon = (name) => `<svg aria-hidden="true"><use href="#${name}"/></svg>`
+      const escapeText = (value) =>
+        String(value).replace(
+          /[&<>"']/g,
+          (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+        )
+      let nodes = [
+        { name: '香港 · 01', protocol: 'VLESS', source: '日常订阅', ms: 48 },
+        { name: '日本 · 02', protocol: 'Trojan', source: '日常订阅', ms: 72 },
+        { name: '新加坡 · 01', protocol: 'VLESS', source: '备用订阅', ms: 85 },
+        { name: '美国 · 03', protocol: 'Hysteria2', source: '备用订阅', ms: 168 },
+      ]
+      let subscriptions = [
+        { name: '日常订阅', count: 28 },
+        { name: '备用订阅', count: 12 },
+      ]
+      let groups = [
+        { name: 'proxy', count: 2 },
+        { name: 'fallback', count: 1 },
+      ]
+      const boundNodes = new Set(['香港 · 01', '日本 · 02'])
+      let empty = false,
+        running = true,
+        dialogType = 'subscription',
+        noticeTimer
+      function notice(message) {
+        clearTimeout(noticeTimer)
+        $('toast').textContent = message
+        $('toast').hidden = false
+        noticeTimer = setTimeout(() => ($('toast').hidden = true), 3500)
+      }
+      function dirty() {
+        const button = $('apply')
+        button.classList.remove('hidden')
+        button.textContent = '应用配置'
+        button.disabled = false
+      }
+      function emptyCard(type, title, message, button) {
+        return `<div class="empty">${icon(type === 'group' ? 'layers' : 'cloud')}<strong>${title}</strong><p>${message}</p><button class="btn ${type === 'subscription' ? 'primary' : ''}" type="button" data-import="${type}">${button}</button></div>`
+      }
+      function renderNodes() {
+        if (empty || !nodes.length) {
+          $('nodes').innerHTML = emptyCard(
+            'node',
+            '还没有节点',
+            '可以手动导入节点，也可以先添加订阅。',
+            '导入第一个节点',
+          )
+          return
+        }
+        const query = $('node-search').value.trim().toLowerCase()
+        let visible = nodes.filter((node) => (node.name + ' ' + node.protocol).toLowerCase().includes(query))
+        if ($('node-sort').value === 'latency') visible.sort((a, b) => a.ms - b.ms)
+        $('nodes').innerHTML = visible.length
+          ? visible
+              .map(
+                (node) =>
+                  `<div class="node"><div class="node-icon">${icon('cloud')}</div><div class="min"><div class="name truncate">${escapeText(node.name)}</div><div class="details"><span>${escapeText(node.protocol)}</span><span>·</span><span class="truncate">${escapeText(node.source)}</span></div></div><span class="latency ${node.ms > 120 ? 'slow' : ''}">${node.ms} ms</span><button type="button" class="btn small" data-add="${escapeText(node.name)}" aria-label="将${escapeText(node.name)}加入 proxy 群组" ${boundNodes.has(node.name) ? 'disabled' : ''}>${boundNodes.has(node.name) ? '已加入' : '加入'}</button></div>`,
+              )
+              .join('')
+          : '<div class="empty"><strong>没有匹配的节点</strong><p>试试其他名称或协议。</p><button class="btn small" id="clear-search" type="button">清除搜索</button></div>'
+      }
+      function render() {
+        $('empty-toggle').textContent = empty ? '查看有数据状态' : '查看空状态'
+        $('empty-toggle').setAttribute('aria-pressed', String(empty))
+        $('group-count').textContent = empty ? '0' : groups.length
+        $('node-count').textContent = empty ? '0' : nodes.length
+        $('sub-count').textContent = empty ? '0' : subscriptions.length
+        $('node-filter').hidden = empty
+        $('groups').innerHTML = empty
+          ? emptyCard('group', '创建第一个群组', '把节点和订阅放进群组，方便统一选择与切换。', '新建群组')
+          : groups
+              .map(
+                (group, index) =>
+                  `<div class="group ${index === 0 ? 'active' : ''}"><div class="row between"><h3>${escapeText(group.name)}</h3><span class="tag ${index === 0 ? 'gold' : ''}">${index === 0 ? '当前使用' : '备用'}</span></div><p class="group-description">${index === 0 ? '自动选择 · 延迟优先' : '故障切换 · 自动接替'}</p><div class="current"><div class="row">${icon('cloud')}<span>${index === 0 ? '香港 · 01' : '日本 · 02'}</span></div><span class="latency">${index === 0 ? '48' : '72'} ms</span></div><div class="row group-foot"><span>${group.count} 个节点 · 1 个订阅</span><button class="btn subtle small" type="button" data-notice="设计中这里打开群组成员选择面板，支持点击选择和拖拽">管理成员${icon('arrow')}</button></div></div>`,
+              )
+              .join('')
+        renderNodes()
+        $('subscriptions').innerHTML = empty
+          ? emptyCard(
+              'subscription',
+              '添加订阅，开始使用',
+              '粘贴订阅链接后，自动获取节点，再加入所需群组。',
+              '添加第一条订阅',
+            )
+          : subscriptions
+              .map(
+                (sub, index) =>
+                  `<div class="sub"><div class="row between"><h3>${escapeText(sub.name)}</h3><span class="tag">${sub.count} 个节点</span></div><p class="meta">上次更新：今天 09:32 · 自动更新已开启</p>${index === 0 ? '<div class="quota"><span></span></div><div class="sub-foot"><span>已用 32 GB / 100 GB</span><span>剩余 68%</span></div>' : ''}<div class="update-row"><span class="latency">更新成功</span><button class="btn small" type="button" data-update="${index}">${icon('refresh')}更新订阅</button></div></div>`,
+              )
+              .join('') + '<p class="sub-help">订阅负责同步节点；在群组中选择实际使用的节点。</p>'
+      }
+      function openImport(type) {
+        dialogType = type
+        const names = { subscription: '添加订阅', node: '导入节点', group: '新建群组' }
+        $('dialog-title').textContent = names[type]
+        $('save-import').textContent = names[type]
+        $('name-label').textContent = type === 'subscription' ? '订阅名称' : type === 'node' ? '节点名称' : '群组名称'
+        $('url-field').hidden = type === 'group'
+        $('resource-url').required = type !== 'group'
+        $('import-form').reset()
+        $('import-dialog').showModal()
+      }
+      document.addEventListener('click', (event) => {
+        const button = event.target.closest('button')
+        if (!button) return
+        if (button.dataset.import) openImport(button.dataset.import)
+        if (button.dataset.notice) notice(button.dataset.notice + '（预览）')
+        if (button.dataset.add && !boundNodes.has(button.dataset.add)) {
+          boundNodes.add(button.dataset.add)
+          groups[0].count++
+          dirty()
+          render()
+          notice(button.dataset.add + ' 已加入 proxy。点击“应用配置”后生效（示例）。')
+        }
+        if (button.dataset.update !== undefined) {
+          button.disabled = true
+          button.textContent = '更新中…'
+          setTimeout(() => {
+            render()
+            notice('订阅更新成功，节点列表已同步（示例）。')
+          }, 650)
+        }
+        if (button.id === 'clear-search') {
+          $('node-search').value = ''
+          renderNodes()
+          $('node-search').focus()
+        }
+      })
+      $('node-search').addEventListener('input', renderNodes)
+      $('node-sort').addEventListener('change', renderNodes)
+      $('empty-toggle').addEventListener('click', () => {
+        empty = !empty
+        render()
+      })
+      $('cancel-import').addEventListener('click', () => $('import-dialog').close())
+      $('import-form').addEventListener('submit', (event) => {
+        event.preventDefault()
+        const name = $('resource-name').value.trim()
+        if (!name) return
+        if (empty) {
+          nodes = []
+          subscriptions = []
+          groups = []
+          boundNodes.clear()
+          empty = false
+        }
+        if (dialogType === 'subscription') subscriptions.push({ name, count: 0 })
+        if (dialogType === 'node') nodes.push({ name, protocol: 'VLESS', source: '手动导入', ms: 56 })
+        if (dialogType === 'group') groups.push({ name, count: 0 })
+        if (!groups.length) groups.push({ name: 'proxy', count: 0 })
+        $('import-dialog').close()
+        render()
+        dirty()
+        notice('示例已保存；实际产品会在这里显示真实导入结果。')
+      })
+      $('run-toggle').addEventListener('click', () => {
+        running = !running
+        $('run-status').classList.toggle('off', !running)
+        $('run-status').lastElementChild.textContent = running ? '代理运行中' : '代理已停止'
+        $('run-toggle').textContent = running ? '停止代理' : '启动代理'
+        notice(running ? '代理已启动（示例）' : '代理已停止（示例）')
+      })
+      $('apply').addEventListener('click', () => {
+        const button = $('apply')
+        button.disabled = true
+        button.textContent = '应用中…'
+        setTimeout(() => {
+          button.classList.add('hidden')
+          notice('配置已应用（示例），无需再次保存。')
+        }, 650)
+      })
+      $('trend-toggle').addEventListener('click', () => {
+        const expanded = $('trend').hidden
+        $('trend').hidden = !expanded
+        $('trend-toggle').setAttribute('aria-expanded', String(expanded))
+      })
+      document.querySelectorAll('.tabs a').forEach((anchor) =>
+        anchor.addEventListener('click', () => {
+          document.querySelectorAll('.tabs a').forEach((link) => link.classList.toggle('active', link === anchor))
+        }),
+      )
+      render()
+    </script>
+  </body>
+</html>

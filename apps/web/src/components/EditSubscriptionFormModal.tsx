@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -36,6 +36,7 @@ export interface EditSubscriptionFormModalProps {
 
 export function EditSubscriptionFormModal({ opened, onClose, subscription, onSubmit }: EditSubscriptionFormModalProps) {
   const { t } = useTranslation()
+  const [submitFailed, setSubmitFailed] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -48,7 +49,7 @@ export function EditSubscriptionFormModal({ opened, onClose, subscription, onSub
     control,
     setValue: setValueOriginal,
     reset,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, isSubmitting },
   } = form
 
   const setValue = useSetValue(setValueOriginal)
@@ -57,6 +58,7 @@ export function EditSubscriptionFormModal({ opened, onClose, subscription, onSub
   // Initialize form when modal opens with subscription data
   useEffect(() => {
     if (opened && subscription) {
+      setSubmitFailed(false)
       reset({
         link: subscription.link,
         tag: subscription.tag,
@@ -68,6 +70,7 @@ export function EditSubscriptionFormModal({ opened, onClose, subscription, onSub
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
+      if (isSubmitting) return
       if (!open) {
         onClose()
         setTimeout(() => {
@@ -75,62 +78,82 @@ export function EditSubscriptionFormModal({ opened, onClose, subscription, onSub
         }, 200)
       }
     },
-    [onClose, reset],
+    [isSubmitting, onClose, reset],
   )
 
   const handleFormSubmit = async (data: FormValues) => {
-    if (subscription) {
-      await onSubmit({ ...data, id: subscription.id })
-      handleOpenChange(false)
+    setSubmitFailed(false)
+    try {
+      if (subscription) {
+        await onSubmit({ ...data, id: subscription.id })
+        onClose()
+      }
+    } catch {
+      setSubmitFailed(true)
     }
   }
 
   return (
     <Dialog open={opened} onOpenChange={handleOpenChange}>
-      <DialogContent>
+      <DialogContent
+        onEscapeKeyDown={(event) => {
+          if (isSubmitting) event.preventDefault()
+        }}
+        onInteractOutside={(event) => {
+          if (isSubmitting) event.preventDefault()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t('editSubscription')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col gap-4">
-          <Input
-            label={t('link')}
-            withAsterisk
-            value={formValues.link}
-            onChange={(e) => setValue('link', e.target.value)}
-            error={errors.link?.message}
-          />
-          <Input
-            label={t('tag')}
-            withAsterisk
-            value={formValues.tag}
-            onChange={(e) => setValue('tag', e.target.value)}
-            error={errors.tag?.message}
-          />
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="cronEnable">{t('autoUpdate')}</Label>
-              <Switch
-                id="cronEnable"
-                checked={formValues.cronEnable}
-                onCheckedChange={(checked) => setValue('cronEnable', checked)}
-              />
+          <fieldset disabled={isSubmitting} className="flex flex-col gap-4">
+            <Input
+              label={t('link')}
+              withAsterisk
+              value={formValues.link}
+              onChange={(e) => setValue('link', e.target.value)}
+              error={errors.link?.message}
+            />
+            <Input
+              label={t('tag')}
+              withAsterisk
+              value={formValues.tag}
+              onChange={(e) => setValue('tag', e.target.value)}
+              error={errors.tag?.message}
+            />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="cronEnable">{t('autoUpdate')}</Label>
+                <Switch
+                  id="cronEnable"
+                  checked={formValues.cronEnable}
+                  onCheckedChange={(checked) => setValue('cronEnable', checked)}
+                />
+              </div>
+              {formValues.cronEnable && (
+                <Input
+                  label={t('cronExpression')}
+                  withAsterisk
+                  value={formValues.cronExp}
+                  onChange={(e) => setValue('cronExp', e.target.value)}
+                  error={errors.cronExp?.message}
+                  placeholder="10 */6 * * *"
+                />
+              )}
             </div>
-            {formValues.cronEnable && (
-              <Input
-                label={t('cronExpression')}
-                withAsterisk
-                value={formValues.cronExp}
-                onChange={(e) => setValue('cronExp', e.target.value)}
-                error={errors.cronExp?.message}
-                placeholder="10 */6 * * *"
-              />
+            <FormActions
+              loading={isSubmitting}
+              reset={() => reset({ link: '', tag: '', cronExp: '10 */6 * * *', cronEnable: true })}
+              isDirty={isDirty}
+              errors={errors}
+            />
+            {submitFailed && (
+              <p role="alert" className="text-sm text-destructive">
+                {t('panel.saveFailed')}
+              </p>
             )}
-          </div>
-          <FormActions
-            reset={() => reset({ link: '', tag: '', cronExp: '10 */6 * * *', cronEnable: true })}
-            isDirty={isDirty}
-            errors={errors}
-          />
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

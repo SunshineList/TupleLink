@@ -1,6 +1,15 @@
 import type { DragUpdate, DropResult } from '@hello-pangea/dnd'
 import type { DraggingResource } from '~/constants'
-import type { GroupsQuery, NodesQuery, SubscriptionsQuery } from '~/schemas/gql/graphql'
+import type { GroupsQuery, SubscriptionsQuery } from '~/schemas/gql/graphql'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import {
+  buildNodeLibrary,
+  defaultNodeFilters,
+  filterNodeLibrary,
+  orderNodeLibrary,
+  reorderVisibleNodes,
+} from '~/utils/node-library'
 import { DragDropContext } from '@hello-pangea/dnd'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -17,7 +26,6 @@ import {
 } from '~/apis'
 import type { NodeLatencyProbeResult } from '~/apis'
 import { DraggableResourceType } from '~/constants'
-import { useMediaQuery } from '~/hooks'
 import { appStateAtom, groupSortOrdersAtom } from '~/store'
 import { deriveTime } from '~/utils'
 import { Config } from './Config'
@@ -36,10 +44,28 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
 }
 
 export function OrchestratePage() {
+  const { t } = useTranslation()
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [activeArea, setActiveArea] = useState('panel-common')
+  const [nodeFilters, setNodeFilters] = useState(defaultNodeFilters)
+  const scrollToArea = (id: string) => {
+    if (id === 'panel-advanced') setAdvancedOpen(true)
+    setActiveArea(id)
+    requestAnimationFrame(() => {
+      const element = document.getElementById(id)
+      element?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        block: 'start',
+      })
+      element?.focus({ preventScroll: true })
+    })
+  }
   const { data: configsQuery } = useConfigsQuery()
-  const { data: nodesQuery } = useNodesQuery()
+  const nodesRequest = useNodesQuery()
+  const nodesQuery = nodesRequest.data
   const { data: groupsQuery } = useGroupsQuery()
-  const { data: subscriptionsQuery } = useSubscriptionsQuery()
+  const subscriptionsRequest = useSubscriptionsQuery()
+  const subscriptionsQuery = subscriptionsRequest.data
 
   const groupAddNodesMutation = useGroupAddNodesMutation()
   const groupAddSubscriptionsMutation = useGroupAddSubscriptionsMutation()
@@ -121,30 +147,15 @@ export function OrchestratePage() {
     return latest
   }, [nodeLatencies])
 
-  // Get sorted node IDs
-  const sortedNodeIds = useMemo(() => {
-    if (nodes.length === 0) return []
-    const currentIds = nodes.map((n: NodesQuery['nodes']['edges'][number]) => n.id)
-    const currentIdSet = new Set(currentIds)
-
-    const result = nodeSortOrder.filter((id) => currentIdSet.has(id))
-    const resultSet = new Set(result)
-
-    for (const id of currentIds) {
-      if (!resultSet.has(id)) {
-        result.push(id)
-      }
-    }
-
-    return result
-  }, [nodes, nodeSortOrder])
-
-  // Get sorted nodes
-  const sortedNodes = useMemo(() => {
-    if (nodes.length === 0) return []
-    const nodeMap = new Map(nodes.map((n: NodesQuery['nodes']['edges'][number]) => [n.id, n]))
-    return sortedNodeIds.map((id) => nodeMap.get(id)).filter(Boolean) as typeof nodes
-  }, [nodes, sortedNodeIds])
+  const nodeLibrary = useMemo(
+    () => orderNodeLibrary(buildNodeLibrary(nodes, subscriptions), nodeSortOrder),
+    [nodes, subscriptions, nodeSortOrder],
+  )
+  const sortedNodeIds = useMemo(() => nodeLibrary.map((entry) => entry.node.id), [nodeLibrary])
+  const visibleNodes = useMemo(
+    () => filterNodeLibrary(nodeLibrary, nodeFilters, nodeLatencies),
+    [nodeLibrary, nodeFilters, nodeLatencies],
+  )
 
   // Get sorted subscription IDs
   const sortedSubscriptionIds = useMemo(() => {
@@ -476,7 +487,15 @@ export function OrchestratePage() {
     // Handle node list sorting
     if (sourceDroppableId === 'node-list' && confirmedDestDroppableId === 'node-list') {
       if (source.index !== destination.index) {
-        setNodeSortOrder(arrayMove(sortedNodeIds, source.index, destination.index))
+        if (nodeFilters.sort === 'custom')
+          setNodeSortOrder(
+            reorderVisibleNodes(
+              sortedNodeIds,
+              visibleNodes.map((entry) => entry.node.id),
+              source.index,
+              destination.index,
+            ),
+          )
       }
       return
     }
@@ -613,43 +632,107 @@ export function OrchestratePage() {
     }
   }
 
-  const matchSmallScreen = useMediaQuery('(max-width: 640px)')
-
   return (
-    <div className="flex flex-col gap-8">
-      <div className={`grid gap-5 ${matchSmallScreen ? 'grid-cols-1' : 'grid-cols-3'}`}>
-        <Config />
-        <DNS />
-        <Routing />
-      </div>
-
-      <TrafficOverview />
-
-      <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
-        <div className={`grid gap-5 ${matchSmallScreen ? 'grid-cols-1' : 'grid-cols-3'}`}>
-          <GroupResource
-            highlight={!!draggingResource}
-            draggingResource={draggingResource}
-            dragDestinationDroppableId={dragDestinationDroppableId}
-            hoveredGroupId={hoveredGroupId}
-            nodeLatencies={nodeLatencies}
-          />
-          <NodeResource
-            sortedNodes={sortedNodes}
-            highlight={draggingResource?.type === DraggableResourceType.groupNode}
-            nodeLatencies={nodeLatencies}
-          />
-          <SubscriptionResource
-            sortedSubscriptions={sortedSubscriptions}
-            nodeLatencies={nodeLatencies}
-            testingLatencies={testNodeLatenciesMutation.isPending}
-            lastLatencyProbeAt={lastLatencyProbeAt}
-            onTestAllNodeLatencies={async () => {
-              await testNodeLatenciesMutation.mutateAsync(undefined)
-            }}
-          />
+    <div className="panel-workspace flex flex-col gap-7">
+      <nav className="flex gap-5 overflow-x-auto border-b text-sm" aria-label={t('panel.title')}>
+        {[
+          ['panel-common', t('panel.common')],
+          ['panel-advanced', t('panel.advanced')],
+          ['panel-monitor', t('panel.monitor')],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            aria-controls={id}
+            aria-current={activeArea === id ? 'location' : undefined}
+            className={`shrink-0 border-b-2 px-1 pb-3 pt-1 ${activeArea === id ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground'}`}
+            onClick={() => scrollToArea(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      <section id="panel-common" tabIndex={-1} className="scroll-mt-36 outline-none" aria-label={t('panel.common')}>
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold">{t('panel.common')}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t('panel.commonDescription')}</p>
         </div>
-      </DragDropContext>
+        <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
+          <div className="grid grid-cols-1 items-start gap-4 min-[900px]:grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)_minmax(0,1fr)]">
+            <GroupResource
+              highlight={!!draggingResource}
+              draggingResource={draggingResource}
+              dragDestinationDroppableId={dragDestinationDroppableId}
+              hoveredGroupId={hoveredGroupId}
+              nodeLatencies={nodeLatencies}
+            />
+            <NodeResource
+              nodes={visibleNodes}
+              totalCount={nodeLibrary.length}
+              filters={nodeFilters}
+              onFiltersChange={setNodeFilters}
+              sources={subscriptions.map((subscription) => ({
+                id: subscription.id,
+                name: subscription.tag || subscription.id,
+              }))}
+              loading={nodesRequest.isPending || subscriptionsRequest.isPending}
+              error={nodesRequest.isError || subscriptionsRequest.isError}
+              onRetry={() => {
+                nodesRequest.refetch()
+                subscriptionsRequest.refetch()
+              }}
+              dragging={isDragging}
+              highlight={draggingResource?.type === DraggableResourceType.groupNode}
+              nodeLatencies={nodeLatencies}
+            />
+            <SubscriptionResource
+              sortedSubscriptions={sortedSubscriptions}
+              nodeLatencies={nodeLatencies}
+              testingLatencies={testNodeLatenciesMutation.isPending}
+              lastLatencyProbeAt={lastLatencyProbeAt}
+              onTestAllNodeLatencies={async () => {
+                await testNodeLatenciesMutation.mutateAsync(undefined)
+              }}
+            />
+          </div>
+        </DragDropContext>
+      </section>
+
+      <section
+        id="panel-advanced"
+        tabIndex={-1}
+        className="scroll-mt-36 rounded-2xl border bg-card shadow-sm outline-none"
+      >
+        <button
+          type="button"
+          aria-expanded={advancedOpen}
+          aria-controls="panel-advanced-content"
+          className="flex w-full items-center gap-3 p-5 text-left"
+          onClick={() => setAdvancedOpen((value) => !value)}
+        >
+          <SlidersHorizontal aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-semibold">{t('panel.advanced')}</span>
+            <span className="mt-1 block text-sm text-muted-foreground">{t('panel.advancedDescription')}</span>
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={`h-4 w-4 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        <div
+          id="panel-advanced-content"
+          hidden={!advancedOpen}
+          className="grid grid-cols-1 gap-4 border-t p-4 lg:grid-cols-3"
+        >
+          <Config />
+          <DNS />
+          <Routing />
+        </div>
+      </section>
+      <section id="panel-monitor" tabIndex={-1} className="scroll-mt-36 outline-none">
+        <TrafficOverview />
+      </section>
     </div>
   )
 }

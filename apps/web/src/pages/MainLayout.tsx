@@ -36,10 +36,10 @@ export function MainLayout() {
   if (routerMode && !ready) return <div className="p-6">{error || '正在准备面板…'}</div>
 
   return (
-    <div className="flex min-h-screen flex-col bg-pattern">
+    <div className={`flex min-h-dvh flex-col ${routerMode ? 'router-panel bg-background' : 'bg-pattern'}`}>
       {routerMode ? <RouterHeader /> : <HeaderWithActions />}
       <main className="flex-1">
-        <div className="container mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
+        <div className="container mx-auto max-w-[1400px] px-4 py-6 lg:px-8 lg:py-7">
           <Outlet />
         </div>
       </main>

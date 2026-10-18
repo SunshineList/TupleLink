@@ -29,3 +29,19 @@ it.each([
 
   expect(JSON.parse(Base64.decode(link.slice('vmess://'.length)))).toMatchObject(expected)
 })
+
+it.each(['none', 'xtls-rprx-vision', 'xtls-rprx-vision-udp443'] as const)(
+  'serializes the VLESS flow choice %s for dae',
+  async (flow) => {
+    const { v2rayProtocol } = await import('./complex')
+    const link = v2rayProtocol.generateLink({
+      ...v2rayProtocol.defaultValues,
+      protocol: 'vless',
+      flow,
+      add: '192.0.2.20',
+      port: 443,
+      id: '33333333-3333-4333-8333-000000000001',
+    })
+    expect(new URL(link).searchParams.get('flow')).toBe(flow === 'none' ? null : flow)
+  },
+)

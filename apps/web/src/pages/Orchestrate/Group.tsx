@@ -24,6 +24,7 @@ import {
 import { DroppableGroupCard } from '~/components/DroppableGroupCard'
 import { GroupFormModal } from '~/components/GroupFormModal'
 import { GroupAddNodesModal, GroupAddSubscriptionsModal } from '~/components/GroupResourcePickerModal'
+import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { Section } from '~/components/Section'
 import { SortableGroupContent } from '~/components/SortableGroupContent'
 import { Button } from '~/components/ui/button'
@@ -51,7 +52,8 @@ export function GroupResource({
   nodeLatencies?: Record<string, NodeLatencyProbeResult>
 }) {
   const { t } = useTranslation()
-  const { data: groupsQuery } = useGroupsQuery()
+  const groupsRequest = useGroupsQuery()
+  const groupsQuery = groupsRequest.data
   const { data: nodesQuery } = useNodesQuery()
   const appState = useStore(appStateAtom)
   const { defaultGroupID } = useStore(defaultResourcesAtom)
@@ -262,14 +264,23 @@ export function GroupResource({
     dragHandleProps?: DraggableProvidedDragHandleProps | null
     snapshot?: DraggableStateSnapshot
   }) => (
-    <div data-group-card-id={groupId} className={cn(snapshot?.isDragging && 'z-50 opacity-90')}>
+    <div
+      data-default-group={defaultGroupID === groupId}
+      data-group-card-id={groupId}
+      className={cn(snapshot?.isDragging && 'z-50 opacity-90')}
+    >
       <DroppableGroupCard
         id={groupId}
         name={name}
         summary={
           <>
+            {defaultGroupID === groupId && (
+              <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-medium">
+                {t('panel.defaultGroup')}
+              </span>
+            )}
             <span className="rounded bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground/80">
-              {policy}
+              {t(`panel.policies.${policy}`, { defaultValue: policy })}
             </span>
             <span>{t('groupPicker.nodesCount', { count: groupNodes.length })}</span>
             <span>{t('groupPicker.subscriptionGroupsCount', { count: groupSubscriptions.length })}</span>
@@ -285,6 +296,7 @@ export function GroupResource({
             <Button
               variant="ghost"
               size="xs"
+              aria-label={`${t('actions.settings')} ${name}`}
               onClick={() => {
                 updateGroupFormModalRef.current?.setEditingID(groupId)
 
@@ -339,6 +351,11 @@ export function GroupResource({
   return (
     <Section
       title={t('group')}
+      count={groups.length}
+      createLabel={t('panel.createGroup')}
+      loading={groupsRequest.isPending}
+      error={groupsRequest.isError}
+      onRetry={() => groupsRequest.refetch()}
       icon={<Table2 className="h-5 w-5" />}
       onCreate={openCreateGroupFormModal}
       highlight={highlight}
@@ -348,7 +365,10 @@ export function GroupResource({
         {(provided) => (
           <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-col gap-3">
             {sortedGroups.map(
-              ({ id: groupId, name, policy, policyParams, nodes: groupNodes, subscriptions: groupSubscriptions }, index) => (
+              (
+                { id: groupId, name, policy, policyParams, nodes: groupNodes, subscriptions: groupSubscriptions },
+                index,
+              ) => (
                 <Draggable key={groupId} draggableId={`group-${groupId}`} index={index}>
                   {(draggableProvided, snapshot) => (
                     <div
@@ -370,6 +390,14 @@ export function GroupResource({
                   )}
                 </Draggable>
               ),
+            )}
+            {!groupsRequest.isPending && !groupsRequest.isError && !groups.length && (
+              <ResourceEmpty
+                title={t('panel.noGroups')}
+                description={t('panel.noGroupsDescription')}
+                action={t('panel.createGroup')}
+                onAction={openCreateGroupFormModal}
+              />
             )}
             {provided.placeholder}
           </div>

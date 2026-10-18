@@ -65,10 +65,12 @@ function SelectionDialog({
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     setQuery('')
     setSelectedIds([])
+    setSubmitError('')
   }, [opened, resetKey])
 
   const filteredItems = useMemo(() => {
@@ -91,6 +93,7 @@ function SelectionDialog({
   }
 
   const handleClose = () => {
+    if (loading) return
     onClose()
     setQuery('')
     setSelectedIds([])
@@ -99,13 +102,26 @@ function SelectionDialog({
   const handleSubmit = async () => {
     if (selectedCount === 0) return
 
-    await onSubmit(selectedIds)
-    handleClose()
+    setSubmitError('')
+    try {
+      await onSubmit(selectedIds)
+      handleClose()
+    } catch {
+      setSubmitError(t('panel.saveFailed'))
+    }
   }
 
   return (
     <Dialog open={opened} onOpenChange={(nextOpen) => !nextOpen && handleClose()}>
-      <ScrollableDialogContent size="xl">
+      <ScrollableDialogContent
+        size="xl"
+        onEscapeKeyDown={(event) => {
+          if (loading) event.preventDefault()
+        }}
+        onPointerDownOutside={(event) => {
+          if (loading) event.preventDefault()
+        }}
+      >
         <ScrollableDialogHeader>
           <div className="pr-8">
             <DialogTitle>{title}</DialogTitle>
@@ -218,6 +234,11 @@ function SelectionDialog({
         </ScrollableDialogBody>
 
         <ScrollableDialogFooter>
+          {submitError && (
+            <p role="alert" className="mr-auto text-xs text-destructive">
+              {submitError}
+            </p>
+          )}
           <Button variant="ghost" onClick={handleClose} disabled={loading}>
             {t('actions.cancel')}
           </Button>

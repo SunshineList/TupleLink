@@ -488,3 +488,53 @@ form {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
+
+/* Router workspace: retain stored theme colors and reduce decorative depth. */
+.panel-workspace .panel-select {
+  width: 100%;
+  min-width: 0;
+  height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--foreground);
+  background: var(--background);
+}
+.router-panel button,
+.router-panel input,
+.router-panel select {
+  touch-action: manipulation;
+}
+.router-panel button:focus-visible,
+.router-panel select:focus-visible,
+.router-panel a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.router-panel .panel-workspace [data-default-group='true'] > [data-slot='card'] {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background: color-mix(in oklab, var(--primary) 3%, var(--card));
+}
+@media (max-width: 640px) {
+  .router-panel .panel-workspace button,
+  .router-panel header button {
+    min-height: 44px;
+  }
+  .router-panel .panel-workspace [data-testid='section'] {
+    padding: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .router-panel *,
+  .router-panel *::before,
+  .router-panel *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.router-panel {
+  background: color-mix(in oklab, var(--background) 97%, var(--foreground) 3%);
+}
