@@ -60,6 +60,25 @@ sh /tmp/daed-install.sh --reinstall
 APK 会保留已经安装的 BTF、相关内核模块及必要依赖，避免被自动当作孤立依赖移除。
 备份可能包含密钥，目录权限 0700、归档权限 0600。
 
+## 订阅下载诊断
+
+出现 403 时，先确认订阅在其他客户端的本次更新是否成功，区分已有节点可用
+与订阅可下载。Daed 报错中的 `route` 是 dae 路由下载，不代表使用 PassWall。
+
+仓库提供独立的只读工具 `openwrt/subscription-check.sh`，可用 `sh` 执行。
+它读取最多 3 条 PassWall 订阅，分别测试系统路径的 Daed 请求头、PassWall
+请求头/会话，以及可用的本机 PassWall SOCKS 出口；也可传一个命名订阅 section ID。
+系统路径仍可能受透明代理规则影响，curl 测试不等同于 Daed 的 Go 下载客户端。
+
+输出仅含 section ID、URL 的 SHA-256 指纹、HTTP 状态、curl 返回码、已知鉴权
+错误代码及内容格式/节点链接数。节点链接数不证明协议参数可导入；HTML、Clash
+YAML 和鉴权响应会单独标识。临时响应和 cookie 使用私有目录，结束后清理。
+该工具不新增依赖，不修改订阅、服务、路由或防火墙配置，不关闭 TLS 校验。
+
+只有系统路径失败、本机 SOCKS 成功时，才进一步核对两条下载路径的出口与权限。
+`AUTH_FAIL` 表示订阅服务拒绝鉴权，需要结合服务商错误说明处理，不能仅靠状态码
+认定是 User-Agent 问题。
+
 ## 环境要求
 
 - 固件提供现代 JavaScript LuCI、uhttpd CGI、rpcd、UCI、jshn 和 jsonfilter。
