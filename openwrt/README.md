@@ -120,6 +120,17 @@ YAML 和鉴权响应会单独标识。临时响应和 cookie 使用私有目录�
 `AUTH_FAIL` 表示订阅服务拒绝鉴权，需要结合服务商错误说明处理，不能仅靠状态码
 认定是 User-Agent 问题。
 
+## 已启动但无法访问的只读诊断
+
+`openwrt/network-check.sh` 收集实际 LAN/WAN 设备、默认路由、现有 TC 过滤器、
+代理服务状态、本机 DNS、国内/Google 的 IPv4 HTTPS 和 Google IPv6 HTTPS，
+最后读取已遮盖凭据的近期日志。不修改 UCI、数据库、路由、防火墙或服务，
+不安装缺少的工具；DNS/HTTPS 请求有时限，仍经过当前透明代理路径。
+
+`Ready`、群组选择节点和 eBPF 加载成功不能单独证明代理出口可用。启动时空
+配置的 `[direct]` 不代表重载后的最终路由。Netkit 回退 veth 后继续成功启动时，
+应先核对真实绑定和实际连接结果，避免仅根据该回退提示更换 iproute2。
+
 ## 环境要求
 
 - 固件提供现代 JavaScript LuCI、uhttpd CGI、rpcd、UCI、jshn 和 jsonfilter。
