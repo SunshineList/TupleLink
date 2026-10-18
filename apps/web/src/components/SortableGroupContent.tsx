@@ -4,11 +4,11 @@ import { useStore } from '@nanostores/react'
 import { ChevronDown, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LatencyBadge } from '~/components/LatencyBadge'
 import { SortableResourceBadge } from '~/components/SortableResourceBadge'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
 import { groupSortOrdersAtom } from '~/store'
-import { formatLatencyLabel } from '~/utils/latency'
 
 interface GroupNode {
   id: string
@@ -251,7 +251,7 @@ export function SortableGroupContent({
             name={tag || name}
             protocol={protocol}
             address={address}
-            meta={formatLatencyLabel(nodeLatencies?.[nodeId], t)}
+            meta={nodeLatencies?.[nodeId] ? <LatencyBadge result={nodeLatencies[nodeId]} /> : undefined}
             onRemove={() => onDelNode(nodeId)}
           >
             {subscriptionID && allSubscriptions?.find((subscription) => subscription.id === subscriptionID)?.tag}

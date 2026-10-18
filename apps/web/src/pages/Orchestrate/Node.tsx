@@ -22,8 +22,8 @@ import { useImportNodesMutation, useRemoveNodesMutation } from '~/apis'
 import { ConfigureNodeFormModal } from '~/components/ConfigureNodeFormModal'
 import { EditNodeFormModal } from '~/components/EditNodeFormModal'
 import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
+import { LatencyBadge, LatencyLegend } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
-import { NodePagination } from '~/components/NodePagination'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
@@ -41,7 +41,6 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { SimpleTooltip } from '~/components/ui/tooltip'
 import { cn } from '~/lib/utils'
 import { getInstantDropStyle } from '~/utils'
-import { formatLatencyLabel } from '~/utils/latency'
 import { defaultNodeFilters } from '~/utils/node-library'
 import { NODE_ROW_HEIGHT, nodeWindow } from '~/utils/node-window'
 
@@ -113,7 +112,7 @@ function NodeRow({
         title={t('latency.testNode')}
         onClick={() => tests.test([node.id])}
       >
-        {formatLatencyLabel(latency, t) || t('latency.test')}
+        <LatencyBadge result={latency} fallback={t('latency.test')} />
       </Button>
       <Button
         variant="outline"
@@ -194,16 +193,6 @@ export function NodeResource({
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
-  const [page, setPage] = useState(0)
-  const pages = Math.max(1, Math.ceil(nodes.length / 12))
-  const currentPage = Math.min(page, pages - 1)
-  const pageStart = currentPage * 12
-  const pageCount = Math.min(12, Math.max(0, nodes.length - pageStart))
-  const changePage = (value: number) => {
-    setPage(value)
-    setScrollTop(0)
-    scrollRef.current?.scrollTo({ top: 0 })
-  }
   const [viewportHeight, setViewportHeight] = useState(456)
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
@@ -232,14 +221,12 @@ export function NodeResource({
     if (scrollRef.current) scrollRef.current.scrollTop = 0
     setScrollTop(0)
     setFocusedId(null)
-    setPage(0)
   }, [filterKey])
-  const range = nodeWindow(pageCount, scrollTop, viewportHeight)
+  const range = nodeWindow(nodes.length, scrollTop, viewportHeight)
   // Retain the focused row while scrolling, so windowing cannot discard keyboard focus.
-  const indices = Array.from({ length: range.end - range.start }, (_, offset) => pageStart + range.start + offset)
+  const indices = Array.from({ length: range.end - range.start }, (_, offset) => range.start + offset)
   const focusedIndex = focusedId ? nodes.findIndex(({ node }) => node.id === focusedId) : -1
-  if (focusedIndex >= pageStart && focusedIndex < pageStart + pageCount && !indices.includes(focusedIndex))
-    indices.push(focusedIndex)
+  if (focusedIndex >= 0 && !indices.includes(focusedIndex)) indices.push(focusedIndex)
   indices.sort((a, b) => a - b)
   const onAction = (entry: LibraryNode, action: NodeAction) => {
     const { node } = entry
@@ -301,6 +288,7 @@ export function NodeResource({
       >
         <p className="shrink-0 text-xs text-muted-foreground">{t('panel.manualNodesHint')}</p>
         <LatencyStatus tests={latencyTests} />
+        <LatencyLegend />
         {totalCount > 0 && (
           <div className="shrink-0 space-y-2" data-node-toolbar>
             <label className="flex items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
@@ -393,13 +381,13 @@ export function NodeResource({
             >
               <div
                 className="relative"
-                style={{ height: (pageCount + (snapshot.isUsingPlaceholder ? 1 : 0)) * NODE_ROW_HEIGHT }}
+                style={{ height: (nodes.length + (snapshot.isUsingPlaceholder ? 1 : 0)) * NODE_ROW_HEIGHT }}
               >
                 {indices.map((index) => (
                   <div
                     key={nodes[index].node.id}
                     className="absolute inset-x-0"
-                    style={{ top: (index - pageStart) * NODE_ROW_HEIGHT, height: NODE_ROW_HEIGHT }}
+                    style={{ top: index * NODE_ROW_HEIGHT, height: NODE_ROW_HEIGHT }}
                   >
                     <Draggable draggableId={`node-${nodes[index].node.id}`} index={index}>
                       {(rowProvided, rowSnapshot) => (
@@ -435,7 +423,6 @@ export function NodeResource({
             </div>
           )}
         </Droppable>
-        <NodePagination page={currentPage} pages={pages} onChange={changePage} disabled={dragging} />
       </Section>
       <Sheet
         open={!!detailNode}
@@ -481,7 +468,7 @@ export function NodeResource({
                 <div>
                   <dt className="text-muted-foreground">{t('panel.nodeLatency')}</dt>
                   <dd className="mt-1">
-                    {formatLatencyLabel(nodeLatencies?.[detailNode.node.id], t) || t('panel.notTested')}
+                    <LatencyBadge result={nodeLatencies?.[detailNode.node.id]} />
                   </dd>
                 </div>
               </dl>

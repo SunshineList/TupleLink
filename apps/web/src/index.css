@@ -687,17 +687,22 @@ form {
 }
 .subscription-node-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+  grid-auto-rows: max-content;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 235px), 1fr));
   align-content: start;
   gap: 12px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 2px;
 }
 .subscription-node-tile {
+  overflow-wrap: anywhere;
   display: flex;
+  height: max-content;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
@@ -733,16 +738,28 @@ form {
     gap: 8px;
   }
   .subscription-node-tile {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 160px;
+    overflow-wrap: anywhere;
     min-height: 126px;
     padding: 12px;
     gap: 8px;
   }
 }
-.subscription-browser nav button,
 .subscription-browser article button,
 .panel-node-probe {
   min-height: 44px;
 }
 .subscription-browser select {
   font-size: 16px;
+}
+
+.panel-node-row {
+  grid-template-columns: 20px minmax(0, 1fr) auto auto 32px;
+}
+@media (max-width: 479px), (pointer: coarse) {
+  .panel-node-row {
+    grid-template-columns: 16px minmax(0, 1fr) auto auto 44px;
+    gap: 4px;
+  }
 }

@@ -256,7 +256,11 @@
     "progress": "Testing {{completed}} / {{total}}",
     "stop": "Stop after this batch",
     "requestFailed": "Latency test interrupted. Previous results are kept. Check that Daed is running and the check URL is reachable, then retry.",
-    "testSubscriptions": "Test subscription nodes"
+    "testSubscriptions": "Test subscription nodes",
+    "colors": "Latency colors",
+    "good": "Green: < 200 ms",
+    "warning": "Yellow: 200–499 ms",
+    "bad": "Red: ≥ 500 ms / failed"
   },
   "link": "Link",
   "logLevel": "Log Level",
@@ -498,14 +502,6 @@
     "nodeLatency": "Latency",
     "manualNodesHint": "Only manually added nodes are shown here. Browse subscription nodes from their subscription.",
     "subscriptionNodes": "Subscription nodes",
-    "subscriptionNodesHint": "Search or jump between pages. Test a node or add it directly to a group.",
-    "nodePages": "Node pages",
-    "firstPage": "First page",
-    "lastPage": "Last page",
-    "previousPage": "Previous page",
-    "nextPage": "Next page",
-    "jumpPage": "Jump to page",
-    "pageSize": "Nodes per page",
-    "nodesPerPage": "{{count}} / page"
+    "subscriptionNodesHint": "Search and scroll through all nodes. Test any node or add it directly to a group."
   }
 }

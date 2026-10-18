@@ -241,13 +241,15 @@ async function login(page, url = base) {
     await largeCard.getByRole('button', { name: /查看节点/ }).click();
     const viewer = frame.locator('[data-subscription-browser]');
     const grid = viewer.getByRole('list', { name: '订阅节点', exact: true });
-    assert.equal(await grid.locator('[data-subscription-node]').count(), 12);
-    await viewer.getByRole('button', { name: '末页', exact: true }).click();
-    assert.equal(await viewer.getByRole('combobox', { name: '跳转页码' }).inputValue(), '83');
-    await grid.getByText('Workspace-0999-Long-node-name-for-layout-testing', { exact: true }).waitFor();
-    assert.equal(await grid.locator('[data-subscription-node]').count(), 4);
-    await viewer.getByRole('button', { name: '上一页', exact: true }).click();
-    assert.equal(await grid.locator('[data-subscription-node]').count(), 12);
+    assert.equal(await grid.locator('[data-subscription-node]').count(), 1000);
+    assert.equal(await viewer.getByRole('navigation', { name: '节点分页' }).count(), 0);
+    assert.equal(await viewer.getByRole('combobox', { name: '每页数量' }).count(), 0);
+    await page.waitForTimeout(300);
+    const toolbarTop = (await viewer.getByRole('searchbox').boundingBox()).y;
+    await grid.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await grid.getByText('Workspace-0999-Long-node-name-for-layout-testing', { exact: true }).scrollIntoViewIfNeeded();
+    assert.equal((await viewer.getByRole('searchbox').boundingBox()).y, toolbarTop);
+    assert.ok(await grid.evaluate(element => element.scrollTop > 10000 && element.scrollWidth <= element.clientWidth + 1));
     const subscriptionSearch = viewer.getByRole('searchbox', { name: '搜索节点' });
     await subscriptionSearch.fill('Workspace-0999');
     assert.equal(await grid.locator('[data-subscription-node]').count(), 1);
@@ -269,18 +271,33 @@ async function login(page, url = base) {
     assert.ok((await gql('query {groups{id nodes{name}}}')).groups.find(item => item.id === groupId).nodes.some(item => item.name.includes('Workspace-0999')));
     // Deterministic transport failures and batch UI are fault-injected; actual
     // HTTP-over-SOCKS probe/cancellation is tested in Go against a local server.
-    let probeRequests = [], failProbe = false;
+    let probeRequests = [], failProbe = false, probeLatency = 18;
     await page.route('**/cgi-bin/daed-router/graphql', async route => {
       const payload = route.request().postDataJSON();
       if (!/mutation TestNodeLatencies/.test(payload.query)) return route.continue();
       const ids = payload.variables.ids; probeRequests.push(ids);
       await new Promise(resolve => setTimeout(resolve, 80));
       if (failProbe) return route.fulfill({ status: 502, contentType: 'text/plain', body: 'Injected gateway failure' });
-      return route.fulfill({ json: { data: { testNodeLatencies: ids.map(id => ({ id, alive: true, latencyMs: 18, testedAt: new Date().toISOString(), message: null })) } } });
+      return route.fulfill({ json: { data: { testNodeLatencies: ids.map(id => ({ id, alive: probeLatency !== null, latencyMs: probeLatency, testedAt: new Date().toISOString(), message: null })) } } });
     });
     await grid.getByRole('button', { name: /^测试节点延迟 / }).click();
     await grid.getByText('18 ms', { exact: true }).waitFor();
     assert.equal(probeRequests[0].length, 1);
+    const colors = {};
+    for (const [value, tone] of [[199,'good'],[200,'warning'],[499,'warning'],[500,'bad'],[null,'bad']]) {
+      probeLatency = value;
+      await grid.getByRole('button', { name: /^测试节点延迟 / }).click();
+      await grid.locator(`[data-latency-tone="${tone}"]`).waitFor();
+      await grid.locator('button:not(:disabled)').filter({ hasText: '测速' }).waitFor();
+      assert.equal(await grid.locator('[data-latency-tone]').getAttribute('data-latency-tone'), tone);
+      colors[tone] = await grid.locator('[data-latency-tone]').evaluate(element => getComputedStyle(element).color);
+    }
+    assert.equal(new Set(Object.values(colors)).size, 3, 'Green, yellow and red must be visually distinct');
+    probeLatency = 18;
+    await grid.getByRole('button', { name: /^测试节点延迟 / }).click();
+    await grid.getByText('18 ms', { exact: true }).waitFor();
+    probeRequests = [probeRequests.at(-1)];
+
     await subscriptionSearch.fill('Workspace-00');
     await viewer.getByRole('button', { name: '测试当前结果', exact: true }).click();
     await viewer.getByText(/测速进度/).waitFor();
@@ -307,7 +324,22 @@ async function login(page, url = base) {
     assert.deepEqual(probeRequests.at(-1), [nodeIds[0]], 'Manual single-node test must submit only that node');
     await page.unroute('**/cgi-bin/daed-router/graphql');
     assert.ok(Math.abs((await frame.locator('#panel-common').boundingBox()).height - beforeLargeHeight) < 3);
-    console.log('PASS: manual/subscription separation, 1000-node grid pagination/search, nested details/QR/group binding, per-node test, bounded batch/progress/stop and 502 input/result preservation');
+    console.log('PASS: manual/subscription separation, 1000-node continuous grid/search, latency color boundaries, nested details/QR/group binding, per-node test, bounded batch/progress/stop and 502 input/result preservation');
+    await largeCard.getByRole('button', { name: /查看节点/ }).click();
+    const lastTile = grid.locator('[data-subscription-node]').last();
+    await lastTile.scrollIntoViewIfNeeded();
+    const savedScroll = await grid.evaluate(element => element.scrollTop);
+    await lastTile.getByRole('button', { name: /^节点详情 / }).click();
+    await detail.waitFor();
+    await page.keyboard.press('Escape');
+    await detail.waitFor({ state: 'hidden' });
+    assert.ok(Math.abs(await grid.evaluate(element => element.scrollTop) - savedScroll) < 3, 'Closing details should retain continuous-list position');
+    await viewer.evaluate(element => { element.ownerDocument.documentElement.style.fontSize = '20px'; });
+    assert.ok(await lastTile.evaluate(element => element.scrollWidth <= element.clientWidth + 1), 'Large text must wrap within the card');
+    assert.ok(await lastTile.evaluate(element => { const tile = element.getBoundingClientRect(); return [...element.querySelectorAll('button')].every(button => { const r = button.getBoundingClientRect(); return r.bottom <= tile.bottom + 1 && r.right <= tile.right + 1; }); }), 'Card actions must remain fully inside the card at larger text sizes');
+    await viewer.evaluate(element => { element.ownerDocument.documentElement.style.fontSize = ''; });
+    await page.keyboard.press('Escape');
+    await viewer.waitFor({ state: 'hidden' });
     await frame.getByRole('button', { name: '查看流量趋势', exact: true }).click();
     await frame.locator('#panel-traffic-trends svg.recharts-surface').first().waitFor();
     for (const name of ['10 分钟', '30 分钟', '1 小时']) await frame.getByRole('button', { name, exact: true }).click();
@@ -328,9 +360,10 @@ async function login(page, url = base) {
       }
       await largeCard.getByRole('button', { name: /查看节点/ }).click();
       assert.ok(await viewer.evaluate(element => element.scrollWidth <= element.clientWidth + 1));
-      assert.ok(await grid.locator('[data-subscription-node]').count() <= 12);
-      await viewer.getByRole('button', { name: '末页', exact: true }).click();
-      await grid.getByText('Workspace-0999-Long-node-name-for-layout-testing', { exact: true }).waitFor();
+      assert.equal(await grid.locator('[data-subscription-node]').count(), 1000);
+      await grid.evaluate(element => { element.scrollTop = element.scrollHeight; });
+      await grid.getByText('Workspace-0999-Long-node-name-for-layout-testing', { exact: true }).scrollIntoViewIfNeeded();
+      assert.ok(await grid.evaluate(element => element.scrollWidth <= element.clientWidth + 1));
       await page.screenshot({ path: path.join(output, 'subscription-' + width + '.png'), fullPage: true });
       await page.keyboard.press('Escape');
       await viewer.waitFor({ state: 'hidden' });
@@ -342,8 +375,16 @@ async function login(page, url = base) {
     }
     await gql('mutation ExtraManualNodes($args:[ImportArgument!]!){importNodes(rollbackError:true,args:$args){node{id}}}', { args: Array.from({ length: 13 }, (_, i) => ({ tag: 'Manual page ' + i, link: `vless://55555555-5555-4555-8555-${String(i).padStart(12, '0')}@192.0.2.90:443?encryption=none&security=tls&type=tcp#Manual-page-${i}` })) });
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await nodes.getByRole('combobox', { name: '跳转页码' }).selectOption({ value: '1' });
-    const pageHandle = nodes.locator('[data-rfd-drag-handle-draggable-id]').first();
+    const manualScroll = nodes.locator('[data-node-scroll]');
+    await manualScroll.waitFor();
+    assert.equal(await nodes.getByRole('navigation', { name: '节点分页' }).count(), 0);
+    await manualScroll.evaluate(element => { element.scrollTop = 12 * 76; });
+    await page.waitForTimeout(150);
+    const visibleManualId = await manualScroll.evaluate(element => {
+      const viewport = element.getBoundingClientRect();
+      return [...element.querySelectorAll('[data-node-id]')].find(row => { const r = row.getBoundingClientRect(); return r.top >= viewport.top && r.bottom <= viewport.bottom; }).dataset.nodeId;
+    });
+    const pageHandle = nodes.locator(`[data-rfd-drag-handle-draggable-id="node-${visibleManualId}"]`);
     const movedPageId = (await pageHandle.getAttribute('data-rfd-drag-handle-draggable-id')).replace(/^node-/, '');
     const pageOrderBefore = await frame.locator('body').evaluate(() => JSON.parse(localStorage.getItem('APP_STATEnodeSortableKeys')));
     await pageHandle.focus();
@@ -354,12 +395,11 @@ async function login(page, url = base) {
     await page.keyboard.press('Space');
     await page.waitForTimeout(250);
     const pageOrderAfter = await frame.locator('body').evaluate(() => JSON.parse(localStorage.getItem('APP_STATEnodeSortableKeys')));
-    assert.equal(await nodes.getByRole('combobox', { name: '跳转页码' }).inputValue(), '1');
     assert.equal(pageOrderAfter.length, 20);
     assert.equal(pageOrderAfter[13], movedPageId);
     assert.deepEqual(pageOrderAfter.slice(0, 7), pageOrderBefore.slice(0, 7));
     assert.equal(new Set(pageOrderAfter).size, 20);
-    console.log('PASS: manual second-page keyboard sorting uses full-library indices and retains hidden ordering');
+    console.log('PASS: manual continuous list keyboard sorting uses full-library indices and retains hidden ordering');
     // Fault injection tests control states only. Run is NEVER forwarded to the daemon.
     let runRequests = [], fakeRunning = false, fakeModified = true, failRun = true;
     await page.route('**/cgi-bin/daed-router/graphql', async route => {
@@ -422,7 +462,7 @@ async function login(page, url = base) {
     const touchSubscription = touchFrame.locator('#workspace-subscriptions [data-rfd-draggable-id]').filter({ hasText: 'Workspace 1000' });
     await touchSubscription.getByRole('button', { name: /查看节点/ }).tap();
     const touchViewer = touchFrame.locator('[data-subscription-browser]');
-    assert.equal(await touchViewer.locator('[data-subscription-node]').count(), 4);
+    assert.equal(await touchViewer.locator('[data-subscription-node]').count(), 1000);
     await touchViewer.getByRole('searchbox', { name: '搜索节点' }).fill('Workspace-0999');
     await touchViewer.getByRole('button', { name: /^节点详情 / }).tap();
     assert.ok(await touchFrame.locator('[data-slot=sheet-content]').getByText('节点详情', { exact: true }).isVisible());

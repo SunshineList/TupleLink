@@ -1,19 +1,17 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.5.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.5.0)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.5.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.5.1)。
 
-## 0.5.0 节点与测速优化
+## 0.5.1 连续浏览与延迟颜色
 
-- “节点”仅展示手动添加的节点，保留编辑、导入、二维码、排序与群组绑定。
-- 点开订阅的“查看节点”，在独立网格中搜索、分页、跳页和按延迟排序；手机
-  默认每页 4 个，电脑默认每页 12 个，也可调整每页数量。
-- 手动与订阅节点都支持单独测速。批量测速每请求最多 8 个，逐批显示结果和
-  进度，支持本批完成后停止；失败保留已完成结果。
-- 延迟查询仅合并缓存与运行时结果，不再因轮询自动探测全部节点。每批总预算
-  24 秒、单节点预算 12 秒，低于 LuCI 网关 30 秒等待时间。旧 API 调用者超过
-  8 个节点须自行分批。延迟反映配置的 HTTP 检查地址经节点的连通性。
-- 无数据库迁移，不改节点、订阅、群组、路由或 DNS 内容。
+- 手动节点与订阅节点继续分开展示；移除所有节点分页和每页数量选择，改为
+  连续滚动，保留固定的搜索、排序与测速工具栏。
+- 订阅网格复用未变化卡片的渲染；手动节点保留窗口化列表。
+- 延迟统一显示彩色标记：低于 200ms 为绿色，200–499ms 为黄色，500ms 及
+  以上或连接失败为红色，未测速为灰色。保留数值、失败文字和颜色说明。
+- 保留单独测速、每批最多 8 个的批量测速、停止、详情、二维码与群组绑定。
+  后端、数据库、节点和现有配置不变。
 
 ## 使用
 
@@ -34,7 +32,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目 0.1.x / 0.2.x / 0.3.x / 0.4.x 安装时使用同一条命令升级：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.5.0/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.5.1/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

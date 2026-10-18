@@ -2,19 +2,86 @@ import type { NodeLatencyProbeResult } from '~/apis'
 import type { LatencyTests } from '~/components/LatencyStatus'
 import type { QRCodeModalRef } from '~/components/QRCodeModal'
 import type { SubscriptionsQuery } from '~/schemas/gql/graphql'
+import type { LibraryNode } from '~/utils/node-library'
 import { Eye, Gauge, Search } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LatencyBadge, LatencyLegend } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
-import { NodePagination } from '~/components/NodePagination'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '~/components/ui/sheet'
-import { useMediaQuery } from '~/hooks'
-import { formatLatencyLabel } from '~/utils/latency'
 import { buildNodeLibrary, defaultNodeFilters, filterNodeLibrary } from '~/utils/node-library'
+
+type SubscriptionNode = LibraryNode['node']
+
+const SubscriptionNodeTile = memo(
+  ({
+    node,
+    latency,
+    pending,
+    busy,
+    onTest,
+    onDetails,
+    onJoin,
+    onQR,
+  }: {
+    node: SubscriptionNode
+    latency?: NodeLatencyProbeResult
+    pending: boolean
+    busy: boolean
+    onTest: (ids: string[]) => Promise<void>
+    onDetails: (node: SubscriptionNode) => void
+    onJoin: (node: SubscriptionNode) => void
+    onQR: (node: SubscriptionNode) => void
+  }) => {
+    const { t } = useTranslation()
+    const name = node.tag || node.name || node.id
+    return (
+      <article role="listitem" data-subscription-node={node.id} className="subscription-node-tile">
+        <button
+          type="button"
+          className="break-words text-left text-sm font-medium leading-snug hover:text-primary"
+          title={name}
+          aria-label={`${t('panel.nodeDetails')} ${name}`}
+          onClick={() => onDetails(node)}
+        >
+          {name}
+        </button>
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>{node.protocol}</span>
+          <LatencyBadge result={latency} />
+        </div>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            loading={pending}
+            disabled={busy}
+            aria-label={`${t('latency.testNode')} ${name}`}
+            onClick={() => onTest([node.id])}
+          >
+            <Gauge />
+            {t('latency.test')}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onJoin(node)}>
+            {t('panel.addToGroup')}
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={`${t('actions.viewQRCode')} ${name}`}
+            onClick={() => onQR(node)}
+          >
+            <Eye />
+          </Button>
+        </div>
+      </article>
+    )
+  },
+)
 
 export function SubscriptionNodes({
   subscription,
@@ -28,12 +95,8 @@ export function SubscriptionNodes({
   latencies: Record<string, NodeLatencyProbeResult>
 }) {
   const { t } = useTranslation()
-  const mobile = useMediaQuery('(max-width: 559px)')
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<'custom' | 'latency'>('custom')
-  const [page, setPage] = useState(0)
-  const [size, setSize] = useState<number | null>(null)
-  const pageSize = size ?? (mobile ? 4 : 12)
   const [adding, setAdding] = useState<{ id: string; name: string; type: 'node' } | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -46,12 +109,19 @@ export function SubscriptionNodes({
     () => filterNodeLibrary(library, { ...defaultNodeFilters, search, sort }, latencies),
     [library, search, sort, latencies],
   )
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const current = Math.min(page, pages - 1)
-  const changePage = (value: number) => {
-    setPage(value)
-    gridRef.current?.scrollTo({ top: 0 })
-  }
+  const showDetails = useCallback((node: SubscriptionNode) => {
+    setDetailId(node.id)
+    setShowLink(false)
+  }, [])
+  const showQR = useCallback((node: SubscriptionNode) => {
+    qrRef.current?.setProps({ name: node.tag || node.name || node.id, link: node.link })
+    setQrOpen(true)
+  }, [])
+  const joinNode = useCallback(
+    (node: SubscriptionNode) => setAdding({ id: node.id, name: node.tag || node.name || node.id, type: 'node' }),
+    [],
+  )
+  const resetScroll = () => gridRef.current?.scrollTo({ top: 0 })
   return (
     <>
       <Dialog
@@ -76,7 +146,7 @@ export function SubscriptionNodes({
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value)
-                  changePage(0)
+                  resetScroll()
                 }}
                 placeholder={t('panel.searchPlaceholder')}
                 className="h-11 w-full min-w-0 bg-transparent text-base outline-none"
@@ -99,104 +169,45 @@ export function SubscriptionNodes({
                 value={sort}
                 onChange={(event) => {
                   setSort(event.target.value as typeof sort)
-                  changePage(0)
+                  resetScroll()
                 }}
               >
                 <option value="custom">{t('panel.defaultSort')}</option>
                 <option value="latency">{t('panel.latencySort')}</option>
               </select>
             </label>
-            <label className="min-w-0 flex-1">
-              <span className="sr-only">{t('panel.pageSize')}</span>
-              <select
-                className="panel-select"
-                value={pageSize}
-                onChange={(event) => {
-                  setSize(Number(event.target.value))
-                  changePage(0)
-                }}
-              >
-                {[4, 12, 24, 48].map((count) => (
-                  <option key={count} value={count}>
-                    {t('panel.nodesPerPage', { count })}
-                  </option>
-                ))}
-              </select>
-            </label>
             <span className="text-xs text-muted-foreground" role="status">
               {t('panel.filteredNodes', { count: filtered.length, total: library.length })}
             </span>
           </div>
+          <LatencyLegend />
           <LatencyStatus tests={tests} />
-          <div className="subscription-node-grid" ref={gridRef} role="list" aria-label={t('panel.subscriptionNodes')}>
-            {filtered.slice(current * pageSize, (current + 1) * pageSize).map(({ node }) => {
-              const name = node.tag || node.name || node.id
-              const latency = latencies[node.id]
-              return (
-                <article
-                  key={node.id}
-                  role="listitem"
-                  data-subscription-node={node.id}
-                  className="subscription-node-tile"
-                >
-                  <button
-                    type="button"
-                    className="break-words text-left text-sm font-medium leading-snug hover:text-primary"
-                    title={name}
-                    aria-label={`${t('panel.nodeDetails')} ${name}`}
-                    onClick={() => {
-                      setDetailId(node.id)
-                      setShowLink(false)
-                    }}
-                  >
-                    {name}
-                  </button>
-                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>{node.protocol}</span>
-                    <span
-                      className="tabular-nums"
-                      title={latency?.testedAt ? new Date(latency.testedAt).toLocaleString() : undefined}
-                    >
-                      {formatLatencyLabel(latency, t) || t('panel.notTested')}
-                    </span>
-                  </div>
-                  <div className="mt-auto flex items-center justify-between gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      loading={tests.pending.has(node.id)}
-                      disabled={tests.busy}
-                      aria-label={`${t('latency.testNode')} ${name}`}
-                      onClick={() => tests.test([node.id])}
-                    >
-                      <Gauge />
-                      {t('latency.test')}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setAdding({ id: node.id, name, type: 'node' })}>
-                      {t('panel.addToGroup')}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label={`${t('actions.viewQRCode')} ${name}`}
-                      onClick={() => {
-                        qrRef.current?.setProps({ name, link: node.link })
-                        setQrOpen(true)
-                      }}
-                    >
-                      <Eye />
-                    </Button>
-                  </div>
-                </article>
-              )
-            })}
+          <div
+            className="subscription-node-grid"
+            ref={gridRef}
+            tabIndex={0}
+            role="list"
+            aria-label={t('panel.subscriptionNodes')}
+          >
+            {filtered.map(({ node }) => (
+              <SubscriptionNodeTile
+                key={node.id}
+                node={node}
+                latency={latencies[node.id]}
+                pending={tests.pending.has(node.id)}
+                busy={tests.busy}
+                onTest={tests.test}
+                onDetails={showDetails}
+                onQR={showQR}
+                onJoin={joinNode}
+              />
+            ))}
             {!filtered.length && (
               <p className="col-span-full p-6 text-center text-sm text-muted-foreground">
                 {library.length ? t('panel.noMatches') : t('panel.noNodes')}
               </p>
             )}
           </div>
-          <NodePagination page={current} pages={pages} onChange={changePage} />
         </DialogContent>
       </Dialog>
       <Sheet
@@ -223,7 +234,9 @@ export function SubscriptionNodes({
                 </div>
                 <div>
                   <dt className="text-muted-foreground">{t('panel.nodeLatency')}</dt>
-                  <dd>{formatLatencyLabel(latencies[detail.id], t) || t('panel.notTested')}</dd>
+                  <dd>
+                    <LatencyBadge result={latencies[detail.id]} />
+                  </dd>
                 </div>
               </dl>
               <div className="flex flex-wrap gap-2">

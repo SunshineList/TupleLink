@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTestNodeLatenciesMutation } from '~/apis'
 import { testLatencyBatches } from '~/utils/latency-batch'
 
 export function useLatencyTests() {
   const { t } = useTranslation()
-  const mutation = useTestNodeLatenciesMutation()
+  const { mutateAsync } = useTestNodeLatenciesMutation()
   const busyRef = useRef(false)
   const stopped = useRef(false)
   const mounted = useRef(true)
@@ -20,35 +20,38 @@ export function useLatencyTests() {
       stopped.current = true
     }
   }, [])
-  const test = async (ids: string[]) => {
-    if (busyRef.current || !ids.length) return
-    busyRef.current = true
-    stopped.current = false
-    setError('')
-    setBusy(true)
-    setProgress({ completed: 0, total: new Set(ids).size })
-    try {
-      await testLatencyBatches(
-        ids,
-        (batch) => {
-          if (mounted.current) setPending(new Set(batch))
-          return mutation.mutateAsync(batch)
-        },
-        (_results, completed, total) => {
-          if (mounted.current) setProgress({ completed, total })
-        },
-        () => stopped.current,
-      )
-    } catch {
-      if (mounted.current) setError(t('latency.requestFailed'))
-    } finally {
-      busyRef.current = false
-      if (mounted.current) {
-        setPending(new Set())
-        setBusy(false)
+  const test = useCallback(
+    async (ids: string[]) => {
+      if (busyRef.current || !ids.length) return
+      busyRef.current = true
+      stopped.current = false
+      setError('')
+      setBusy(true)
+      setProgress({ completed: 0, total: new Set(ids).size })
+      try {
+        await testLatencyBatches(
+          ids,
+          (batch) => {
+            if (mounted.current) setPending(new Set(batch))
+            return mutateAsync(batch)
+          },
+          (_results, completed, total) => {
+            if (mounted.current) setProgress({ completed, total })
+          },
+          () => stopped.current,
+        )
+      } catch {
+        if (mounted.current) setError(t('latency.requestFailed'))
+      } finally {
+        busyRef.current = false
+        if (mounted.current) {
+          setPending(new Set())
+          setBusy(false)
+        }
       }
-    }
-  }
+    },
+    [mutateAsync, t],
+  )
   return {
     test,
     pending,
