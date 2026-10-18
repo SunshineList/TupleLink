@@ -186,6 +186,7 @@ def main():
                     if "down" in request:
                         state["proxy_down"] = request["down"]
                     answer["requests"] = state["proxy_requests"]
+                    answer["address"] = "127.0.0.1:" + str(socks.server_address[1])
                 result.write_text(json.dumps(answer))
             time.sleep(0.1)
     finally:

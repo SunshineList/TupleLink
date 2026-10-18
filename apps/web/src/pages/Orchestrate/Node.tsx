@@ -1,15 +1,29 @@
 import type { DraggableProvided, DraggableStateSnapshot } from '@hello-pangea/dnd'
 import type { NodeLatencyProbeResult } from '~/apis'
+import type { LatencyTests } from '~/components/LatencyStatus'
 import type { QRCodeModalRef } from '~/components/QRCodeModal'
 import type { LibraryNode, NodeFilters } from '~/utils/node-library'
 import { Draggable, Droppable } from '@hello-pangea/dnd'
-import { Cloud, CloudUpload, Eye, FileInput, GripVertical, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react'
+import {
+  Cloud,
+  CloudUpload,
+  Eye,
+  FileInput,
+  Gauge,
+  GripVertical,
+  MoreHorizontal,
+  Pencil,
+  Search,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useImportNodesMutation, useRemoveNodesMutation } from '~/apis'
 import { ConfigureNodeFormModal } from '~/components/ConfigureNodeFormModal'
 import { EditNodeFormModal } from '~/components/EditNodeFormModal'
 import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
+import { LatencyStatus } from '~/components/LatencyStatus'
+import { NodePagination } from '~/components/NodePagination'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
@@ -41,7 +55,9 @@ function NodeRow({
   snapshot,
   latency,
   onAction,
+  tests,
 }: {
+  tests: LatencyTests
   entry: LibraryNode
   provided: DraggableProvided
   snapshot: DraggableStateSnapshot
@@ -87,12 +103,18 @@ function NodeRow({
           {sources.length ? sources.map((source) => source.name).join(' · ') : t('panel.manual')}
         </p>
       </div>
-      <span
-        className="truncate text-right text-xs tabular-nums"
-        title={latency?.testedAt ? new Date(latency.testedAt).toLocaleString() : undefined}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="panel-node-probe"
+        loading={tests.pending.has(node.id)}
+        disabled={tests.busy}
+        aria-label={`${t('latency.testNode')} ${name}`}
+        title={t('latency.testNode')}
+        onClick={() => tests.test([node.id])}
       >
-        {formatLatencyLabel(latency, t) || t('panel.notTested')}
-      </span>
+        {formatLatencyLabel(latency, t) || t('latency.test')}
+      </Button>
       <Button
         variant="outline"
         size="sm"
@@ -148,7 +170,7 @@ export function NodeResource({
   totalCount,
   filters,
   onFiltersChange,
-  sources,
+  latencyTests,
   highlight,
   nodeLatencies,
   loading,
@@ -161,7 +183,7 @@ export function NodeResource({
   totalCount: number
   filters: NodeFilters
   onFiltersChange: (value: NodeFilters) => void
-  sources: Array<{ id: string; name: string }>
+  latencyTests: LatencyTests
   highlight?: boolean
   nodeLatencies?: Record<string, NodeLatencyProbeResult>
   loading?: boolean
@@ -172,6 +194,16 @@ export function NodeResource({
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
+  const [page, setPage] = useState(0)
+  const pages = Math.max(1, Math.ceil(nodes.length / 12))
+  const currentPage = Math.min(page, pages - 1)
+  const pageStart = currentPage * 12
+  const pageCount = Math.min(12, Math.max(0, nodes.length - pageStart))
+  const changePage = (value: number) => {
+    setPage(value)
+    setScrollTop(0)
+    scrollRef.current?.scrollTo({ top: 0 })
+  }
   const [viewportHeight, setViewportHeight] = useState(456)
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
@@ -200,12 +232,14 @@ export function NodeResource({
     if (scrollRef.current) scrollRef.current.scrollTop = 0
     setScrollTop(0)
     setFocusedId(null)
+    setPage(0)
   }, [filterKey])
-  const range = nodeWindow(nodes.length, scrollTop, viewportHeight)
+  const range = nodeWindow(pageCount, scrollTop, viewportHeight)
   // Retain the focused row while scrolling, so windowing cannot discard keyboard focus.
-  const indices = Array.from({ length: range.end - range.start }, (_, offset) => range.start + offset)
+  const indices = Array.from({ length: range.end - range.start }, (_, offset) => pageStart + range.start + offset)
   const focusedIndex = focusedId ? nodes.findIndex(({ node }) => node.id === focusedId) : -1
-  if (focusedIndex >= 0 && !indices.includes(focusedIndex)) indices.push(focusedIndex)
+  if (focusedIndex >= pageStart && focusedIndex < pageStart + pageCount && !indices.includes(focusedIndex))
+    indices.push(focusedIndex)
   indices.sort((a, b) => a - b)
   const onAction = (entry: LibraryNode, action: NodeAction) => {
     const { node } = entry
@@ -242,18 +276,31 @@ export function NodeResource({
         className="panel-node-section"
         contentClassName="min-h-0 flex-1"
         actions={
-          <SimpleTooltip label={t('actions.configureNode')}>
+          <>
             <Button
               variant="ghost"
               size="icon"
-              aria-label={t('actions.configureNode')}
-              onClick={() => setOpenedConfigureNodeFormModal(true)}
+              aria-label={t('latency.testManual')}
+              disabled={latencyTests.busy || !library.length}
+              onClick={() => latencyTests.test(library.map(({ node }) => node.id))}
             >
-              <FileInput aria-hidden="true" className="h-4 w-4" />
+              <Gauge />
             </Button>
-          </SimpleTooltip>
+            <SimpleTooltip label={t('actions.configureNode')}>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('actions.configureNode')}
+                onClick={() => setOpenedConfigureNodeFormModal(true)}
+              >
+                <FileInput aria-hidden="true" className="h-4 w-4" />
+              </Button>
+            </SimpleTooltip>
+          </>
         }
       >
+        <p className="shrink-0 text-xs text-muted-foreground">{t('panel.manualNodesHint')}</p>
+        <LatencyStatus tests={latencyTests} />
         {totalCount > 0 && (
           <div className="shrink-0 space-y-2" data-node-toolbar>
             <label className="flex items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
@@ -271,24 +318,7 @@ export function NodeResource({
                 className="h-10 w-full min-w-0 bg-transparent text-sm outline-none"
               />
             </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="min-w-0">
-                <span className="sr-only">{t('panel.source')}</span>
-                <select
-                  className="panel-select"
-                  value={filters.source}
-                  disabled={dragging}
-                  onChange={(event) => onFiltersChange({ ...filters, source: event.target.value })}
-                >
-                  <option value="all">{t('panel.allSources')}</option>
-                  <option value="manual">{t('panel.manual')}</option>
-                  {sources.map((source) => (
-                    <option key={source.id} value={source.id}>
-                      {source.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className="grid gap-2">
               <label className="min-w-0">
                 <span className="sr-only">{t('panel.sort')}</span>
                 <select
@@ -332,6 +362,7 @@ export function NodeResource({
               snapshot={snapshot}
               latency={nodeLatencies?.[nodes[rubric.source.index].node.id]}
               onAction={onAction}
+              tests={latencyTests}
             />
           )}
         >
@@ -362,13 +393,13 @@ export function NodeResource({
             >
               <div
                 className="relative"
-                style={{ height: (nodes.length + (snapshot.isUsingPlaceholder ? 1 : 0)) * NODE_ROW_HEIGHT }}
+                style={{ height: (pageCount + (snapshot.isUsingPlaceholder ? 1 : 0)) * NODE_ROW_HEIGHT }}
               >
                 {indices.map((index) => (
                   <div
                     key={nodes[index].node.id}
                     className="absolute inset-x-0"
-                    style={{ top: index * NODE_ROW_HEIGHT, height: NODE_ROW_HEIGHT }}
+                    style={{ top: (index - pageStart) * NODE_ROW_HEIGHT, height: NODE_ROW_HEIGHT }}
                   >
                     <Draggable draggableId={`node-${nodes[index].node.id}`} index={index}>
                       {(rowProvided, rowSnapshot) => (
@@ -378,6 +409,7 @@ export function NodeResource({
                           snapshot={rowSnapshot}
                           latency={nodeLatencies?.[nodes[index].node.id]}
                           onAction={onAction}
+                          tests={latencyTests}
                         />
                       )}
                     </Draggable>
@@ -403,6 +435,7 @@ export function NodeResource({
             </div>
           )}
         </Droppable>
+        <NodePagination page={currentPage} pages={pages} onChange={changePage} disabled={dragging} />
       </Section>
       <Sheet
         open={!!detailNode}

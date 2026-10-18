@@ -248,7 +248,15 @@
     "testAllNodesWithStatus": "Test all node latencies · Last tested at {{ time }} · {{ count }} nodes measured",
     "nodesMeasured": "{{ count }} nodes measured",
     "failed": "Failed",
-    "unavailable": "Unavailable"
+    "unavailable": "Unavailable",
+    "test": "Test",
+    "testNode": "Test node latency",
+    "testManual": "Test manual nodes",
+    "testFiltered": "Test matching nodes",
+    "progress": "Testing {{completed}} / {{total}}",
+    "stop": "Stop after this batch",
+    "requestFailed": "Latency test interrupted. Previous results are kept. Check that Daed is running and the check URL is reachable, then retry.",
+    "testSubscriptions": "Test subscription nodes"
   },
   "link": "Link",
   "logLevel": "Log Level",
@@ -487,6 +495,17 @@
     "filteredNodes": "{{count}} of {{total}} nodes",
     "viewSubscriptionNodes": "View nodes",
     "protocol": "Protocol",
-    "nodeLatency": "Latency"
+    "nodeLatency": "Latency",
+    "manualNodesHint": "Only manually added nodes are shown here. Browse subscription nodes from their subscription.",
+    "subscriptionNodes": "Subscription nodes",
+    "subscriptionNodesHint": "Search or jump between pages. Test a node or add it directly to a group.",
+    "nodePages": "Node pages",
+    "firstPage": "First page",
+    "lastPage": "Last page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "jumpPage": "Jump to page",
+    "pageSize": "Nodes per page",
+    "nodesPerPage": "{{count}} / page"
   }
 }

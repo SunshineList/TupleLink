@@ -62,6 +62,30 @@ def prepare(root):
             raise ValueError("Refusing to overwrite different backend addition: " + name)
         shutil.copyfile(HERE / "wing" / name, destination)
         generated[name] = digest(data)
+    # Keep latency fixes in the release source, without changing submodule pins.
+    patches = {
+        "graphql/service/node/latency_mutation_utils.go": ("b7e722f4c24dd9606fceaf310daf285b30b8d878413ca20702970ef3b4ca805d", lambda value: (HERE / "wing/node_latency.go").read_text(encoding="utf-8")),
+        "graphql/service/node/latency_cache.go": ("4d4fd03249c617bcc9fccb508dbc2d567fa74557dd5900ee046cbf307ff64831", lambda value: value.replace('if err := refreshLatencyCacheIfNeeded(ctx); err != nil {\n\t\treturn nil, err\n\t}', '// Reading results must never start network probes.').replace('if _, ok := merged[id]; !ok {', 'if cached, ok := merged[id]; !ok || resolver.TestedAtV.After(cached.TestedAtV) {')),
+        "graphql/mutation.go": ("90a8f23ac625f2d3adf79f7f236d40b6529e2857028cc5ed02f02c0e111ee8ef", lambda value: value.replace('TestNodeLatencies(args *struct', 'TestNodeLatencies(ctx context.Context, args *struct').replace('node.TestLatencies(context.TODO(), args.IDs)', 'node.TestLatencies(ctx, args.IDs)')),
+    }
+    for relative, (original, transform) in patches.items():
+        destination = root / relative
+        data = destination.read_bytes()
+        if digest(data) == original:
+            data = transform(data.decode()).encode()
+        elif previous.get(relative) != digest(data):
+            raise ValueError("Unknown backend source; refusing to overwrite: " + relative)
+        elif relative.endswith("latency_mutation_utils.go"):
+            data = (HERE / "wing/node_latency.go").read_bytes()
+        destination.write_bytes(data)
+        generated[relative] = digest(data)
+    destination = root / "graphql/service/node/router_latency_test.go"
+    key = "graphql/service/node/router_latency_test.go"
+    data = (HERE / "wing/node_latency_test.go").read_bytes()
+    if destination.exists() and destination.read_bytes() != data and previous.get(key) != digest(destination.read_bytes()):
+        raise ValueError("Unknown latency tests; refusing to overwrite")
+    destination.write_bytes(data)
+    generated[key] = digest(data)
     manifest.write_text(json.dumps(generated, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 

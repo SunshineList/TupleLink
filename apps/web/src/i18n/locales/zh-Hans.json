@@ -248,7 +248,15 @@
     "testAllNodesWithStatus": "测试所有节点延迟 · 最近测速时间 {{ time }} · 已测速 {{ count }} 个节点",
     "nodesMeasured": "已测速 {{ count }} 个节点",
     "failed": "失败",
-    "unavailable": "不可用"
+    "unavailable": "不可用",
+    "test": "测速",
+    "testNode": "测试节点延迟",
+    "testManual": "测试手动节点",
+    "testFiltered": "测试当前结果",
+    "progress": "测速进度 {{completed}} / {{total}}",
+    "stop": "本批完成后停止",
+    "requestFailed": "测速中断，已保留已有结果。请确认 Daed 服务及测速地址可用后重试。",
+    "testSubscriptions": "测试订阅节点"
   },
   "link": "链接",
   "logLevel": "日志等级",
@@ -487,6 +495,17 @@
     "filteredNodes": "共 {{total}} 个，当前匹配 {{count}} 个",
     "viewSubscriptionNodes": "查看节点",
     "protocol": "协议",
-    "nodeLatency": "延迟"
+    "nodeLatency": "延迟",
+    "manualNodesHint": "这里只显示手动添加的节点；订阅节点请从对应订阅查看。",
+    "subscriptionNodes": "订阅节点",
+    "subscriptionNodesHint": "搜索或跳页快速找节点，支持单独测速和加入群组。",
+    "nodePages": "节点分页",
+    "firstPage": "首页",
+    "lastPage": "末页",
+    "previousPage": "上一页",
+    "nextPage": "下一页",
+    "jumpPage": "跳转页码",
+    "pageSize": "每页数量",
+    "nodesPerPage": "每页 {{count}} 个"
   }
 }

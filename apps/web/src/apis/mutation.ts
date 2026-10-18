@@ -830,8 +830,12 @@ export function useTestNodeLatenciesMutation() {
 
       return data.testNodeLatencies
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEY_NODE_LATENCY })
+    onSuccess: (results) => {
+      queryClient.setQueryData<NodeLatencyProbeResult[]>(QUERY_KEY_NODE_LATENCY, (previous = []) => {
+        const merged = new Map(previous.map((result) => [result.id, result]))
+        for (const result of results) merged.set(result.id, result)
+        return [...merged.values()]
+      })
     },
   })
 }

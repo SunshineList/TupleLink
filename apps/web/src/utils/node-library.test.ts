@@ -10,6 +10,15 @@ import {
 } from './node-library'
 
 describe('node library', () => {
+  it('keeps manual and subscription views separate without copying subscription nodes', () => {
+    const manual = buildNodeLibrary(mockNodes.nodes.edges, [])
+    const subscription = buildNodeLibrary([], [mockSubscriptions.subscriptions[0]])
+    expect(manual.map((entry) => entry.node.id)).toEqual(mockNodes.nodes.edges.map((node) => node.id))
+    expect(manual.every((entry) => entry.editable && !entry.sources.length)).toBe(true)
+    expect(
+      subscription.every((entry) => !entry.editable && entry.sources[0].id === mockSubscriptions.subscriptions[0].id),
+    ).toBe(true)
+  })
   it('merges subscription nodes without losing manual edit permissions or duplicating IDs', () => {
     const nodes = mockNodes.nodes.edges
     const library = buildNodeLibrary(nodes, mockSubscriptions.subscriptions)

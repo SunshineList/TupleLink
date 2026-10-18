@@ -23,12 +23,12 @@ import {
   useNodeLatenciesQuery,
   useNodesQuery,
   useSubscriptionsQuery,
-  useTestNodeLatenciesMutation,
 } from '~/apis'
 import type { NodeLatencyProbeResult } from '~/apis'
 import { DraggableResourceType } from '~/constants'
 import { appStateAtom, groupSortOrdersAtom } from '~/store'
 import { deriveTime } from '~/utils'
+import { useLatencyTests } from '~/hooks/useLatencyTests'
 import { Config } from './Config'
 import { DNS } from './DNS'
 import { GroupResource } from './Group'
@@ -93,7 +93,7 @@ export function OrchestratePage() {
   const groupAddNodesMutation = useGroupAddNodesMutation()
   const groupAddSubscriptionsMutation = useGroupAddSubscriptionsMutation()
   const groupDelNodesMutation = useGroupDelNodesMutation()
-  const testNodeLatenciesMutation = useTestNodeLatenciesMutation()
+  const latencyTests = useLatencyTests()
 
   const [draggingResource, setDraggingResource] = useState<DraggingResource | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -155,25 +155,10 @@ export function OrchestratePage() {
     () => Object.fromEntries((nodeLatenciesQuery.data ?? []).map((result) => [result.id, result])),
     [nodeLatenciesQuery.data],
   )
-  const lastLatencyProbeAt = useMemo(() => {
-    let latest: string | null = null
-    let latestMs = -Infinity
-
-    for (const { testedAt } of Object.values(nodeLatencies)) {
-      if (!testedAt) continue
-      const ms = Date.parse(testedAt)
-      if (Number.isFinite(ms) && ms > latestMs) {
-        latestMs = ms
-        latest = testedAt
-      }
-    }
-
-    return latest
-  }, [nodeLatencies])
 
   const nodeLibrary = useMemo(
-    () => orderNodeLibrary(buildNodeLibrary(nodes, subscriptions), nodeSortOrder),
-    [nodes, subscriptions, nodeSortOrder],
+    () => orderNodeLibrary(buildNodeLibrary(nodes, []), nodeSortOrder),
+    [nodes, nodeSortOrder],
   )
   const sortedNodeIds = useMemo(() => nodeLibrary.map((entry) => entry.node.id), [nodeLibrary])
   const filteredNodes = useMemo(
@@ -772,16 +757,12 @@ export function OrchestratePage() {
                 totalCount={nodeLibrary.length}
                 filters={nodeFilters}
                 onFiltersChange={setNodeFilters}
-                sources={subscriptions.map((subscription) => ({
-                  id: subscription.id,
-                  name: subscription.tag || subscription.id,
-                }))}
-                loading={nodesRequest.isPending || subscriptionsRequest.isPending}
-                error={nodesRequest.isError || subscriptionsRequest.isError}
+                loading={nodesRequest.isPending}
+                error={nodesRequest.isError}
                 onRetry={() => {
                   nodesRequest.refetch()
-                  subscriptionsRequest.refetch()
                 }}
+                latencyTests={latencyTests}
                 dragging={isDragging}
                 highlight={draggingResource?.type === DraggableResourceType.groupNode}
                 nodeLatencies={nodeLatencies}
@@ -797,18 +778,7 @@ export function OrchestratePage() {
               <SubscriptionResource
                 sortedSubscriptions={sortedSubscriptions}
                 nodeLatencies={nodeLatencies}
-                testingLatencies={testNodeLatenciesMutation.isPending}
-                lastLatencyProbeAt={lastLatencyProbeAt}
-                onTestAllNodeLatencies={async () => {
-                  await testNodeLatenciesMutation.mutateAsync(undefined)
-                }}
-                onViewNodes={(id) => {
-                  setNodeFilters((current) => ({ ...current, source: id, search: '' }))
-                  setMobilePanel('nodes')
-                  requestAnimationFrame(() =>
-                    document.getElementById('workspace-nodes')?.focus({ preventScroll: true }),
-                  )
-                }}
+                latencyTests={latencyTests}
               />
             </div>
           </div>
