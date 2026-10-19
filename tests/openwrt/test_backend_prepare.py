@@ -16,6 +16,7 @@ SOURCES = (
     "graphql/service/node/latency_cache.go",
     "graphql/mutation.go",
     "dae/runtime.go",
+    "dae-core/component/outbound/dialer/dialer.go",
     "dae-core/component/outbound/dialer/register.go",
     "dae-core/common/subscription/subscription.go",
 )
@@ -35,6 +36,7 @@ class BackendPrepareTests(unittest.TestCase):
 
     def test_runtime_patch_is_reproducible_and_idempotent(self):
         PREPARE.prepare(self.root)
+        self.assertIn("return routerCheckConn(conn), nil", (self.root / "dae-core/component/outbound/dialer/dialer.go").read_text(encoding="utf-8"))
         self.assertEqual((self.root / "dae/runtime.go").read_bytes(), (ROOT / "openwrt/wing/runtime.go").read_bytes())
         before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         PREPARE.prepare(self.root)

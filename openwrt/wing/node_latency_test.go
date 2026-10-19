@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"github.com/daeuniverse/dae-wing/db"
 	dialer "github.com/daeuniverse/dae/component/outbound/dialer"
@@ -21,6 +22,94 @@ import (
 	"testing"
 	"time"
 )
+
+// A proxy can accept TCP and then never send its encrypted response salt.
+// HTTP cancellation must interrupt that Read before Close waits on its lock.
+func TestRouterLatencySilentShadowsocksReleasesBatchSlots(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var peers []net.Conn
+	var servers sync.WaitGroup
+	accepted := make(chan struct{})
+	servers.Add(1)
+	go func() {
+		defer servers.Done()
+		defer close(accepted)
+		for {
+			c, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			peers = append(peers, c)
+			mu.Unlock()
+			servers.Add(1)
+			go func() {
+				defer servers.Done()
+				defer c.Close()
+				_, _ = io.Copy(io.Discard, c)
+			}()
+		}
+	}()
+	cleanup := func() {
+		_ = listener.Close()
+		<-accepted
+		mu.Lock()
+		for _, c := range peers {
+			_ = c.Close()
+		}
+		mu.Unlock()
+		servers.Wait()
+	}
+	defer cleanup()
+	log := logrus.New()
+	log.SetOutput(io.Discard)
+	option := &dialer.GlobalOption{Log: log, CheckInterval: time.Minute, TcpCheckOptionRaw: dialer.TcpCheckOptionRaw{Log: log, Raw: []string{"http://127.0.0.1/generate_204", "127.0.0.1"}, Method: http.MethodGet, ResolverNetwork: "udp"}}
+	user := base64.RawURLEncoding.EncodeToString([]byte("chacha20-ietf-poly1305:fixture-silent-server"))
+	nodes := make([]db.Node, latencyProbeConcurrency)
+	for i := range nodes {
+		nodes[i].ID = uint(i + 1)
+		nodes[i].Link = "ss://" + user + "@" + listener.Addr().String()
+	}
+	for batch := 0; batch < 2; batch++ {
+		done := make(chan error, 1)
+		go func() {
+			results, err := runLatencyProbes(context.Background(), nodes, func(ctx context.Context, n *db.Node) *LatencyResolver {
+				ctx, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+				defer cancel()
+				return testSingleNodeLatency(ctx, option, n)
+			})
+			if err == nil {
+				for _, r := range results {
+					if r == nil || r.AliveVal || r.MessageV == nil || *r.MessageV != "timeout" {
+						err = fmt.Errorf("silent SS did not return a timeout")
+						break
+					}
+				}
+			}
+			done <- err
+		}()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(time.Second):
+			cleanup()
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+			}
+			t.Fatal("silent Shadowsocks held batch slots after the test deadline")
+		}
+		if len(latencyProbeSlots) != 0 {
+			t.Fatal("test slots were not released")
+		}
+	}
+}
 
 func TestRouterLatencyFailureCategoriesDoNotLeakCredentials(t *testing.T) {
 	for _, c := range []struct {

@@ -1,7 +1,13 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.11](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.11)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.12](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.12)。
+
+## 0.6.12 无响应 SS 测试取消修复
+
+- 修复 SS 服务器只接受 TCP、一直不返回加密数据时，HTTP 取消等待读取锁，导致单项或批量测试无法结束的问题。关闭测试/健康检查连接前先中断读写，及时释放连接及测试名额。
+- 两轮各八个无响应 SS 的真实套接字回归覆盖超时返回及并发名额释放；正常协议传输和 HTTP 连接复用不改变。
+- 此修复解决测试卡住，不会使其他客户端也无法连接的公网节点恢复。升级保留节点、订阅、群组和配置，无新依赖或数据库迁移。
 
 ## 0.6.11 协议参数兼容修复
 
@@ -91,7 +97,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.11/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.12/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

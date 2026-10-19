@@ -19,6 +19,21 @@ import (
 	"golang.org/x/crypto/blake2b"
 )
 
+// The pinned SS stream holds its read mutex while waiting for the response
+// salt, and Close waits for that mutex before closing the underlying socket.
+// Interrupt pending I/O first so HTTP cancellation can actually finish. This
+// deadline is only applied when closing, preserving healthy keep-alive reuse.
+func routerCheckConn(conn netproxy.Conn) net.Conn {
+	return &routerHTTPConn{Conn: &netproxy.FakeNetConn{Conn: conn}}
+}
+
+type routerHTTPConn struct{ net.Conn }
+
+func (c *routerHTTPConn) Close() error {
+	_ = c.Conn.SetDeadline(time.Now())
+	return c.Conn.Close()
+}
+
 // Adapt URI options at the shared constructor so interactive tests, health
 // checks and actual traffic use exactly the same protocol parameters.
 func routerProtocolOptions(link string, next netproxy.Dialer, hopInterval time.Duration) (string, netproxy.Dialer, error) {
