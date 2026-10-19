@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { generateHysteria2URL } from '../src/generator'
 import {
   parseHTTPUrl,
   parseHysteria2Url,
@@ -9,6 +10,50 @@ import {
   parseTrojanUrl,
   parseV2rayUrl,
 } from '../src/parser'
+
+describe('protocol compatibility regressions', () => {
+  it('accepts SIP002 plaintext credentials and preserves special password characters', () => {
+    expect(parseSSUrl('ss://chacha20-ietf-poly1305:fixture%3A%40%2B%3D@example.com:51011#HK')).toMatchObject({
+      method: 'chacha20-ietf-poly1305',
+      password: 'fixture:@+=',
+      server: 'example.com',
+      port: 51011,
+    })
+  })
+  it('preserves flag-style TLS and equals signs in plugin options', () => {
+    const plugin = encodeURIComponent('v2ray-plugin;tls;host=fixture.test;path=/ws?token=abc==')
+    expect(parseSSUrl(`ss://YWVzLTEyOC1nY206Zml4dHVyZQ@example.com:443?plugin=${plugin}`)).toMatchObject({
+      tls: 'tls',
+      host: 'fixture.test',
+      path: '/ws?token=abc==',
+    })
+  })
+  it('retains the complete Hysteria2 user:password authentication when editing', () => {
+    const parsed = parseHysteria2Url(
+      'hy2://fixture:pass%3Aword@example.com:443?obfs=salamander&obfs-password=abcd&ports=5000-5002',
+    )!
+    expect(parsed.auth).toBe('fixture:pass:word')
+    const regenerated = generateHysteria2URL({
+      protocol: 'hy2',
+      auth: parsed.auth!,
+      host: '::1',
+      port: 443,
+      params: {},
+      hash: '',
+    })
+    expect(new URL(regenerated).hostname).toBe('[::1]')
+    expect(parseHysteria2Url(regenerated)?.auth).toBe('fixture:pass:word')
+  })
+  it('keeps explicit TLS aliases and false precedence when editing AnyTLS and HY2', () => {
+    expect(parseNodeUrl('anytls://fixture@example.com:443?allowInsecure=true')?.data).toMatchObject({
+      allowInsecure: true,
+    })
+    expect(parseNodeUrl('anytls://fixture@example.com:443?insecure=false&allowInsecure=true')?.data).toMatchObject({
+      allowInsecure: false,
+    })
+    expect(parseHysteria2Url('hy2://fixture@example.com:443?insecure=TRUE')?.allowInsecure).toBe(true)
+  })
+})
 
 describe('parseHTTPUrl', () => {
   it('should parse basic HTTP URL', () => {

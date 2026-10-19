@@ -1,0 +1,290 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (c) 2023, daeuniverse Organization <team@v2raya.org>
+package node
+
+import (
+	"context"
+	"crypto/x509"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/netip"
+	"net/url"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"github.com/daeuniverse/dae-wing/common"
+	"github.com/daeuniverse/dae-wing/dae"
+	"github.com/daeuniverse/dae-wing/db"
+	dialer "github.com/daeuniverse/dae/component/outbound/dialer"
+	"github.com/daeuniverse/outbound/netproxy"
+	"github.com/graph-gophers/graphql-go"
+	"github.com/sirupsen/logrus"
+)
+
+const latencyProbeConcurrency = 8
+const latencyRequestTimeout = 24 * time.Second
+
+var latencyRequestSlot = make(chan struct{}, latencyProbeConcurrency)
+var latencyProbeSlots = make(chan struct{}, latencyProbeConcurrency)
+var latencyOptions struct {
+	sync.Mutex
+	global  string
+	option  *dialer.GlobalOption
+	err     error
+	expires time.Time
+}
+
+func TestLatencies(ctx context.Context, ids *[]graphql.ID) ([]*LatencyResolver, error) {
+	// Bound work before opening dialers. Older callers receive a useful error,
+	// rather than tying up CGI workers until the gateway times out.
+	if ids != nil && len(*ids) > latencyProbeConcurrency {
+		return nil, fmt.Errorf("test at most 8 nodes per request")
+	}
+	nodes, err := latencyProbeNodes(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes) > latencyProbeConcurrency {
+		return nil, fmt.Errorf("test at most 8 nodes per request")
+	}
+	if len(nodes) == 0 {
+		return []*LatencyResolver{}, nil
+	}
+	select {
+	case latencyRequestSlot <- struct{}{}:
+		defer func() { <-latencyRequestSlot }()
+	default:
+		return nil, fmt.Errorf("latency test already in progress; retry shortly")
+	}
+	ctx, cancel := context.WithTimeout(ctx, latencyRequestTimeout)
+	defer cancel()
+	option, err := latencyProbeOption(ctx)
+	if err != nil {
+		return nil, err
+	}
+	results, err := runLatencyProbes(ctx, nodes, func(ctx context.Context, n *db.Node) *LatencyResolver { return testSingleNodeLatency(ctx, option, n) })
+	if err != nil {
+		return nil, err
+	}
+	storeLatencyResults(results)
+	return results, nil
+}
+
+func runLatencyProbes(ctx context.Context, nodes []db.Node, probe func(context.Context, *db.Node) *LatencyResolver) ([]*LatencyResolver, error) {
+	results := make([]*LatencyResolver, len(nodes))
+	var wg sync.WaitGroup
+	for index := range nodes {
+		index := index
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			select {
+			case latencyProbeSlots <- struct{}{}:
+				defer func() { <-latencyProbeSlots }()
+				results[index] = probe(ctx, &nodes[index])
+			case <-ctx.Done():
+			}
+		}()
+	}
+	wg.Wait()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// Retained for source compatibility with the upstream cache helpers. Queries
+// no longer call those helpers; explicit tests use bounded batches above.
+func testLatencyResultsForNodes(option *dialer.GlobalOption, nodes []db.Node) []*LatencyResolver {
+	ctx, cancel := context.WithTimeout(context.Background(), latencyRequestTimeout)
+	defer cancel()
+	if len(nodes) > latencyProbeConcurrency {
+		return nil
+	}
+	results, _ := runLatencyProbes(ctx, nodes, func(ctx context.Context, n *db.Node) *LatencyResolver { return testSingleNodeLatency(ctx, option, n) })
+	return results
+}
+
+func latencyProbeOption(ctx context.Context) (*dialer.GlobalOption, error) {
+	var model db.Config
+	if err := db.DB(ctx).Where("selected = ?", true).First(&model).Error; err != nil {
+		return nil, err
+	}
+	// Share successful target resolution across concurrent one-node requests.
+	// A changed configuration bypasses the short cache immediately. Failed DNS
+	// is shared for just one second to avoid serial retries by concurrent callers.
+	latencyOptions.Lock()
+	defer latencyOptions.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if latencyOptions.global == model.Global && time.Now().Before(latencyOptions.expires) {
+		return latencyOptions.option, latencyOptions.err
+	}
+	parsed, err := dae.ParseConfig(&model.Global, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	log := logrus.New()
+	log.SetOutput(io.Discard)
+	option := dialer.NewGlobalOption(&parsed.Global, log)
+	if _, err := option.TcpCheckOptionRaw.Option(); err != nil {
+		failure := fmt.Errorf("cannot resolve latency check target; check DNS or tcp_check_url")
+		latencyOptions.global, latencyOptions.option, latencyOptions.err, latencyOptions.expires = model.Global, nil, failure, time.Now().Add(time.Second)
+		return nil, failure
+	}
+	latencyOptions.global, latencyOptions.option, latencyOptions.expires = model.Global, option, time.Now().Add(30*time.Second)
+	latencyOptions.err = nil
+	return option, nil
+}
+
+func latencyProbeNodes(ctx context.Context, ids *[]graphql.ID) ([]db.Node, error) {
+	q := db.DB(ctx).Model(&db.Node{})
+	if ids != nil {
+		decoded, err := common.DecodeCursorBatch(*ids)
+		if err != nil {
+			return nil, err
+		}
+		q = q.Where("id in ?", decoded)
+	}
+	var nodes []db.Node
+	if err := q.Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
+func testSingleNodeLatency(ctx context.Context, option *dialer.GlobalOption, node *db.Node) *LatencyResolver {
+	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	r := &LatencyResolver{NodeID: node.ID, TestedAtV: time.Now()}
+	d, err := dialer.NewFromLinkContext(ctx, option, dialer.InstanceOption{DisableCheck: true}, node.Link, "")
+	if err != nil {
+		message := "invalid_node"
+		r.MessageV = &message
+		return r
+	}
+	defer d.Close()
+	result, err := probeInteractiveLatency(ctx, d)
+	if err != nil {
+		message := latencyFailureCode(err)
+		r.MessageV = &message
+		return r
+	}
+	r.AliveVal, r.TestedAtV = result.Alive, result.CheckedAt
+	if result.Alive {
+		ms := int32(result.Latency.Milliseconds())
+		r.LatencyMsV = &ms
+	} else {
+		message := "unreachable"
+		r.MessageV = &message
+	}
+	return r
+}
+
+// One real HTTP request per available IP family, raced with a shared deadline.
+// Manual tests need the first working route, not background health-check retries
+// or a wait for an unusable second family. Closing a temporary dialer does not
+// modify the selected node or the running proxy's health history.
+func probeInteractiveLatency(parent context.Context, d *dialer.Dialer) (*dialer.LatencyProbeResult, error) {
+	opt, err := d.TcpCheckOptionRaw.Option()
+	if err != nil {
+		return nil, err
+	}
+	network, err := netproxy.ParseMagicNetwork(d.TcpCheckOptionRaw.ResolverNetwork)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	defer cancel()
+	type attempt struct {
+		ok      bool
+		latency time.Duration
+		err     error
+	}
+	results := make(chan attempt, 2)
+	var wg sync.WaitGroup
+	for _, family := range []struct {
+		ip    netip.Addr
+		index int
+	}{{opt.Ip4, dialer.IdxTcp4}, {opt.Ip6, dialer.IdxTcp6}} {
+		if !family.ip.IsValid() {
+			continue
+		}
+		wg.Add(1)
+		go func(ip netip.Addr, index int) {
+			defer wg.Done()
+			start := time.Now()
+			ok, err := d.HttpCheck(ctx, index, opt.Url, ip, opt.Method, network.Mark, network.Mptcp)
+			results <- attempt{ok: ok && err == nil, latency: time.Since(start), err: err}
+		}(family.ip, family.index)
+	}
+	go func() { wg.Wait(); close(results) }()
+	result := &dialer.LatencyProbeResult{}
+	var failure error
+	for attempt := range results {
+		if attempt.ok && !result.Alive {
+			result.Alive, result.Latency = true, attempt.latency
+			cancel()
+		}
+		// Prefer an actionable error over a second family's generic timeout.
+		if attempt.err != nil && (failure == nil || latencyFailureCode(failure) == "timeout") {
+			failure = attempt.err
+		}
+	}
+	result.CheckedAt = time.Now()
+	if !result.Alive && failure != nil {
+		return result, failure
+	}
+	return result, nil
+}
+
+// Return fixed categories only: nested network errors can contain credentials,
+// the full node URL, private certificate paths or server-controlled messages.
+func latencyFailureCode(err error) string {
+	for {
+		var request *url.Error
+		if !errors.As(err, &request) || request.Err == nil {
+			break
+		}
+		err = request.Err
+	}
+	var dns *net.DNSError
+	if errors.As(err, &dns) {
+		return "dns_failed"
+	}
+	var authority x509.UnknownAuthorityError
+	var hostname x509.HostnameError
+	var certificate x509.CertificateInvalidError
+	if errors.As(err, &authority) || errors.As(err, &hostname) || errors.As(err, &certificate) {
+		return "tls_failed"
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return "connection_refused"
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed) {
+		return "connection_closed"
+	}
+	message := strings.ToLower(err.Error())
+	var network net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &network) && network.Timeout()) || strings.Contains(message, "timeout") {
+		return "timeout"
+	}
+	if errors.Is(err, context.Canceled) {
+		return "cancelled"
+	}
+	if strings.Contains(message, "certificate") || strings.Contains(message, "tls: ") {
+		return "tls_failed"
+	}
+	if strings.Contains(message, "auth") || strings.Contains(message, "password") {
+		return "authentication_failed"
+	}
+	if strings.Contains(message, "status code") {
+		return "check_target_failed"
+	}
+	return "unreachable"
+}

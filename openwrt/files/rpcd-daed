@@ -1,0 +1,62 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -e
+. /usr/share/libubox/jshn.sh
+
+case "${1:-}" in
+list)
+	printf '%s\n' '{"status":{},"logs":{},"action":{"action":""}}'
+	;;
+call)
+	case "${2:-}" in
+	status) /usr/libexec/daed/check ;;
+	logs)
+		json_init
+		logs=$(tail -c 32768 /var/log/daed/daed.log 2>/dev/null | tail -n 120 | \
+			sed -E 's#[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]"<>]+#[URL REDACTED]#g; s/([Tt]oken|[Pp]assword|[Aa]uthorization)([=: ]+)[^, ]+/\1\2[REDACTED]/g') || logs=''
+		json_add_string logs "$logs"
+		json_dump
+		;;
+	action)
+		input=''
+		read -r input || :
+		json_load "${input:-\{\}}" || exit 1
+		action=''
+		json_get_var action action
+		case "$action" in start|restart|stop|boot_enable|boot_disable) ;; *)
+			json_init; json_add_boolean success 0; json_dump; exit 0 ;;
+		esac
+		mkdir -p /var/lock
+		exec 9>/var/lock/daed-install.lock
+		if ! flock -n 9; then
+			json_init
+			json_add_boolean success 0
+			json_add_string message 'Daed 正在安装或执行其他服务操作，请稍后重试。'
+			json_dump
+			exit 0
+		fi
+		success=1
+		case "$action" in
+		start|restart)
+			if /usr/libexec/daed/check --check >/dev/null; then
+				uci set daed.main.enabled=1
+				uci commit daed
+				/etc/init.d/daed "$action" >/dev/null 2>&1 || success=0
+			else success=0; fi ;;
+		stop)
+			uci set daed.main.enabled=0
+			uci commit daed
+			/etc/init.d/daed stop >/dev/null 2>&1 || success=0 ;;
+		boot_enable) /etc/init.d/daed enable >/dev/null 2>&1 || success=0 ;;
+		boot_disable) /etc/init.d/daed disable >/dev/null 2>&1 || success=0 ;;
+		*) success=0 ;;
+		esac
+		json_init
+		json_add_boolean success "$success"
+		json_dump
+		;;
+	*) exit 1 ;;
+	esac
+	;;
+*) exit 1 ;;
+esac

@@ -17,6 +17,27 @@ afterAll(() => {
   vi.unstubAllGlobals()
 })
 
+it('preserves Hysteria2 port hopping and the standard obfuscation parameter', async () => {
+  const { hysteria2Protocol } = await import('./complex')
+  const link = hysteria2Protocol.generateLink({
+    ...hysteria2Protocol.defaultValues,
+    server: '127.0.0.1',
+    port: 443,
+    auth: 'fixture:password',
+    obfs: 'salamander',
+    obfsPassword: 'fixture-obfs',
+    ports: '5000-5002',
+  })
+  const parsed = hysteria2Protocol.parseLink?.(link)
+  expect(parsed).toMatchObject({
+    auth: 'fixture:password',
+    obfs: 'salamander',
+    obfsPassword: 'fixture-obfs',
+    ports: '5000-5002',
+  })
+  expect(new URL(link).searchParams.get('obfs-password')).toBe('fixture-obfs')
+})
+
 it.each([
   { net: 'tcp', type: 'http', path: '/x', expected: { type: 'http', path: '/x' } },
   { net: 'grpc', type: 'none', path: 'svc', expected: { path: 'svc' } },
@@ -29,3 +50,19 @@ it.each([
 
   expect(JSON.parse(Base64.decode(link.slice('vmess://'.length)))).toMatchObject(expected)
 })
+
+it.each(['none', 'xtls-rprx-vision', 'xtls-rprx-vision-udp443'] as const)(
+  'serializes the VLESS flow choice %s for dae',
+  async (flow) => {
+    const { v2rayProtocol } = await import('./complex')
+    const link = v2rayProtocol.generateLink({
+      ...v2rayProtocol.defaultValues,
+      protocol: 'vless',
+      flow,
+      add: '192.0.2.20',
+      port: 443,
+      id: '33333333-3333-4333-8333-000000000001',
+    })
+    expect(new URL(link).searchParams.get('flow')).toBe(flow === 'none' ? null : flow)
+  },
+)

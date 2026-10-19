@@ -70,7 +70,8 @@ export function generateURL({
 export function generateHysteria2URL({ protocol, auth, host, port, params, hash }: GenerateHysteria2URLParams): string {
   // Encode the auth field to handle special characters like '@'
   const encodedAuth = encodeURIComponent(auth)
-  const uri = new URL(`${protocol}://${encodedAuth}@${host}:${port}/`)
+  const hostname = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host
+  const uri = new URL(`${protocol}://${encodedAuth}@${hostname}:${port}/`)
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== '') {

@@ -1,5 +1,5 @@
-import type { TypedDocumentNode } from '@graphql-typed-document-node/core'
-import type { ClientError, RequestDocument, Variables } from 'graphql-request'
+import type { ClientError } from 'graphql-request'
+import type { GQLClientInterface } from '~/utils/graphql-client'
 import { useStore } from '@nanostores/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GraphQLClient } from 'graphql-request'
@@ -7,15 +7,11 @@ import { createContext, use, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 
 import { isMockMode, MockGraphQLClient } from '~/mocks'
-import { endpointURLAtom, tokenAtom } from '~/store'
+import { endpointURLAtom, routerSessionExpiredAtom, tokenAtom } from '~/store'
+import { cancellableGraphQLClient } from '~/utils/graphql-client'
+import { routerMode } from '~/utils/router-mode'
 
-// Define a common interface for GraphQL clients
-export interface GQLClientInterface {
-  request: <T, V extends Variables = Variables>(
-    document: RequestDocument | TypedDocumentNode<T, V>,
-    variables?: V,
-  ) => Promise<T>
-}
+export type { GQLClientInterface } from '~/utils/graphql-client'
 
 // Use an interface type to support both real and mock clients
 export type GQLClient = GQLClientInterface
@@ -70,22 +66,28 @@ export function QueryProvider({ children, colorScheme, themeMode, setThemeMode }
       return new MockGraphQLClient('mock://localhost')
     }
 
-    return new GraphQLClient(endpointURL, {
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-      responseMiddleware: (response) => {
-        const error = (response as ClientError).response?.errors?.[0]
+    return cancellableGraphQLClient(
+      new GraphQLClient(endpointURL, {
+        credentials: routerMode ? 'same-origin' : undefined,
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+        responseMiddleware: (response) => {
+          const status = (response as ClientError).response?.status
+          if (routerMode && (status === 401 || status === 403)) routerSessionExpiredAtom.set(true)
+          const error = (response as ClientError).response?.errors?.[0]
 
-        if (error) {
-          toast.error(error.message)
+          if (error) {
+            toast.error(error.message)
 
-          if (error.message === 'access denied') {
-            tokenAtom.set('')
+            if (error.message === 'access denied') {
+              if (routerMode) routerSessionExpiredAtom.set(true)
+              else tokenAtom.set('')
+            }
           }
-        }
-      },
-    })
+        },
+      }),
+    )
   }, [endpointURL, token])
 
   const colorSchemeContextValue = useMemo(

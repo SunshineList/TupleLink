@@ -1,13 +1,13 @@
 import type { NodeLatencyProbeResult } from '~/apis'
 import { Droppable } from '@hello-pangea/dnd'
-import { ChevronDown, Plus } from 'lucide-react'
 import { useStore } from '@nanostores/react'
-import { useMemo, useState } from 'react'
+import { ChevronDown, Plus } from 'lucide-react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { LatencyBadge } from '~/components/LatencyBadge'
 import { SortableResourceBadge } from '~/components/SortableResourceBadge'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
-import { formatLatencyLabel } from '~/utils/latency'
 import { groupSortOrdersAtom } from '~/store'
 
 interface GroupNode {
@@ -50,8 +50,9 @@ function GroupDropZone({
   onToggle,
   addButtonLabel,
   onAdd,
-  emptyLabel,
   children,
+  showAddButtons,
+  columns,
 }: {
   droppableId: string
   type: 'NODE' | 'SUBSCRIPTION'
@@ -63,77 +64,88 @@ function GroupDropZone({
   onToggle: () => void
   addButtonLabel: string
   onAdd: () => void
-  emptyLabel: string
   children: React.ReactNode[]
+  showAddButtons: boolean
+  columns: number
 }) {
   const compact = collapsed || !open
 
+  const split = columns === 2 && !compact ? Math.ceil(children.length / 2) : children.length
   return (
-    <div className="flex flex-col gap-2">
-      {!collapsed && (
-        <button
-          type="button"
-          className="flex items-center justify-between gap-3 py-1 text-left text-xs font-medium transition-colors hover:text-foreground"
-          onClick={onToggle}
-        >
-          <span>
-            {label} ({count})
-          </span>
-          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !open && '-rotate-90')} />
-        </button>
-      )}
-
-      <Droppable droppableId={droppableId} type={type}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            role={compact ? 'button' : undefined}
-            tabIndex={compact ? 0 : undefined}
-            className={cn(
-              'rounded-lg border transition-colors outline-none',
-              compact
-                ? 'flex min-h-11 cursor-pointer items-center justify-between border-dashed px-3 py-2 hover:border-primary/30 hover:bg-accent/40 focus-visible:border-primary/40'
-                : 'flex min-h-[40px] flex-col gap-2 border-transparent',
-              snapshot.isDraggingOver && 'border-primary bg-primary/5',
-            )}
-            onClick={compact ? onOpen : undefined}
-            onKeyDown={
-              compact
-                ? (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      onOpen()
-                    }
-                  }
-                : undefined
-            }
+    <section className="min-w-0" data-group-section={type.toLowerCase()}>
+      {(count > 0 || showAddButtons) && (
+        <div className="flex min-h-8 items-center justify-between gap-2">
+          <button
+            type="button"
+            className="flex min-h-8 min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-medium"
+            onClick={onToggle}
+            aria-expanded={!compact}
           >
-            {compact ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold">{label}</span>
-                  <span className="rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{count}</span>
+            <ChevronDown
+              className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', compact && '-rotate-90')}
+            />
+            <span>
+              {label} ({count})
+            </span>
+          </button>
+          {showAddButtons && (
+            <Button type="button" variant="ghost" size="xs" onClick={onAdd} aria-label={addButtonLabel}>
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
+      <div
+        className={cn('grid min-w-0 gap-1.5', columns === 2 && !compact && 'grid-cols-2')}
+        data-group-columns={columns}
+      >
+        {[0, 1].map((column) => {
+          const offset = column === 0 ? 0 : split
+          const items = compact ? [] : column === 0 ? children.slice(0, split) : children.slice(split)
+          return (
+            <Droppable
+              key={column}
+              droppableId={column === 0 ? droppableId : droppableId.replace(/-(nodes|subscriptions)$/, '-column-1-$1')}
+              type={type}
+              isDropDisabled={column === 1 && (compact || columns === 1)}
+            >
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  data-group-column-offset={offset}
+                  data-group-column={column}
+                  hidden={column === 1 && (compact || columns === 1)}
+                  role={compact ? 'button' : undefined}
+                  tabIndex={compact ? 0 : undefined}
+                  aria-label={compact ? label : undefined}
+                  className={cn(
+                    'flex min-w-0 flex-col gap-1.5 rounded-md outline-none',
+                    compact && 'h-1 cursor-pointer',
+                    !count && 'min-h-1',
+                    snapshot.isDraggingOver && 'min-h-8 bg-primary/5 ring-1 ring-primary/30',
+                  )}
+                  onClick={compact ? onOpen : undefined}
+                  onKeyDown={
+                    compact
+                      ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            onOpen()
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  {items}
+                  {provided.placeholder}
                 </div>
-                {provided.placeholder}
-              </>
-            ) : (
-              <>
-                <div className="mb-1 flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="xs" onClick={onAdd}>
-                    <Plus className="h-3.5 w-3.5" />
-                    {addButtonLabel}
-                  </Button>
-                </div>
-
-                {children.length > 0 ? children : <p className="py-3 text-center text-xs text-muted-foreground">{emptyLabel}</p>}
-                {provided.placeholder}
-              </>
-            )}
-          </div>
-        )}
-      </Droppable>
-    </div>
+              )}
+            </Droppable>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -150,6 +162,7 @@ export function SortableGroupContent({
   onDelSubscription,
   onOpenAddNodes,
   onOpenAddSubscriptions,
+  showAddButtons = true,
 }: {
   groupId: string
   nodes: GroupNode[]
@@ -163,12 +176,23 @@ export function SortableGroupContent({
   onDelSubscription: (subscriptionId: string) => void
   onOpenAddNodes: () => void
   onOpenAddSubscriptions: () => void
+  showAddButtons?: boolean
 }) {
   const { t } = useTranslation()
   const groupSortOrders = useStore(groupSortOrdersAtom)
   const groupSortOrder = groupSortOrders[groupId] || { nodes: [], subscriptions: [] }
   const nodeSortOrder = groupSortOrder.nodes
   const subSortOrder = groupSortOrder.subscriptions
+
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [columns, setColumns] = useState(1)
+  useLayoutEffect(() => {
+    const element = contentRef.current
+    if (!element) return
+    const observer = new ResizeObserver(([entry]) => setColumns(entry.contentRect.width >= 360 ? 2 : 1))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   const [expandedSections, setExpandedSections] = useState<string[]>(['node', 'subscription'])
 
@@ -222,29 +246,33 @@ export function SortableGroupContent({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div ref={contentRef} className="flex min-w-0 flex-col gap-1" data-group-content>
       <GroupDropZone
+        showAddButtons={showAddButtons}
         droppableId={`${groupId}-nodes`}
         type="NODE"
         label={t('node')}
         count={nodes.length}
         collapsed={collapsed}
         open={effectiveExpandedSections.includes('node')}
-        onOpen={onExpand}
+        onOpen={() => {
+          onExpand()
+          setExpandedSections((current) => (current.includes('node') ? current : [...current, 'node']))
+        }}
         onToggle={() => toggleSection('node')}
         addButtonLabel={t('groupPicker.openNodePicker')}
         onAdd={onOpenAddNodes}
-        emptyLabel={t('empty')}
+        columns={columns}
       >
         {sortedNodes.map(({ id: nodeId, tag, name, protocol, address, subscriptionID }, index) => (
           <SortableResourceBadge
             key={nodeId}
             id={`${groupId}-node-${nodeId}`}
-            index={index}
+            index={columns === 2 ? index % Math.ceil(sortedNodes.length / 2) : index}
             name={tag || name}
             protocol={protocol}
             address={address}
-            meta={formatLatencyLabel(nodeLatencies?.[nodeId], t)}
+            meta={nodeLatencies?.[nodeId] ? <LatencyBadge result={nodeLatencies[nodeId]} /> : undefined}
             onRemove={() => onDelNode(nodeId)}
           >
             {subscriptionID && allSubscriptions?.find((subscription) => subscription.id === subscriptionID)?.tag}
@@ -253,23 +281,27 @@ export function SortableGroupContent({
       </GroupDropZone>
 
       <GroupDropZone
+        showAddButtons={showAddButtons}
         droppableId={`${groupId}-subscriptions`}
         type="SUBSCRIPTION"
         label={t('groupPicker.subscriptionGroupLabel')}
         count={subscriptions.length}
         collapsed={collapsed}
         open={effectiveExpandedSections.includes('subscription')}
-        onOpen={onExpand}
+        onOpen={() => {
+          onExpand()
+          setExpandedSections((current) => (current.includes('subscription') ? current : [...current, 'subscription']))
+        }}
         onToggle={() => toggleSection('subscription')}
         addButtonLabel={t('groupPicker.openSubscriptionPicker')}
         onAdd={onOpenAddSubscriptions}
-        emptyLabel={t('empty')}
+        columns={columns}
       >
         {sortedSubscriptions.map(({ subscription, nameFilterRegex, matchedCount, matchedNodes }, index) => (
           <SortableResourceBadge
             key={subscription.id}
             id={`${groupId}-sub-${subscription.id}`}
-            index={index}
+            index={columns === 2 ? index % Math.ceil(sortedSubscriptions.length / 2) : index}
             name={subscription.tag || subscription.link}
             meta={
               nameFilterRegex
@@ -282,7 +314,10 @@ export function SortableGroupContent({
               {nameFilterRegex && <span>{t('groupPicker.subscriptionRegexTooltip', { regex: nameFilterRegex })}</span>}
               {matchedNodes.length > 0 && (
                 <span className="opacity-80">
-                  {matchedNodes.slice(0, 5).map((node) => node.name).join(', ')}
+                  {matchedNodes
+                    .slice(0, 5)
+                    .map((node) => node.name)
+                    .join(', ')}
                   {matchedNodes.length > 5 && ` +${matchedNodes.length - 5}`}
                 </span>
               )}

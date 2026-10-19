@@ -1,0 +1,27 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Only discover the existing local downloader; never start or reconfigure PassWall.
+set +x
+mode=$(uci -q get daed.main.subscription_proxy)
+case "$mode" in ''|auto) mode=auto ;; off|passwall) ;; *) exit 1 ;; esac
+printf '%s\n' "$mode"
+[ "$mode" != off ] || exit 0
+
+socks=
+version=
+if command -v lua >/dev/null 2>&1; then
+	socks=$(lua -e 'local ok,a=pcall(require,"luci.passwall.api"); if ok and type(a.get_cache_var)=="function" then local v=a.get_cache_var("GLOBAL_SOCKS_server"); if type(v)=="string" then io.write(v) end end' 2>/dev/null)
+	version=$(lua -e 'local ok,a=pcall(require,"luci.passwall.api"); if ok and type(a.get_version)=="function" then local v=a.get_version(); if type(v)=="string" then io.write(v:match("^([^-]+)") or "") end end' 2>/dev/null)
+fi
+case "$socks" in
+	127.0.0.1:*|localhost:*|'[::1]:'*) ;;
+	0.0.0.0:*) socks="127.0.0.1:${socks##*:}" ;;
+	*) socks= ;;
+esac
+if [ -n "$socks" ]; then
+	port=${socks##*:}
+	case "$port" in ''|*[!0-9]*) socks= ;; esac
+	if [ -n "$socks" ] && { [ "${#port}" -gt 5 ] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; }; then socks=; fi
+fi
+version=$(printf '%s' "$version" | tr -cd 'a-zA-Z0-9._' | cut -c1-48)
+printf '%s\npasswall%s\n' "$socks" "${version:+/$version}"

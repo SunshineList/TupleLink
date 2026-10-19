@@ -88,7 +88,8 @@ export function generateV2rayLink(data: V2rayFormValues): string {
       host,
       headerType: type,
       sni,
-      flow,
+      // The form's "none" choice means no XTLS flow; dae rejects flow=none.
+      flow: flow === 'none' ? undefined : flow,
       allowInsecure,
     }
 
@@ -382,7 +383,8 @@ type Hysteria2FormValues = z.infer<typeof hysteria2Schema>
 function generateHysteria2Link(data: Hysteria2FormValues): string {
   const query = {
     obfs: data.obfs,
-    obfsPassword: data.obfsPassword,
+    'obfs-password': data.obfsPassword,
+    ports: data.ports || '',
     sni: data.sni,
     insecure: data.allowInsecure ? 1 : 0,
     pinSHA256: data.pinSHA256,

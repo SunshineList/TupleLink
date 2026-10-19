@@ -48,6 +48,7 @@ export function GroupFormModal({
   const { t } = useTranslation()
   const [editingID, setEditingID] = useState<string>()
   const [origins, setOrigins] = useState<FormValues>()
+  const [submitFailed, setSubmitFailed] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -60,7 +61,7 @@ export function GroupFormModal({
     control,
     setValue: setValueOriginal,
     reset,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, isSubmitting },
   } = form
 
   const setValue = useSetValue(setValueOriginal)
@@ -73,16 +74,18 @@ export function GroupFormModal({
 
   const resetForm = useCallback(() => {
     reset(defaultValues)
+    setSubmitFailed(false)
   }, [reset])
 
   const handleClose = useCallback(() => {
+    if (isSubmitting) return
     onClose()
     setTimeout(() => {
       resetForm()
       setEditingID(undefined)
       setOrigins(undefined)
     }, 200)
-  }, [onClose, resetForm])
+  }, [isSubmitting, onClose, resetForm])
 
   useImperativeHandle(ref, () => ({
     form: {
@@ -125,37 +128,53 @@ export function GroupFormModal({
   ]
 
   const onSubmit = async (data: FormValues) => {
-    const policyParams = data.policy === Policy.Fixed
-      ? editingID && origins?.policy === Policy.Fixed
-        ? origins.policyParams
-        : [{ key: '', val: '0' }]
-      : []
+    setSubmitFailed(false)
+    const policyParams =
+      data.policy === Policy.Fixed
+        ? editingID && origins?.policy === Policy.Fixed
+          ? origins.policyParams
+          : [{ key: '', val: '0' }]
+        : []
 
-    if (editingID) {
-      await groupSetPolicyMutation.mutateAsync({
-        id: editingID,
-        policy: data.policy,
-        policyParams,
-      })
-    } else {
-      await createGroupMutation.mutateAsync({
-        name: data.name,
-        policy: data.policy,
-        policyParams,
-      })
+    try {
+      if (editingID) {
+        await groupSetPolicyMutation.mutateAsync({
+          id: editingID,
+          policy: data.policy,
+          policyParams,
+        })
+      } else {
+        await createGroupMutation.mutateAsync({
+          name: data.name,
+          policy: data.policy,
+          policyParams,
+        })
+      }
+
+      onClose()
+      resetForm()
+      setEditingID(undefined)
+      setOrigins(undefined)
+    } catch {
+      setSubmitFailed(true)
     }
-
-    handleClose()
   }
 
   return (
     <Dialog open={opened} onOpenChange={handleClose}>
-      <DialogContent>
+      <DialogContent
+        onEscapeKeyDown={(event) => {
+          if (isSubmitting) event.preventDefault()
+        }}
+        onInteractOutside={(event) => {
+          if (isSubmitting) event.preventDefault()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t('group')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="space-y-4">
+          <fieldset disabled={isSubmitting} className="space-y-4">
             <Input
               withAsterisk
               label={t('name')}
@@ -172,7 +191,13 @@ export function GroupFormModal({
               onChange={(value) => setValue('policy', value as Policy)}
             />
 
+            {submitFailed && (
+              <p role="alert" className="text-sm text-destructive">
+                {t('panel.saveFailed')}
+              </p>
+            )}
             <FormActions
+              loading={isSubmitting}
               reset={() => {
                 if (editingID && origins) {
                   reset(origins)
@@ -183,7 +208,7 @@ export function GroupFormModal({
               isDirty={isDirty}
               errors={errors}
             />
-          </div>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

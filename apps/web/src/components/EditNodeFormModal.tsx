@@ -9,7 +9,7 @@ import type { TrojanFormValues } from './ConfigureNodeFormModal/TrojanForm.tsx'
 import type { TuicFormValues } from './ConfigureNodeFormModal/TuicForm.tsx'
 import type { V2rayFormValues } from './ConfigureNodeFormModal/V2rayForm.tsx'
 import { parseNodeUrl } from '@daeuniverse/dae-node-parser'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTagNodeMutation, useUpdateNodeMutation } from '../apis/index.ts'
 import { AnyTLSForm } from './ConfigureNodeFormModal/AnyTLSForm.tsx'
@@ -80,12 +80,21 @@ export function EditNodeFormModal({ opened, onClose, node }: EditNodeFormModalPr
   const tagNodeMutation = useTagNodeMutation()
   const [actionsPortal, setActionsPortal] = useState<HTMLDivElement | null>(null)
   const [currentTag, setCurrentTag] = useState('')
+  const [submitFailed, setSubmitFailed] = useState(false)
+  const saving = updateNodeMutation.isPending || tagNodeMutation.isPending
 
   // Parse the node link to detect protocol and get initial values
   const { nodeType, initialValues } = useMemo(() => parseNode(node?.link), [node?.link])
 
   // Track user's manual tab selection separately from detected type
   const [manualTab, setManualTab] = useState<NodeType | null>(null)
+  useEffect(() => {
+    if (opened) {
+      setCurrentTag(node?.tag || '')
+      setManualTab(null)
+      setSubmitFailed(false)
+    }
+  }, [opened, node?.id, node?.tag])
 
   // Use manual selection if user switched tabs, otherwise use detected type
   const activeTab = manualTab ?? (nodeType !== 'unknown' ? nodeType : 'v2ray')
@@ -95,6 +104,7 @@ export function EditNodeFormModal({ opened, onClose, node }: EditNodeFormModalPr
   }
 
   const handleClose = () => {
+    if (saving) return
     setCurrentTag('')
     setManualTab(null)
     onClose()
@@ -110,21 +120,27 @@ export function EditNodeFormModal({ opened, onClose, node }: EditNodeFormModalPr
   }
 
   const onLinkGeneration = async (link: string) => {
-    if (node) {
-      await updateNodeMutation.mutateAsync({
-        id: node.id,
-        newLink: link,
-      })
-
-      // Update tag if it changed
-      if (currentTag !== node.tag) {
-        await tagNodeMutation.mutateAsync({
+    if (saving) return
+    setSubmitFailed(false)
+    try {
+      if (node) {
+        await updateNodeMutation.mutateAsync({
           id: node.id,
-          tag: currentTag,
+          newLink: link,
         })
-      }
 
-      handleClose()
+        // Update tag if it changed
+        if (currentTag !== node.tag) {
+          await tagNodeMutation.mutateAsync({
+            id: node.id,
+            tag: currentTag,
+          })
+        }
+
+        handleClose()
+      }
+    } catch {
+      setSubmitFailed(true)
     }
   }
 
@@ -132,12 +148,25 @@ export function EditNodeFormModal({ opened, onClose, node }: EditNodeFormModalPr
 
   return (
     <Dialog open={opened} onOpenChange={handleOpenChange}>
-      <ScrollableDialogContent size="lg">
+      <ScrollableDialogContent
+        size="lg"
+        onEscapeKeyDown={(event) => {
+          if (saving) event.preventDefault()
+        }}
+        onInteractOutside={(event) => {
+          if (saving) event.preventDefault()
+        }}
+      >
         <ScrollableDialogHeader>
           <DialogTitle>{t('editNode')}</DialogTitle>
         </ScrollableDialogHeader>
         <div className="flex-1 flex flex-col min-h-0">
           <ScrollableDialogBody className="flex-1 space-y-4">
+            {submitFailed && (
+              <p role="alert" className="text-sm text-destructive">
+                {t('panel.saveFailed')}
+              </p>
+            )}
             <Input
               label={t('tag')}
               value={currentTag}

@@ -1,0 +1,170 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Read-only checks; also shipped separately so the installer uses the same checks.
+set -e
+
+if ! command -v jsonfilter >/dev/null 2>&1 || [ ! -r /usr/share/libubox/jshn.sh ]; then
+	echo 'Daed requires jsonfilter and jshn (normally installed with LuCI).' >&2
+	exit 1
+fi
+. /usr/share/libubox/jshn.sh
+
+config_value() {
+	uci -q get "daed.main.$1" 2>/dev/null || printf '%s\n' "$2"
+}
+
+listen_address() {
+	# Browsers use the authenticated gateway, never the daemon port.
+	host=127.0.0.1
+	port=$(config_value listen_port 2023)
+	case "$port" in ''|*[!0-9]*) return 1 ;; esac
+	[ "$port" -ge 1 ] && [ "$port" -le 65535 ] || return 1
+	printf '%s:%s\n' "$host" "$port"
+}
+
+if [ "${1:-}" = --listen ]; then
+	listen_address
+	exit $?
+fi
+
+compatible=1
+add_check() {
+	json_add_object ''
+	json_add_string name "$1"
+	json_add_string status "$2"
+	json_add_string message "$3"
+	json_close_object
+	[ "$2" != error ] || compatible=0
+}
+
+firmware=unknown
+release=unknown
+if [ -r /etc/openwrt_release ]; then
+	. /etc/openwrt_release
+	firmware=${DISTRIB_ID:-OpenWrt}
+	release=${DISTRIB_RELEASE:-unknown}
+fi
+arch=$(uname -m)
+kernel=$(uname -r)
+listen=$(listen_address) || listen=''
+json_init
+json_add_string firmware "$firmware"
+json_add_string release "$release"
+json_add_string architecture "$arch"
+json_add_string kernel "$kernel"
+json_add_string listen "$listen"
+json_add_array checks
+
+if [ -r /etc/openwrt_release ] && [ -x /sbin/uci ]; then
+	add_check system ok 'OpenWrt family firmware detected.'
+else
+	add_check system error 'Requires OpenWrt, ImmortalWrt or iStoreOS with UCI and LuCI.'
+fi
+case "$arch" in
+	x86_64|aarch64) add_check architecture ok "$arch" ;;
+	*) add_check architecture error 'This release supports x86_64 and ARM64 only.' ;;
+esac
+major=${kernel%%.*}
+minor=${kernel#*.}; minor=${minor%%.*}
+case "$major.$minor" in
+	*[!0-9.]*|.*|*.) add_check kernel error 'Unable to determine kernel version.' ;;
+	*)
+		if [ "$major" -gt 5 ] || { [ "$major" -eq 5 ] && [ "$minor" -ge 17 ]; }; then
+			add_check kernel ok "$kernel"
+		else
+			add_check kernel error 'LAN/WAN transparent proxy requires Linux 5.17 or later.'
+		fi ;;
+esac
+# Match cilium/ebpf v0.20.0's search order. An existing but invalid first file
+# must not be skipped: the runtime would fail on the same file.
+btf_path=''
+for candidate in /sys/kernel/btf/vmlinux \
+	"/boot/vmlinux-$kernel" "/lib/modules/$kernel/vmlinux-$kernel" \
+	"/lib/modules/$kernel/build/vmlinux" "/usr/lib/modules/$kernel/kernel/vmlinux" \
+	"/usr/lib/debug/boot/vmlinux-$kernel" "/usr/lib/debug/boot/vmlinux-$kernel.debug" \
+	"/usr/lib/debug/lib/modules/$kernel/vmlinux"; do
+	if [ -e "$candidate" ]; then btf_path=$candidate; break; fi
+done
+probe=${DAED_BTF_PROBE:-/usr/libexec/daed/btf-probe}
+if [ -z "$btf_path" ]; then
+	add_check btf error 'No native BTF or current-kernel vmlinux file was found. Existing external BTF packages are supported; no firmware or BTF is downloaded automatically.'
+elif [ -x "$probe" ]; then
+	if probe_result=$("$probe" --file "$btf_path" 2>&1); then
+		add_check btf ok "BTF parsed: $btf_path. Required network types exist; actual eBPF loading still needs validation."
+	else
+		add_check btf error "BTF cannot be parsed at $btf_path: $probe_result"
+	fi
+elif [ "$btf_path" = /sys/kernel/btf/vmlinux ] && [ -r "$btf_path" ]; then
+	add_check btf warning 'Native BTF exists; source-only check has no parser. Use the release installer for full BTF parsing.'
+else
+	add_check btf error "External BTF found at $btf_path, but the parser is missing. Use the release installer or repair daed-router."
+fi
+
+kernel_config=''
+if [ -r /proc/config.gz ]; then
+	kernel_config=$(zcat /proc/config.gz 2>/dev/null) || kernel_config=''
+elif [ -r "/boot/config-$kernel" ]; then
+	kernel_config=$(cat "/boot/config-$kernel")
+fi
+if [ -n "$kernel_config" ]; then
+	missing=''
+	for option in BPF BPF_SYSCALL BPF_JIT CGROUPS KPROBES NET_INGRESS NET_EGRESS NET_SCH_INGRESS NET_CLS_BPF NET_CLS_ACT BPF_STREAM_PARSER KPROBE_EVENTS BPF_EVENTS; do
+		if ! printf '%s\n' "$kernel_config" | grep -q "^CONFIG_$option=[ym]$"; then
+			missing="$missing CONFIG_$option"
+		fi
+	done
+	if [ -n "$missing" ]; then
+		add_check kernel_options error "Required kernel options are missing:$missing"
+	else
+		add_check kernel_options ok 'Required BPF kernel options are configured.'
+	fi
+else
+	add_check kernel_options warning 'Kernel config is unavailable; BTF/version checks alone cannot prove eBPF will load.'
+fi
+if [ -n "$listen" ]; then
+	add_check listen ok "Management address: $listen"
+else
+	add_check listen error 'No usable LAN IPv4 address, or invalid listen host/port. Check the selected LAN network in settings.'
+fi
+
+services=$(ubus call service list 2>/dev/null) || services='{}'
+# Warnings do not block first install or configurations that do not use geodata.
+# The package provides /usr/share/daed links; /etc/daed custom data takes priority.
+for asset in geosite.dat geoip.dat; do
+	asset_path=''
+	for directory in /etc/daed /usr/local/share/daed /usr/share/daed; do
+		if [ -s "$directory/$asset" ]; then asset_path="$directory/$asset"; break; fi
+	done
+	if [ -n "$asset_path" ]; then
+		add_check "$asset" ok "Rule data is readable at $asset_path; rule parsing is verified when applying configuration."
+	elif [ -s "/usr/share/v2ray/$asset" ]; then
+		add_check "$asset" warning "OpenWrt rule data exists, but the Daed search-path link is missing. Upgrade or repair daed-router."
+	else
+		add_check "$asset" warning "Default rule data is missing. Install the firmware's v2ray-geosite/v2ray-geoip packages before using geodata rules."
+	fi
+done
+
+for other in dae passwall passwall2 openclash mihomo sing-box; do
+	active=$(printf '%s' "$services" | jsonfilter -e "@[\"$other\"].instances.*.running" 2>/dev/null) || active=''
+	case "$active" in
+		*true*) add_check "other_$other" warning "$other is running. Check DNS, interfaces and traffic interception before enabling the proxy; no other service is changed." ;;
+	esac
+done
+json_close_array
+json_add_boolean compatible "$compatible"
+running=0
+active=$(printf '%s' "$services" | jsonfilter -e '@.daed.instances.*.running' 2>/dev/null) || active=''
+case "$active" in *true*) running=1 ;; esac
+json_add_boolean running "$running"
+enabled=0
+[ "$(config_value enabled 0)" != 1 ] || enabled=1
+json_add_boolean enabled "$enabled"
+boot=0
+/etc/init.d/daed enabled >/dev/null 2>&1 && boot=1
+json_add_boolean autostart "$boot"
+version=$(cat /usr/share/daed-router/version 2>/dev/null) || version=uninstalled
+json_add_string version "$version"
+json_dump
+if [ "${1:-}" = --check ]; then
+	[ "$compatible" = 1 ]
+fi

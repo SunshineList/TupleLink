@@ -1,9 +1,19 @@
 import type { DragUpdate, DropResult } from '@hello-pangea/dnd'
 import type { DraggingResource } from '~/constants'
-import type { GroupsQuery, NodesQuery, SubscriptionsQuery } from '~/schemas/gql/graphql'
+import type { GroupsQuery, SubscriptionsQuery } from '~/schemas/gql/graphql'
+import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import {
+  buildNodeLibrary,
+  defaultNodeFilters,
+  filterNodeLibrary,
+  orderNodeLibrary,
+  reorderVisibleNodes,
+} from '~/utils/node-library'
+import type { LibraryNode } from '~/utils/node-library'
 import { DragDropContext } from '@hello-pangea/dnd'
 import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   useConfigsQuery,
   useGroupAddNodesMutation,
@@ -13,13 +23,13 @@ import {
   useNodeLatenciesQuery,
   useNodesQuery,
   useSubscriptionsQuery,
-  useTestNodeLatenciesMutation,
 } from '~/apis'
 import type { NodeLatencyProbeResult } from '~/apis'
 import { DraggableResourceType } from '~/constants'
-import { useMediaQuery } from '~/hooks'
 import { appStateAtom, groupSortOrdersAtom } from '~/store'
 import { deriveTime } from '~/utils'
+import { groupColumnBase, groupColumnLocations } from '~/utils/group-columns'
+import { useLatencyTests } from '~/hooks/useLatencyTests'
 import { Config } from './Config'
 import { DNS } from './DNS'
 import { GroupResource } from './Group'
@@ -35,25 +45,66 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
   return newArray
 }
 
-export function OrchestratePage() {
+export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' | 'resources' | 'advanced' }) {
+  const { t } = useTranslation()
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [activeArea, setActiveArea] = useState('panel-common')
+  const [nodeFilters, setNodeFilters] = useState(defaultNodeFilters)
+  const [mobilePanel, setMobilePanel] = useState('nodes')
+  const workspaceRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const element = workspaceRef.current
+    if (!element) return
+    const resize = () => {
+      const top = element.getBoundingClientRect().top + window.scrollY
+      const height = `${Math.max(320, Math.min(760, window.innerHeight - top - 24))}px`
+      if (element.style.getPropertyValue('--workspace-height') !== height)
+        element.style.setProperty('--workspace-height', height)
+    }
+    const observer = new ResizeObserver(resize)
+    observer.observe(element.parentElement!)
+    const header = document.querySelector('header')
+    if (header) observer.observe(header)
+    window.addEventListener('resize', resize)
+    resize()
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', resize)
+    }
+  }, [area])
+  const scrollToArea = (id: string) => {
+    if (id === 'panel-advanced') setAdvancedOpen(true)
+    setActiveArea(id)
+    requestAnimationFrame(() => {
+      const element = document.getElementById(id)
+      element?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+        block: 'start',
+      })
+      element?.focus({ preventScroll: true })
+    })
+  }
   const { data: configsQuery } = useConfigsQuery()
-  const { data: nodesQuery } = useNodesQuery()
+  const nodesRequest = useNodesQuery()
+  const nodesQuery = nodesRequest.data
   const { data: groupsQuery } = useGroupsQuery()
-  const { data: subscriptionsQuery } = useSubscriptionsQuery()
+  const subscriptionsRequest = useSubscriptionsQuery()
+  const subscriptionsQuery = subscriptionsRequest.data
 
   const groupAddNodesMutation = useGroupAddNodesMutation()
   const groupAddSubscriptionsMutation = useGroupAddSubscriptionsMutation()
   const groupDelNodesMutation = useGroupDelNodesMutation()
-  const testNodeLatenciesMutation = useTestNodeLatenciesMutation()
+  const latencyTests = useLatencyTests()
 
   const [draggingResource, setDraggingResource] = useState<DraggingResource | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [dragNodes, setDragNodes] = useState<LibraryNode[] | null>(null)
   const [dragDestinationDroppableId, setDragDestinationDroppableId] = useState<string | null>(null)
   const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null)
   const autoScrollFrameRef = useRef<number | null>(null)
   const draggingActiveRef = useRef(false)
   const edgeAutoScrollEnabledRef = useRef(false)
-  const dragPointerRef = useRef<{ y: number } | null>(null)
+  const dragPointerRef = useRef<{ x: number; y: number } | null>(null)
   const hoveredGroupIdRef = useRef<string | null>(null)
 
   // Use persistent store for sort order
@@ -105,46 +156,17 @@ export function OrchestratePage() {
     () => Object.fromEntries((nodeLatenciesQuery.data ?? []).map((result) => [result.id, result])),
     [nodeLatenciesQuery.data],
   )
-  const lastLatencyProbeAt = useMemo(() => {
-    let latest: string | null = null
-    let latestMs = -Infinity
 
-    for (const { testedAt } of Object.values(nodeLatencies)) {
-      if (!testedAt) continue
-      const ms = Date.parse(testedAt)
-      if (Number.isFinite(ms) && ms > latestMs) {
-        latestMs = ms
-        latest = testedAt
-      }
-    }
-
-    return latest
-  }, [nodeLatencies])
-
-  // Get sorted node IDs
-  const sortedNodeIds = useMemo(() => {
-    if (nodes.length === 0) return []
-    const currentIds = nodes.map((n: NodesQuery['nodes']['edges'][number]) => n.id)
-    const currentIdSet = new Set(currentIds)
-
-    const result = nodeSortOrder.filter((id) => currentIdSet.has(id))
-    const resultSet = new Set(result)
-
-    for (const id of currentIds) {
-      if (!resultSet.has(id)) {
-        result.push(id)
-      }
-    }
-
-    return result
-  }, [nodes, nodeSortOrder])
-
-  // Get sorted nodes
-  const sortedNodes = useMemo(() => {
-    if (nodes.length === 0) return []
-    const nodeMap = new Map(nodes.map((n: NodesQuery['nodes']['edges'][number]) => [n.id, n]))
-    return sortedNodeIds.map((id) => nodeMap.get(id)).filter(Boolean) as typeof nodes
-  }, [nodes, sortedNodeIds])
+  const nodeLibrary = useMemo(
+    () => orderNodeLibrary(buildNodeLibrary(nodes, []), nodeSortOrder),
+    [nodes, nodeSortOrder],
+  )
+  const sortedNodeIds = useMemo(() => nodeLibrary.map((entry) => entry.node.id), [nodeLibrary])
+  const filteredNodes = useMemo(
+    () => filterNodeLibrary(nodeLibrary, nodeFilters, nodeLatencies),
+    [nodeLibrary, nodeFilters, nodeLatencies],
+  )
+  const visibleNodes = dragNodes || filteredNodes
 
   // Get sorted subscription IDs
   const sortedSubscriptionIds = useMemo(() => {
@@ -247,22 +269,28 @@ export function OrchestratePage() {
 
     if (!draggingActiveRef.current || !edgeAutoScrollEnabledRef.current || !dragPointerRef.current) return
 
-    const viewportHeight = window.innerHeight
-    const threshold = Math.min(320, Math.max(180, Math.round(viewportHeight * 0.3)))
-    const pointerY = dragPointerRef.current.y
+    const { x, y: pointerY } = dragPointerRef.current
+    const target = document
+      .elementFromPoint(x, pointerY)
+      ?.closest('[data-node-scroll], .panel-side-scroll') as HTMLElement | null
+    const bounds = target?.getBoundingClientRect()
+    const top = bounds?.top ?? 0
+    const bottom = bounds?.bottom ?? window.innerHeight
+    const threshold = Math.min(64, Math.max(24, (bottom - top) * 0.15))
     let delta = 0
 
-    if (pointerY < threshold) {
-      const intensity = Math.min(1, (threshold - pointerY) / threshold)
-      delta = -Math.round(24 + intensity * intensity * 176)
-    } else if (pointerY > viewportHeight - threshold) {
-      const intensity = Math.min(1, (pointerY - (viewportHeight - threshold)) / threshold)
-      delta = Math.round(24 + intensity * intensity * 176)
+    if (pointerY < top + threshold) {
+      const intensity = Math.min(1, (top + threshold - pointerY) / threshold)
+      delta = -Math.round(4 + intensity * intensity * 20)
+    } else if (pointerY > bottom - threshold) {
+      const intensity = Math.min(1, (pointerY - (bottom - threshold)) / threshold)
+      delta = Math.round(4 + intensity * intensity * 20)
     }
 
     if (delta === 0) return
 
-    window.scrollBy(0, delta)
+    if (target) target.scrollBy(0, delta)
+    else window.scrollBy(0, delta)
     autoScrollFrameRef.current = window.requestAnimationFrame(tickEdgeAutoScroll)
   }, [])
 
@@ -287,6 +315,7 @@ export function OrchestratePage() {
 
     const handlePointerMove = (event: MouseEvent | PointerEvent) => {
       dragPointerRef.current = {
+        x: event.clientX,
         y: event.clientY,
       }
 
@@ -316,10 +345,12 @@ export function OrchestratePage() {
 
   const onDragStart = (start: { draggableId: string; source: { droppableId: string } }) => {
     const draggableId = start.draggableId
-    const droppableId = start.source.droppableId
+    const droppableId = groupColumnBase(start.source.droppableId)
 
     setIsDragging(true)
+    setDragNodes(filteredNodes)
     setDragDestinationDroppableId(null)
+    dragPointerRef.current = null
     hoveredGroupIdRef.current = null
     setHoveredGroupId(null)
     edgeAutoScrollEnabledRef.current = true
@@ -359,7 +390,7 @@ export function OrchestratePage() {
 
   const onDragUpdate = useCallback(
     (update: DragUpdate) => {
-      const nextDroppableId = update.destination?.droppableId ?? null
+      const nextDroppableId = update.destination ? groupColumnBase(update.destination.droppableId) : null
       setDragDestinationDroppableId((current) => (current === nextDroppableId ? current : nextDroppableId))
       ensureEdgeAutoScroll()
     },
@@ -367,10 +398,21 @@ export function OrchestratePage() {
   )
 
   const onDragEnd = (result: DropResult) => {
-    const { source, destination, draggableId } = result
-    const fallbackGroupId = hoveredGroupIdRef.current
+    const { draggableId } = result
+    const { source, destination } = groupColumnLocations(result.source, result.destination, (id) => {
+      const column = document.querySelector(`[data-rfd-droppable-id="${CSS.escape(id)}"]`)
+      return Number(column?.getAttribute('data-group-column-offset')) || 0
+    })
+    const pointer = dragPointerRef.current
+    const fallbackGroupId = pointer
+      ? document
+          .elementFromPoint(pointer.x, pointer.y)
+          ?.closest('[data-group-card-id]')
+          ?.getAttribute('data-group-card-id') || null
+      : hoveredGroupIdRef.current
 
     setIsDragging(false)
+    setDragNodes(null)
     setDraggingResource(null)
     setDragDestinationDroppableId(null)
     setHoveredGroupId(null)
@@ -388,7 +430,13 @@ export function OrchestratePage() {
       return
     }
 
-    if (!destination) {
+    // A collapsed target can retain its pre-expansion dimensions in the drag
+    // engine. Prefer the card actually under the pointer over that stale result.
+    const pointerTargetsGroup =
+      fallbackGroupId &&
+      sourceDroppableId !== 'group-list' &&
+      !destination?.droppableId.startsWith(`${fallbackGroupId}-`)
+    if (!destination || pointerTargetsGroup) {
       if (fallbackGroupId) {
         if (sourceDroppableId === 'subscription-list') {
           const subId = draggableId.replace('subscription-', '')
@@ -476,7 +524,15 @@ export function OrchestratePage() {
     // Handle node list sorting
     if (sourceDroppableId === 'node-list' && confirmedDestDroppableId === 'node-list') {
       if (source.index !== destination.index) {
-        setNodeSortOrder(arrayMove(sortedNodeIds, source.index, destination.index))
+        if (nodeFilters.sort === 'custom')
+          setNodeSortOrder(
+            reorderVisibleNodes(
+              sortedNodeIds,
+              visibleNodes.map((entry) => entry.node.id),
+              source.index,
+              destination.index,
+            ),
+          )
       }
       return
     }
@@ -613,43 +669,191 @@ export function OrchestratePage() {
     }
   }
 
-  const matchSmallScreen = useMediaQuery('(max-width: 640px)')
-
   return (
-    <div className="flex flex-col gap-8">
-      <div className={`grid gap-5 ${matchSmallScreen ? 'grid-cols-1' : 'grid-cols-3'}`}>
-        <Config />
-        <DNS />
-        <Routing />
-      </div>
+    <div className="panel-workspace flex flex-col gap-5" data-workspace={area}>
+      {area === 'dashboard' && (
+        <section id="panel-monitor">
+          <TrafficOverview compact />
+        </section>
+      )}
+      {area === 'all' && (
+        <nav className="flex gap-5 overflow-x-auto border-b text-sm" aria-label={t('panel.title')}>
+          {[
+            ['panel-common', t('panel.common')],
+            ['panel-advanced', t('panel.advanced')],
+            ['panel-monitor', t('panel.monitor')],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-controls={id}
+              aria-current={activeArea === id ? 'location' : undefined}
+              className={`shrink-0 border-b-2 px-1 pb-3 pt-1 ${activeArea === id ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground'}`}
+              onClick={() => scrollToArea(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+      <section
+        id="panel-common"
+        hidden={area === 'advanced'}
+        tabIndex={-1}
+        className="scroll-mt-36 outline-none"
+        aria-label={t(area === 'dashboard' ? 'group' : 'panel.resources')}
+      >
+        {area === 'all' && (
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold">{t('panel.common')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('panel.commonDescription')}</p>
+          </div>
+        )}
+        <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
+          {area !== 'dashboard' && (
+            <div className="panel-mobile-tabs" role="tablist" aria-label={t('panel.common')}>
+              {[
+                ['groups', t('group'), groups.length],
+                ['nodes', t('node'), nodeLibrary.length],
+                ['subscriptions', t('subscription'), subscriptions.length],
+              ]
+                .filter(([id]) => area === 'all' || id !== 'groups')
+                .map(([id, label, count], index, tabs) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    id={`workspace-tab-${id}`}
+                    aria-controls={`workspace-${id}`}
+                    aria-selected={mobilePanel === id}
+                    tabIndex={mobilePanel === id ? 0 : -1}
+                    onClick={() => setMobilePanel(String(id))}
+                    onKeyDown={(event) => {
+                      const keys = tabs.map(([id]) => String(id))
+                      const next =
+                        event.key === 'ArrowRight'
+                          ? (index + 1) % keys.length
+                          : event.key === 'ArrowLeft'
+                            ? (index + keys.length - 1) % keys.length
+                            : event.key === 'Home'
+                              ? 0
+                              : event.key === 'End'
+                                ? keys.length - 1
+                                : -1
+                      if (next < 0) return
+                      event.preventDefault()
+                      setMobilePanel(keys[next])
+                      document.getElementById(`workspace-tab-${keys[next]}`)?.focus()
+                    }}
+                  >
+                    {label} <span className="tabular-nums">{count}</span>
+                  </button>
+                ))}
+            </div>
+          )}
+          <div className="panel-common-grid" ref={workspaceRef}>
+            <div
+              id="workspace-groups"
+              hidden={area === 'resources'}
+              className="panel-resource-pane"
+              data-active={area === 'dashboard' || mobilePanel === 'groups'}
+              role="region"
+              aria-label={t('group')}
+            >
+              <GroupResource
+                latencyTests={latencyTests}
+                quickAdd={area === 'dashboard'}
+                highlight={!!draggingResource}
+                draggingResource={draggingResource}
+                dragDestinationDroppableId={dragDestinationDroppableId}
+                hoveredGroupId={hoveredGroupId}
+                nodeLatencies={nodeLatencies}
+              />
+            </div>
+            <div
+              id="workspace-nodes"
+              hidden={area === 'dashboard'}
+              className="panel-resource-pane"
+              data-active={mobilePanel === 'nodes'}
+              role="region"
+              aria-label={t('node')}
+              tabIndex={-1}
+            >
+              <NodeResource
+                library={nodeLibrary}
+                nodes={visibleNodes}
+                totalCount={nodeLibrary.length}
+                filters={nodeFilters}
+                onFiltersChange={setNodeFilters}
+                loading={nodesRequest.isPending}
+                error={nodesRequest.isError}
+                onRetry={() => {
+                  nodesRequest.refetch()
+                }}
+                latencyTests={latencyTests}
+                dragging={isDragging}
+                highlight={draggingResource?.type === DraggableResourceType.groupNode}
+                nodeLatencies={nodeLatencies}
+              />
+            </div>
+            <div
+              id="workspace-subscriptions"
+              hidden={area === 'dashboard'}
+              className="panel-resource-pane"
+              data-active={mobilePanel === 'subscriptions'}
+              role="region"
+              aria-label={t('subscription')}
+            >
+              <SubscriptionResource
+                sortedSubscriptions={sortedSubscriptions}
+                nodeLatencies={nodeLatencies}
+                latencyTests={latencyTests}
+              />
+            </div>
+          </div>
+        </DragDropContext>
+      </section>
 
-      <TrafficOverview />
-
-      <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
-        <div className={`grid gap-5 ${matchSmallScreen ? 'grid-cols-1' : 'grid-cols-3'}`}>
-          <GroupResource
-            highlight={!!draggingResource}
-            draggingResource={draggingResource}
-            dragDestinationDroppableId={dragDestinationDroppableId}
-            hoveredGroupId={hoveredGroupId}
-            nodeLatencies={nodeLatencies}
-          />
-          <NodeResource
-            sortedNodes={sortedNodes}
-            highlight={draggingResource?.type === DraggableResourceType.groupNode}
-            nodeLatencies={nodeLatencies}
-          />
-          <SubscriptionResource
-            sortedSubscriptions={sortedSubscriptions}
-            nodeLatencies={nodeLatencies}
-            testingLatencies={testNodeLatenciesMutation.isPending}
-            lastLatencyProbeAt={lastLatencyProbeAt}
-            onTestAllNodeLatencies={async () => {
-              await testNodeLatenciesMutation.mutateAsync(undefined)
-            }}
-          />
+      <section
+        id="panel-advanced"
+        hidden={area !== 'advanced' && area !== 'all'}
+        tabIndex={-1}
+        className="scroll-mt-36 rounded-2xl border bg-card shadow-sm outline-none"
+      >
+        {area === 'all' && (
+          <button
+            type="button"
+            aria-expanded={advancedOpen}
+            aria-controls="panel-advanced-content"
+            className="flex w-full items-center gap-3 p-5 text-left"
+            onClick={() => setAdvancedOpen((value) => !value)}
+          >
+            <SlidersHorizontal aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold">{t('panel.advanced')}</span>
+              <span className="mt-1 block text-sm text-muted-foreground">{t('panel.advancedDescription')}</span>
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className={`h-4 w-4 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+        )}
+        <div
+          id="panel-advanced-content"
+          hidden={area !== 'advanced' && !advancedOpen}
+          className="panel-advanced-grid grid grid-cols-1 gap-4 p-4 lg:grid-cols-3"
+        >
+          <Config />
+          <DNS />
+          <Routing />
         </div>
-      </DragDropContext>
+      </section>
+      {area === 'all' && (
+        <section id="panel-monitor" tabIndex={-1} className="scroll-mt-36 outline-none">
+          <TrafficOverview />
+        </section>
+      )}
     </div>
   )
 }

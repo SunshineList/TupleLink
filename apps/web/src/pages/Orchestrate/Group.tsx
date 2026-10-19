@@ -2,12 +2,13 @@ import type { DraggableProvidedDragHandleProps, DraggableStateSnapshot } from '@
 import type { NodeLatencyProbeResult } from '~/apis'
 import type { GroupFormModalRef } from '~/components/GroupFormModal'
 import type { GroupPickerItem } from '~/components/GroupResourcePickerModal'
+import type { LatencyTests } from '~/components/LatencyStatus'
 import type { DraggingResource } from '~/constants'
 import type { GroupsQuery, NodesQuery, SubscriptionsQuery } from '~/schemas/gql/graphql'
 import { Draggable, Droppable } from '@hello-pangea/dnd'
 import { useStore } from '@nanostores/react'
 
-import { Settings2, Table2 } from 'lucide-react'
+import { Plus, Settings2, Table2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -24,6 +25,7 @@ import {
 import { DroppableGroupCard } from '~/components/DroppableGroupCard'
 import { GroupFormModal } from '~/components/GroupFormModal'
 import { GroupAddNodesModal, GroupAddSubscriptionsModal } from '~/components/GroupResourcePickerModal'
+import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { Section } from '~/components/Section'
 import { SortableGroupContent } from '~/components/SortableGroupContent'
 import { Button } from '~/components/ui/button'
@@ -33,7 +35,6 @@ import { useDisclosure } from '~/hooks'
 import { cn } from '~/lib/utils'
 import { appStateAtom, defaultResourcesAtom } from '~/store'
 import { getInstantDropStyle } from '~/utils'
-import { formatLatencyLabel, hasMeasuredLatency } from '~/utils/latency'
 
 const GROUP_DROPPABLE_ID = 'group-list'
 
@@ -43,15 +44,20 @@ export function GroupResource({
   dragDestinationDroppableId,
   hoveredGroupId,
   nodeLatencies,
+  latencyTests,
+  quickAdd = false,
 }: {
   highlight?: boolean
   draggingResource?: DraggingResource | null
   dragDestinationDroppableId?: string | null
   hoveredGroupId?: string | null
   nodeLatencies?: Record<string, NodeLatencyProbeResult>
+  latencyTests: LatencyTests
+  quickAdd?: boolean
 }) {
   const { t } = useTranslation()
-  const { data: groupsQuery } = useGroupsQuery()
+  const groupsRequest = useGroupsQuery()
+  const groupsQuery = groupsRequest.data
   const { data: nodesQuery } = useNodesQuery()
   const appState = useStore(appStateAtom)
   const { defaultGroupID } = useStore(defaultResourcesAtom)
@@ -147,18 +153,14 @@ export function GroupResource({
         const description = [node.name && node.name !== title ? node.name : '', node.address]
           .filter(Boolean)
           .join(' · ')
-        const metaTone: GroupPickerItem['metaTone'] = hasMeasuredLatency(nodeLatencies?.[node.id])
-          ? 'primary'
-          : 'default'
 
         return {
           id: node.id,
           title,
           description: description || undefined,
-          meta: [t('groupPicker.manualNode'), formatLatencyLabel(nodeLatencies?.[node.id], t)]
-            .filter(Boolean)
-            .join(' · '),
-          metaTone,
+          meta: t('groupPicker.manualNode'),
+          source: t('groupPicker.manualNode'),
+          sourceId: 'manual',
           badge: node.protocol || undefined,
           keywords: [node.name, node.tag, node.address, node.protocol].filter(Boolean) as string[],
         }
@@ -171,21 +173,14 @@ export function GroupResource({
         .filter((node) => !existingNodeIds.has(node.id))
         .map((node) => {
           const title = node.name || node.id
-          const metaTone: GroupPickerItem['metaTone'] = hasMeasuredLatency(nodeLatencies?.[node.id])
-            ? 'primary'
-            : 'default'
 
           return {
             id: node.id,
             title,
             description: undefined,
-            meta: [
-              t('groupPicker.fromSubscription', { name: subscriptionName }),
-              formatLatencyLabel(nodeLatencies?.[node.id], t),
-            ]
-              .filter(Boolean)
-              .join(' · '),
-            metaTone,
+            meta: t('groupPicker.fromSubscription', { name: subscriptionName }),
+            source: subscriptionName,
+            sourceId: subscription.id,
             badge: node.protocol || undefined,
             keywords: [node.name, node.link, node.protocol, subscriptionName].filter(Boolean) as string[],
           }
@@ -193,7 +188,7 @@ export function GroupResource({
     })
 
     return [...manualNodeItems, ...subscriptionNodeItems]
-  }, [addingNodesGroup, nodeLatencies, nodes, subscriptions, t])
+  }, [addingNodesGroup, nodes, subscriptions, t])
 
   const addableSubscriptionItems = useMemo<GroupPickerItem[]>(() => {
     if (!addingSubscriptionsGroup) return []
@@ -262,17 +257,38 @@ export function GroupResource({
     dragHandleProps?: DraggableProvidedDragHandleProps | null
     snapshot?: DraggableStateSnapshot
   }) => (
-    <div data-group-card-id={groupId} className={cn(snapshot?.isDragging && 'z-50 opacity-90')}>
+    <div
+      data-default-group={defaultGroupID === groupId}
+      data-group-card-id={groupId}
+      className={cn(snapshot?.isDragging && 'z-50 opacity-90')}
+    >
       <DroppableGroupCard
         id={groupId}
         name={name}
         summary={
           <>
+            {defaultGroupID === groupId && (
+              <span className="rounded bg-primary/10 px-2 py-0.5 text-[11px] font-medium">
+                {t('panel.defaultGroup')}
+              </span>
+            )}
             <span className="rounded bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground/80">
-              {policy}
+              {t(`panel.policies.${policy}`, { defaultValue: policy })}
             </span>
             <span>{t('groupPicker.nodesCount', { count: groupNodes.length })}</span>
             <span>{t('groupPicker.subscriptionGroupsCount', { count: groupSubscriptions.length })}</span>
+            {!!groupNodes.length && !expandedGroupIds.has(groupId) && (
+              <span
+                className="max-w-full basis-full whitespace-normal [overflow-wrap:anywhere]"
+                title={groupNodes.map((node) => node.tag || node.name).join(' · ')}
+              >
+                {groupNodes
+                  .slice(0, 2)
+                  .map((node) => node.tag || node.name)
+                  .join(' · ')}
+                {groupNodes.length > 2 ? '…' : ''}
+              </span>
+            )}
           </>
         }
         collapsed={!expandedGroupIds.has(groupId)}
@@ -280,11 +296,26 @@ export function GroupResource({
         onToggleCollapsed={() => setGroupExpanded(groupId, !expandedGroupIds.has(groupId))}
         onRemove={defaultGroupID !== groupId ? () => removeGroupMutation.mutate(groupId) : undefined}
         onRename={(newName) => renameGroupMutation.mutate({ id: groupId, name: newName })}
+        quickActions={
+          quickAdd && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setAddingNodesGroupId(groupId)}>
+                <Plus className="h-3.5 w-3.5" />
+                {t('groupPicker.openNodePicker')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setAddingSubscriptionsGroupId(groupId)}>
+                <Plus className="h-3.5 w-3.5" />
+                {t('groupPicker.openSubscriptionPicker')}
+              </Button>
+            </>
+          )
+        }
         actions={
           <SimpleTooltip label={t('actions.settings')}>
             <Button
               variant="ghost"
               size="xs"
+              aria-label={`${t('actions.settings')} ${name}`}
               onClick={() => {
                 updateGroupFormModalRef.current?.setEditingID(groupId)
 
@@ -303,6 +334,7 @@ export function GroupResource({
         }
       >
         <SortableGroupContent
+          showAddButtons={!quickAdd}
           groupId={groupId}
           nodes={groupNodes}
           subscriptions={groupSubscriptions}
@@ -339,16 +371,26 @@ export function GroupResource({
   return (
     <Section
       title={t('group')}
+      count={groups.length}
+      createLabel={t('panel.createGroup')}
+      loading={groupsRequest.isPending}
+      error={groupsRequest.isError}
+      onRetry={() => groupsRequest.refetch()}
       icon={<Table2 className="h-5 w-5" />}
       onCreate={openCreateGroupFormModal}
       highlight={highlight}
       bordered
+      className="panel-side-section"
+      contentClassName="min-h-0 flex-1 overflow-y-auto overscroll-contain panel-side-scroll"
     >
       <Droppable droppableId={GROUP_DROPPABLE_ID} type="GROUP">
         {(provided) => (
           <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-col gap-3">
             {sortedGroups.map(
-              ({ id: groupId, name, policy, policyParams, nodes: groupNodes, subscriptions: groupSubscriptions }, index) => (
+              (
+                { id: groupId, name, policy, policyParams, nodes: groupNodes, subscriptions: groupSubscriptions },
+                index,
+              ) => (
                 <Draggable key={groupId} draggableId={`group-${groupId}`} index={index}>
                   {(draggableProvided, snapshot) => (
                     <div
@@ -371,6 +413,14 @@ export function GroupResource({
                 </Draggable>
               ),
             )}
+            {!groupsRequest.isPending && !groupsRequest.isError && !groups.length && (
+              <ResourceEmpty
+                title={t('panel.noGroups')}
+                description={t('panel.noGroupsDescription')}
+                action={t('panel.createGroup')}
+                onAction={openCreateGroupFormModal}
+              />
+            )}
             {provided.placeholder}
           </div>
         )}
@@ -384,6 +434,8 @@ export function GroupResource({
       />
 
       <GroupAddNodesModal
+        tests={latencyTests}
+        latencies={nodeLatencies}
         opened={!!addingNodesGroupId}
         onClose={() => setAddingNodesGroupId(null)}
         groupName={addingNodesGroup?.name || t('group')}
@@ -397,10 +449,13 @@ export function GroupResource({
             id: addingNodesGroupId,
             nodeIDs,
           })
+          setGroupExpanded(addingNodesGroupId, true)
         }}
       />
 
       <GroupAddSubscriptionsModal
+        tests={latencyTests}
+        latencies={nodeLatencies}
         opened={!!addingSubscriptionsGroupId}
         onClose={() => setAddingSubscriptionsGroupId(null)}
         groupName={addingSubscriptionsGroup?.name || t('group')}
@@ -415,6 +470,7 @@ export function GroupResource({
             subscriptionIDs,
             nameFilterRegex,
           })
+          setGroupExpanded(addingSubscriptionsGroupId, true)
         }}
       />
     </Section>

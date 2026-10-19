@@ -6,7 +6,7 @@
 
 ## 安装或升级
 
-支持 **x86_64 和 ARM64**，提供 IPK / APK v3 安装包。固件需具备现代 LuCI、受支持的内核、eBPF 和匹配的 BTF；安装器会先检查兼容性，具体条件见[安装说明](https://github.com/slobys/daed/blob/openwrt-v0.6.13/openwrt/README.md)。
+支持 **x86_64 和 ARM64**，提供 IPK / APK v3 安装包。固件需具备现代 LuCI、受支持的内核、eBPF 和匹配的 BTF；安装器会先检查兼容性，具体条件见[安装说明](openwrt/README.md)。
 
 在路由器 SSH 中以 root 执行：
 
@@ -15,6 +15,15 @@ uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/do
 ```
 
 已有本项目安装时，执行同一条命令即可升级。升级前自动备份，保留节点、订阅、群组和配置；备份位于 `/root/daed-backups`。其他来源的 Daed 安装请先参阅迁移说明。
+
+## 获取完整源码
+
+```sh
+git clone --recurse-submodules https://github.com/slobys/daed.git
+cd daed
+```
+
+也可以直接下载 [0.6.13 完整源码包](https://github.com/slobys/daed/releases/download/openwrt-v0.6.13/daed-openwrt-source.tar.gz)，其中已包含后端子模块。GitHub 的 **Code → Download ZIP** 不包含子模块；编译请使用上述任一方式，步骤见[开发说明](openwrt/README.md#开发)。
 
 ## 开始使用
 
@@ -29,7 +38,7 @@ uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/do
 
 - [YouTube 频道](https://www.youtube.com/@naiyou) · [Telegram 群组](https://t.me/naiyous)
 - [下载新版](https://github.com/slobys/daed/releases) · [反馈问题](https://github.com/slobys/daed/issues)
-- [详细安装、升级和卸载说明](https://github.com/slobys/daed/blob/openwrt-v0.6.13/openwrt/README.md) · [验证记录](https://github.com/slobys/daed/blob/openwrt-v0.6.13/openwrt/VALIDATION.md)
+- [详细安装、升级和卸载说明](openwrt/README.md) · [验证记录](openwrt/VALIDATION.md)
 
 ## 致谢与许可
 

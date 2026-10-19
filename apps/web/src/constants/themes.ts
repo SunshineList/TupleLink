@@ -627,6 +627,52 @@ export const tealTheme: ThemeDefinition = {
   },
 }
 
+function tintedTheme(id: string, name: string, hue: number, chroma: number): ThemeDefinition {
+  const variant = (dark: boolean): ThemeColors => {
+    const base = dark ? amberTheme.dark : amberTheme.light
+    const primary = `oklch(${dark ? 0.78 : 0.52} ${chroma} ${hue})`
+    const foreground = `oklch(${dark ? 0.95 : 0.2} 0.015 ${hue})`
+    const background = `oklch(${dark ? 0.16 : 0.985} 0.008 ${hue})`
+    const card = `oklch(${dark ? 0.2 : 0.997} 0.005 ${hue})`
+    const secondary = `oklch(${dark ? 0.25 : 0.95} 0.02 ${hue})`
+    const border = `oklch(${dark ? 0.3 : 0.9} 0.015 ${hue})`
+    return {
+      ...base,
+      background,
+      foreground,
+      card,
+      cardForeground: foreground,
+      popover: card,
+      popoverForeground: foreground,
+      primary,
+      primaryForeground: dark ? `oklch(0.16 0.015 ${hue})` : 'oklch(0.99 0 0)',
+      secondary,
+      secondaryForeground: foreground,
+      muted: secondary,
+      mutedForeground: `oklch(${dark ? 0.72 : 0.45} 0.02 ${hue})`,
+      accent: secondary,
+      accentForeground: foreground,
+      border,
+      input: border,
+      ring: primary,
+      chart1: primary,
+      sidebar: card,
+      sidebarForeground: foreground,
+      sidebarPrimary: primary,
+      sidebarPrimaryForeground: dark ? background : 'oklch(0.99 0 0)',
+      sidebarAccent: secondary,
+      sidebarAccentForeground: foreground,
+      sidebarBorder: border,
+      sidebarRing: primary,
+    }
+  }
+  return { id, name, light: variant(false), dark: variant(true) }
+}
+const skyTheme = tintedTheme('sky', 'Sky', 235, 0.12)
+const indigoTheme = tintedTheme('indigo', 'Indigo', 275, 0.17)
+const coffeeTheme = tintedTheme('coffee', 'Coffee', 55, 0.075)
+const oliveTheme = tintedTheme('olive', 'Olive', 115, 0.1)
+
 // All available themes
 export const themes: ThemeDefinition[] = [
   amberTheme,
@@ -637,6 +683,10 @@ export const themes: ThemeDefinition[] = [
   slateTheme,
   sunsetTheme,
   tealTheme,
+  skyTheme,
+  indigoTheme,
+  coffeeTheme,
+  oliveTheme,
 ]
 
 export const themeIds = themes.map((t) => t.id) as [string, ...string[]]

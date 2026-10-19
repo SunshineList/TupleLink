@@ -1,6 +1,7 @@
 import type { DraggableProvided, DraggableStateSnapshot } from '@hello-pangea/dnd'
 import { Draggable } from '@hello-pangea/dnd'
 import { GripVertical, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '~/components/ui/button'
 import { SimpleTooltip } from '~/components/ui/tooltip'
 import { cn } from '~/lib/utils'
@@ -25,13 +26,15 @@ export function SortableResourceBadge({
   onRemove?: () => void
   children?: React.ReactNode
 }) {
+  const { t } = useTranslation()
   const card = (provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
     <div
+      data-group-member
       ref={provided.innerRef}
       {...provided.draggableProps}
       style={getInstantDropStyle(provided, snapshot)}
       className={cn(
-        'group relative flex min-h-11 items-center gap-2 overflow-hidden rounded-lg border bg-card px-3.5 py-2.5 select-none',
+        'group group-member-card relative flex w-full min-w-0 items-start gap-1 rounded-lg border bg-card p-2 select-none',
         'transition-[shadow,border-color,opacity,background-color] duration-200',
         'hover:shadow-sm hover:border-primary/30 hover:bg-accent/50',
         snapshot.isDragging && 'opacity-90 z-10 shadow-lg ring-2 ring-primary/20',
@@ -39,33 +42,34 @@ export function SortableResourceBadge({
     >
       {/* Drag handle */}
       <div
-        className="flex shrink-0 cursor-grab items-center justify-center rounded-md p-1.5 touch-none active:cursor-grabbing"
+        className="group-member-handle flex h-7 w-5 shrink-0 cursor-grab items-center justify-center rounded touch-none active:cursor-grabbing"
         {...provided.dragHandleProps}
       >
         <GripVertical className="h-4 w-4 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground/70" />
       </div>
 
-      {/* Protocol badge */}
-      {protocol && (
-        <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded bg-primary/10 text-primary">
-          {protocol}
+      <div className="min-w-0 flex-1">
+        <span data-group-member-name className="block text-xs font-medium leading-5 [overflow-wrap:anywhere]">
+          {name}
         </span>
-      )}
-
-      {/* Main content */}
-      <div className="flex-1 min-w-0">
-        <span className="text-xs font-medium truncate block">{name}</span>
-        {address && <span className="text-[10px] text-muted-foreground truncate block mt-0.5">{address}</span>}
+        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground">
+          {protocol && <span className="shrink-0 font-medium uppercase text-primary">{protocol}</span>}
+          {address && (
+            <span className="min-w-0 flex-1 truncate" title={address}>
+              {address}
+            </span>
+          )}
+          {meta && <span className="min-w-0 max-w-full [overflow-wrap:anywhere]">{meta}</span>}
+        </div>
       </div>
-
-      {meta && <span className="shrink-0 text-[10px] font-medium text-primary">{meta}</span>}
 
       {/* Remove button */}
       {onRemove && (
         <Button
           variant="ghost"
           size="xs"
-          className="h-5 w-5 p-0 rounded-full sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          aria-label={`${t('actions.remove')} ${name}`}
+          className="group-member-remove h-7 w-6 p-0 shrink-0 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           onClick={(e) => {
             e.stopPropagation()
             onRemove()

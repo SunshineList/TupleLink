@@ -1,0 +1,58 @@
+[
+  {
+    "name": "ipk-x86_64",
+    "base_commit": "78b23a26c4c98938d549e7ff5876508544e33d4d",
+    "cpu": "x86_64",
+    "format": "ipk",
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-sdk-24.10.4-x86-64_gcc-13.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "229e871f734a2cee5ce3ad6a3e98d3836b0899bfdeaea4d9c2c5cc7b1fce1407",
+    "architectures": ["x86_64"]
+  },
+  {
+    "name": "ipk-arm64",
+    "base_commit": "78b23a26c4c98938d549e7ff5876508544e33d4d",
+    "cpu": "arm64",
+    "format": "ipk",
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/armsr/armv8/openwrt-sdk-24.10.4-armsr-armv8_gcc-13.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "321f4d4d61e02e54795fcb0ca25243955fc425ac7a71b0d86a83c7b16c5fc4ac",
+    "architectures": [
+      "aarch64",
+      "aarch64_generic",
+      "aarch64_cortex-a35",
+      "aarch64_cortex-a53",
+      "aarch64_cortex-a55",
+      "aarch64_cortex-a72",
+      "aarch64_cortex-a73",
+      "aarch64_cortex-a75",
+      "aarch64_cortex-a76"
+    ]
+  },
+  {
+    "name": "apk-x86_64",
+    "base_commit": "ba915c2ee711d047d5be8575c1e98699119429ab",
+    "cpu": "x86_64",
+    "format": "apk",
+    "url": "https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-sdk-25.12.4-x86-64_gcc-14.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "28e004c1be4d215d19c1f12a6aa4c8d8f80689549eb707d0ff5a71f16fa8d05f",
+    "architectures": ["x86_64"]
+  },
+  {
+    "name": "apk-arm64",
+    "base_commit": "ba915c2ee711d047d5be8575c1e98699119429ab",
+    "cpu": "arm64",
+    "format": "apk",
+    "url": "https://downloads.openwrt.org/releases/25.12.4/targets/armsr/armv8/openwrt-sdk-25.12.4-armsr-armv8_gcc-14.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "20c94ee1d8b8572558e42a0d222bfa1c782db0ecba14860824c3e9fdd7b95665",
+    "architectures": [
+      "aarch64",
+      "aarch64_generic",
+      "aarch64_cortex-a35",
+      "aarch64_cortex-a53",
+      "aarch64_cortex-a55",
+      "aarch64_cortex-a72",
+      "aarch64_cortex-a73",
+      "aarch64_cortex-a75",
+      "aarch64_cortex-a76"
+    ]
+  }
+]

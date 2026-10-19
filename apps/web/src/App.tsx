@@ -7,7 +7,8 @@ import { TooltipProvider } from '~/components/ui/tooltip'
 import { getThemeById, themeColorsToCSSVars } from '~/constants'
 import { QueryProvider } from '~/contexts'
 import { Router } from '~/Router'
-import { appStateAtom, colorSchemeAtom } from '~/store'
+import { appStateAtom, colorSchemeAtom, routerSessionExpiredAtom } from '~/store'
+import { routerMode } from '~/utils/router-mode'
 
 type ColorScheme = 'dark' | 'light'
 
@@ -33,6 +34,7 @@ function useSystemColorScheme(): ColorScheme {
 
 export function App() {
   const appState = useStore(appStateAtom)
+  const sessionExpired = useStore(routerSessionExpiredAtom)
   const systemColorScheme = useSystemColorScheme()
   const themeMode = appState.themeMode || 'system'
   const colorTheme = appState.colorTheme || 'amber'
@@ -76,7 +78,16 @@ export function App() {
       <TooltipProvider>
         <div className="h-dvh">
           <Toaster />
-          <Router />
+          {routerMode && sessionExpired ? (
+            <div className="p-8 text-center">
+              <p>路由器登录已失效，请刷新后台页面。</p>
+              <button className="mt-4 underline" onClick={() => window.parent.location.reload()}>
+                刷新后台
+              </button>
+            </div>
+          ) : (
+            <Router />
+          )}
         </div>
       </TooltipProvider>
     </QueryProvider>
