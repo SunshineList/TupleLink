@@ -24,6 +24,7 @@ import { EditNodeFormModal } from '~/components/EditNodeFormModal'
 import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
 import { LatencyBadge } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
+import { NodeName } from '~/components/NodeName'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
@@ -55,7 +56,9 @@ function NodeRow({
   latency,
   onAction,
   tests,
+  compact = false,
 }: {
+  compact?: boolean
   tests: LatencyTests
   entry: LibraryNode
   provided: DraggableProvided
@@ -73,6 +76,7 @@ function NodeRow({
       style={getInstantDropStyle(provided, snapshot)}
       className={cn('panel-node-row', snapshot.isDragging && 'panel-node-dragging')}
       data-node-id={node.id}
+      data-density={compact ? 'compact' : 'normal'}
       role="listitem"
     >
       <div
@@ -82,16 +86,16 @@ function NodeRow({
       >
         <GripVertical aria-hidden="true" className="h-4 w-4" />
       </div>
-      <div className="min-w-0">
+      <div className="panel-node-content min-w-0">
         <button
           type="button"
-          className="block w-full truncate text-left text-sm font-medium hover:text-primary"
+          className="block w-full min-w-0 text-left text-sm font-medium hover:text-primary"
           title={name}
           aria-label={`${t('panel.nodeDetails')} ${name}`}
           data-node-details={node.id}
           onClick={() => onAction(entry, 'details')}
         >
-          {name}
+          <NodeName name={name} />
         </button>
         <p
           className="mt-1 truncate text-xs text-muted-foreground"
@@ -121,8 +125,7 @@ function NodeRow({
         aria-label={t('panel.addToGroup')}
         onClick={() => onAction(entry, 'join')}
       >
-        <span className="hidden min-[480px]:inline">{t('panel.addToGroup')}</span>
-        <span className="min-[480px]:hidden">{t('panel.join')}</span>
+        {t('panel.join')}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -194,6 +197,8 @@ export function NodeResource({
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(456)
+  const [columnCount, setColumnCount] = useState(1)
+  const [rowHeight, setRowHeight] = useState(NODE_ROW_HEIGHT)
   const [focusedId, setFocusedId] = useState<string | null>(null)
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null)
   const detailNode = detailNodeId ? library.find(({ node }) => node.id === detailNodeId) || null : null
@@ -213,7 +218,13 @@ export function NodeResource({
   useLayoutEffect(() => {
     const element = scrollRef.current
     if (!element) return
-    const observer = new ResizeObserver(() => setViewportHeight(element.clientHeight))
+    const observer = new ResizeObserver(() => {
+      setViewportHeight(element.clientHeight)
+      // Each column remains a vertical droppable, preserving keyboard and pointer sorting.
+      const columns = element.clientWidth >= 560 ? 2 : 1
+      setColumnCount(columns)
+      setRowHeight(columns === 2 && matchMedia('(pointer: coarse), (max-width: 640px)').matches ? 96 : NODE_ROW_HEIGHT)
+    })
     observer.observe(element)
     return () => observer.disconnect()
   }, [loading, error])
@@ -222,12 +233,8 @@ export function NodeResource({
     setScrollTop(0)
     setFocusedId(null)
   }, [filterKey])
-  const range = nodeWindow(nodes.length, scrollTop, viewportHeight)
-  // Retain the focused row while scrolling, so windowing cannot discard keyboard focus.
-  const indices = Array.from({ length: range.end - range.start }, (_, offset) => range.start + offset)
-  const focusedIndex = focusedId ? nodes.findIndex(({ node }) => node.id === focusedId) : -1
-  if (focusedIndex >= 0 && !indices.includes(focusedIndex)) indices.push(focusedIndex)
-  indices.sort((a, b) => a - b)
+  const split = columnCount === 2 ? Math.ceil(nodes.length / 2) : nodes.length
+  const columns = columnCount === 2 ? [nodes.slice(0, split), nodes.slice(split)] : [nodes]
   const onAction = (entry: LibraryNode, action: NodeAction) => {
     const { node } = entry
     const name = node.tag || node.name || ''
@@ -343,90 +350,105 @@ export function NodeResource({
             {filters.sort === 'latency' && <p className="text-xs text-muted-foreground">{t('panel.filtersReorder')}</p>}
           </div>
         )}
-        <Droppable
-          droppableId={NODE_DROPPABLE_ID}
-          type="NODE"
-          mode="virtual"
-          renderClone={(provided, snapshot, rubric) => (
-            <NodeRow
-              entry={nodes[rubric.source.index]}
-              provided={provided}
-              snapshot={snapshot}
-              latency={nodeLatencies?.[nodes[rubric.source.index].node.id]}
-              onAction={onAction}
-              tests={latencyTests}
+        <div
+          ref={scrollRef}
+          data-workspace-scroll
+          data-node-scroll
+          tabIndex={0}
+          onScroll={(event) => {
+            if (event.currentTarget.clientHeight) setScrollTop(event.currentTarget.scrollTop)
+          }}
+          onFocusCapture={(event) =>
+            setFocusedId((event.target as HTMLElement).closest('[data-node-id]')?.getAttribute('data-node-id') || null)
+          }
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg outline-offset-2"
+        >
+          <div
+            className="manual-node-columns"
+            data-columns={columnCount}
+            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+          >
+            {columns.map((entries, column) => {
+              const offset = column * split
+              const range = nodeWindow(entries.length, scrollTop, viewportHeight, rowHeight)
+              const indices = Array.from({ length: range.end - range.start }, (_, index) => range.start + index)
+              const focusedIndex = entries.findIndex(({ node }) => node.id === focusedId)
+              if (focusedIndex >= 0 && !indices.includes(focusedIndex)) indices.push(focusedIndex)
+              indices.sort((a, b) => a - b)
+              return (
+                <Droppable
+                  key={column}
+                  droppableId={column ? `${NODE_DROPPABLE_ID}-column-1` : NODE_DROPPABLE_ID}
+                  type="NODE"
+                  mode="virtual"
+                  renderClone={(provided, snapshot, rubric) => (
+                    <NodeRow
+                      compact={columnCount === 2}
+                      entry={entries[rubric.source.index]}
+                      provided={provided}
+                      snapshot={snapshot}
+                      latency={nodeLatencies?.[entries[rubric.source.index].node.id]}
+                      onAction={onAction}
+                      tests={latencyTests}
+                    />
+                  )}
+                >
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      data-group-column-offset={offset}
+                      role="list"
+                      aria-label={t('panel.nodeList')}
+                      className={cn('relative min-w-0', snapshot.isDraggingOver && 'bg-primary/5')}
+                      style={{
+                        height: Math.max(1, entries.length + (snapshot.isUsingPlaceholder ? 1 : 0)) * rowHeight,
+                      }}
+                    >
+                      {indices.map((index) => (
+                        <div
+                          key={entries[index].node.id}
+                          className="absolute inset-x-0"
+                          style={{ top: index * rowHeight, height: rowHeight }}
+                        >
+                          <Draggable draggableId={`node-${entries[index].node.id}`} index={index}>
+                            {(rowProvided, rowSnapshot) => (
+                              <NodeRow
+                                compact={columnCount === 2}
+                                entry={entries[index]}
+                                provided={rowProvided}
+                                snapshot={rowSnapshot}
+                                latency={nodeLatencies?.[entries[index].node.id]}
+                                onAction={onAction}
+                                tests={latencyTests}
+                              />
+                            )}
+                          </Draggable>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Droppable>
+              )
+            })}
+          </div>
+          {!loading && !error && !totalCount && (
+            <ResourceEmpty
+              title={t('panel.noNodes')}
+              description={t('panel.noNodesDescription')}
+              action={t('panel.importNode')}
+              onAction={() => setOpenedImportNodeFormModal(true)}
             />
           )}
-        >
-          {(provided, snapshot) => (
-            <div
-              ref={(element) => {
-                provided.innerRef(element)
-                scrollRef.current = element
-              }}
-              {...provided.droppableProps}
-              data-workspace-scroll
-              data-node-scroll
-              role="list"
-              aria-label={t('panel.nodeList')}
-              tabIndex={0}
-              onScroll={(event) => {
-                if (event.currentTarget.clientHeight) setScrollTop(event.currentTarget.scrollTop)
-              }}
-              onFocusCapture={(event) =>
-                setFocusedId(
-                  (event.target as HTMLElement).closest('[data-node-id]')?.getAttribute('data-node-id') || null,
-                )
-              }
-              className={cn(
-                'min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg outline-offset-2',
-                snapshot.isDraggingOver && 'bg-primary/5',
-              )}
-            >
-              <div
-                className="relative"
-                style={{ height: (nodes.length + (snapshot.isUsingPlaceholder ? 1 : 0)) * NODE_ROW_HEIGHT }}
-              >
-                {indices.map((index) => (
-                  <div
-                    key={nodes[index].node.id}
-                    className="absolute inset-x-0"
-                    style={{ top: index * NODE_ROW_HEIGHT, height: NODE_ROW_HEIGHT }}
-                  >
-                    <Draggable draggableId={`node-${nodes[index].node.id}`} index={index}>
-                      {(rowProvided, rowSnapshot) => (
-                        <NodeRow
-                          entry={nodes[index]}
-                          provided={rowProvided}
-                          snapshot={rowSnapshot}
-                          latency={nodeLatencies?.[nodes[index].node.id]}
-                          onAction={onAction}
-                          tests={latencyTests}
-                        />
-                      )}
-                    </Draggable>
-                  </div>
-                ))}
-              </div>
-              {!loading && !error && !totalCount && (
-                <ResourceEmpty
-                  title={t('panel.noNodes')}
-                  description={t('panel.noNodesDescription')}
-                  action={t('panel.importNode')}
-                  onAction={() => setOpenedImportNodeFormModal(true)}
-                />
-              )}
-              {!loading && !error && totalCount > 0 && !nodes.length && (
-                <ResourceEmpty
-                  title={t('panel.noMatches')}
-                  description={t('panel.noMatchesDescription')}
-                  action={t('panel.clearFilters')}
-                  onAction={() => onFiltersChange(defaultNodeFilters)}
-                />
-              )}
-            </div>
+          {!loading && !error && totalCount > 0 && !nodes.length && (
+            <ResourceEmpty
+              title={t('panel.noMatches')}
+              description={t('panel.noMatchesDescription')}
+              action={t('panel.clearFilters')}
+              onAction={() => onFiltersChange(defaultNodeFilters)}
+            />
           )}
-        </Droppable>
+        </div>
       </Section>
       <Sheet
         open={!!detailNode}

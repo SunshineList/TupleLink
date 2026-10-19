@@ -3,11 +3,12 @@ import type { LatencyTests } from '~/components/LatencyStatus'
 import type { QRCodeModalRef } from '~/components/QRCodeModal'
 import type { SubscriptionsQuery } from '~/schemas/gql/graphql'
 import type { LibraryNode } from '~/utils/node-library'
-import { Eye, Gauge, Search } from 'lucide-react'
+import { Eye, Gauge, Plus, Search } from 'lucide-react'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LatencyBadge } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
+import { NodeName } from '~/components/NodeName'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Button } from '~/components/ui/button'
@@ -43,35 +44,47 @@ const SubscriptionNodeTile = memo(
       <article role="listitem" data-subscription-node={node.id} className="subscription-node-tile">
         <button
           type="button"
-          className="break-words text-left text-sm font-medium leading-snug hover:text-primary"
+          className="subscription-node-name min-w-0 text-left text-sm font-medium hover:text-primary"
           title={name}
           aria-label={`${t('panel.nodeDetails')} ${name}`}
           onClick={() => onDetails(node)}
         >
-          {name}
+          <NodeName name={name} />
         </button>
-        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{node.protocol}</span>
-          <LatencyBadge result={latency} />
-        </div>
-        <div className="mt-auto flex flex-wrap items-center justify-between gap-1">
+        <div className="subscription-node-actions">
+          <span className="subscription-node-protocol">{node.protocol}</span>
           <Button
             size="sm"
-            variant="outline"
+            variant="ghost"
+            className="subscription-node-test"
             loading={pending}
             disabled={busy}
+            title={t('latency.testNode')}
             aria-label={`${t('latency.testNode')} ${name}`}
             onClick={() => onTest([node.id])}
           >
-            <Gauge />
-            {t('latency.test')}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => onJoin(node)}>
-            {t('panel.addToGroup')}
+            {latency ? (
+              <LatencyBadge result={latency} />
+            ) : (
+              <>
+                <Gauge />
+                <span>{t('latency.test')}</span>
+              </>
+            )}
           </Button>
           <Button
             size="icon"
             variant="ghost"
+            title={t('panel.addToGroup')}
+            aria-label={t('panel.addToGroup')}
+            onClick={() => onJoin(node)}
+          >
+            <Plus />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            title={t('actions.viewQRCode')}
             aria-label={`${t('actions.viewQRCode')} ${name}`}
             onClick={() => onQR(node)}
           >

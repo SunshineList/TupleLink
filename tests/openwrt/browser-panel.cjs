@@ -270,7 +270,8 @@ async function login(page, url = base) {
     await firstPick.waitFor();
     await page.waitForTimeout(250);
     assert.ok((await firstPick.boundingBox()).height<=76,'Normal picker rows should stay compact');
-    assert.ok(Math.abs((await firstPick.boundingBox()).y-(await secondPick.boundingBox()).y)<2,'Desktop picker uses two columns');
+    assert.equal(await nodePicker.locator('[data-picker-list]').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),3,'Default LuCI picker uses three columns');
+    assert.ok(Math.abs((await firstPick.boundingBox()).y-(await secondPick.boundingBox()).y)<2,'Desktop picker uses three columns');
     assert.ok(await firstPick.evaluate(element=>element.scrollWidth<=element.clientWidth+1),'Picker content must not overflow');
 
     await firstPick.getByRole('checkbox').check();
@@ -488,6 +489,8 @@ async function login(page, url = base) {
     assert.equal(await viewer.getByRole('navigation', { name: '节点分页' }).count(), 0);
     assert.equal(await viewer.getByRole('combobox', { name: '每页数量' }).count(), 0);
     await page.waitForTimeout(300);
+    assert.ok((await grid.locator('[data-subscription-node]').first().boundingBox()).height<=110,'Subscription nodes should use compact two-line cards');
+    assert.equal(await grid.locator('[data-latency-tone="unmeasured"]').count(),0,'Untested nodes use a single test action, without repeated gray badges');
     const toolbarTop = (await viewer.getByRole('searchbox').boundingBox()).y;
     await grid.evaluate(element => { element.scrollTop = element.scrollHeight; });
     await grid.getByText('Workspace-0999-Long-node-name-for-layout-testing', { exact: true }).scrollIntoViewIfNeeded();
@@ -532,7 +535,7 @@ async function login(page, url = base) {
       probeLatency = value;
       await grid.getByRole('button', { name: /^测试节点延迟 / }).click();
       await grid.locator(`[data-latency-tone="${tone}"]`).waitFor();
-      await grid.locator('button:not(:disabled)').filter({ hasText: '测速' }).waitFor();
+      await grid.locator('button:not(:disabled)').and(grid.getByRole('button', {name:/^测试节点延迟 /})).waitFor();
       assert.equal(await grid.locator('[data-latency-tone]').getAttribute('data-latency-tone'), tone);
       colors[tone] = await grid.locator('[data-latency-tone]').evaluate(element => getComputedStyle(element).color);
     }

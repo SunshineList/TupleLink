@@ -681,7 +681,7 @@ form {
   flex-direction: column;
   width: calc(100% - 2rem);
   max-width: 1280px;
-  height: min(860px, calc(100dvh - 2rem));
+  max-height: min(860px, calc(100dvh - 2rem));
   gap: 12px;
   padding: 20px;
 }
@@ -698,19 +698,6 @@ form {
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   padding: 2px;
-}
-.subscription-node-tile {
-  overflow-wrap: anywhere;
-  display: flex;
-  height: max-content;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  min-height: 140px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--card);
-  padding: 14px;
 }
 .panel-node-probe {
   padding-inline: 4px;
@@ -735,14 +722,6 @@ form {
   }
   .subscription-node-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-  .subscription-node-tile {
-    content-visibility: auto;
-    contain-intrinsic-block-size: auto 160px;
-    overflow-wrap: anywhere;
-    min-height: 126px;
-    padding: 12px;
     gap: 8px;
   }
 }
@@ -865,5 +844,224 @@ form {
   .node-picker-toolbar input {
     min-height: 44px;
     font-size: 16px;
+  }
+}
+
+/* Compact resources: stable rows, restrained motion and explicit selection. */
+.node-picker-dialog {
+  width: calc(100% - 2rem);
+  max-width: 1280px;
+}
+.node-picker-body {
+  container-type: inline-size;
+}
+.picker-node-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+@container (min-width: 520px) {
+  .picker-node-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (min-width: 780px) {
+  .picker-node-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container (min-width: 1060px) {
+  .picker-node-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.picker-node-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: var(--card);
+  cursor: pointer;
+  transition:
+    border-color 150ms,
+    background-color 150ms,
+    box-shadow 150ms;
+}
+.picker-node-row:hover,
+.subscription-node-tile:hover,
+.panel-node-row:hover {
+  border-color: color-mix(in oklab, var(--primary) 60%, var(--border));
+  background: color-mix(in oklab, var(--primary) 7%, var(--card));
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--primary) 10%, transparent);
+}
+.picker-node-row:focus-within,
+.subscription-node-tile:focus-within,
+.panel-node-row:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.picker-node-row.picker-node-selected {
+  border-color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 13%, var(--card));
+  box-shadow: inset 3px 0 var(--primary);
+}
+.picker-node-selected .picker-node-select {
+  color: var(--primary);
+  font-weight: 600;
+}
+.picker-node-select {
+  font-size: 14px;
+  font-weight: 500;
+}
+.node-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.node-name-text {
+  display: inline-block;
+  min-width: 0;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  button:is(:hover, :focus-visible) .node-name[data-overflow='true'] .node-name-text {
+    animation: node-name-pan var(--name-duration, 4s) 800ms ease-in-out infinite alternate;
+  }
+}
+@keyframes node-name-pan {
+  0%,
+  5% {
+    transform: translateX(0);
+  }
+  95%,
+  100% {
+    transform: translateX(var(--name-travel));
+  }
+}
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .picker-node-select:focus .node-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .picker-node-select:focus .node-name {
+    max-height: 4.5em;
+    overflow-y: auto;
+  }
+}
+.manual-node-columns {
+  display: grid;
+  gap: 8px;
+}
+.panel-node-row[data-density='compact'] {
+  height: 72px;
+  padding: 2px 4px;
+  grid-template-columns: 16px minmax(0, 1fr) auto 28px;
+  grid-template-rows: 32px 32px;
+  gap: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.panel-node-row[data-density='compact'] .panel-node-handle {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+.panel-node-row[data-density='compact'] .panel-node-content {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+.panel-node-row[data-density='compact'] .panel-node-probe {
+  grid-column: 3;
+  grid-row: 1;
+  min-height: 32px;
+  height: 32px;
+}
+.panel-node-row[data-density='compact'] .panel-node-join {
+  grid-column: 3;
+  grid-row: 2;
+  min-height: 32px;
+  height: 32px;
+}
+.panel-node-row[data-density='compact'] .panel-node-more {
+  grid-column: 4;
+  grid-row: 1 / 3;
+  width: 28px;
+}
+.subscription-node-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 8px;
+}
+.subscription-node-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 8px 10px;
+  transition:
+    border-color 150ms,
+    background-color 150ms,
+    box-shadow 150ms;
+}
+.subscription-browser .subscription-node-name {
+  min-height: 28px;
+  width: 100%;
+}
+.subscription-node-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.subscription-node-protocol {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+.subscription-node-actions button {
+  flex-shrink: 0;
+  height: 32px;
+  min-height: 32px;
+  width: 32px;
+  padding-inline: 4px;
+}
+.subscription-node-actions .subscription-node-test {
+  width: auto;
+  min-width: 64px;
+  font-size: 12px;
+}
+.subscription-node-test [data-latency-tone] {
+  font-size: 11px;
+  padding: 2px 5px;
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .panel-node-row[data-density='compact'] {
+    height: 92px;
+    grid-template-rows: 44px 44px;
+    gap: 0 4px;
+    padding-block: 0;
+  }
+  .panel-node-row[data-density='compact'] :is(.panel-node-probe, .panel-node-join) {
+    min-height: 44px;
+    height: 44px;
+  }
+  .subscription-node-actions button {
+    height: 44px;
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .subscription-browser .subscription-node-name {
+    min-height: 32px;
   }
 }

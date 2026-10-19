@@ -32,4 +32,21 @@ describe('group column ordering', () => {
       destination: null,
     })
   })
+  it('maps manual library columns before preserving the filtered library order', () => {
+    const offset = (id: string) => (id === 'node-list-column-1' ? 4 : 0)
+    expect(groupColumnBase('node-list-column-1')).toBe('node-list')
+    for (const [fromId, fromIndex, toId, toIndex, expected] of [
+      ['node-list', 1, 'node-list-column-1', 2, [1, 6]],
+      ['node-list-column-1', 2, 'node-list', 0, [6, 0]],
+      ['node-list-column-1', 0, 'node-list', 4, [4, 3]],
+    ] as const) {
+      const result = groupColumnLocations(
+        { droppableId: fromId, index: fromIndex },
+        { droppableId: toId, index: toIndex },
+        offset,
+      )
+      expect([result.source.index, result.destination?.index]).toEqual(expected)
+      expect(result.destination?.droppableId).toBe('node-list')
+    }
+  })
 })

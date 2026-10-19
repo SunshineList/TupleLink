@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 
 import { LatencyBadge } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
+import { NodeName } from '~/components/NodeName'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Dialog, DialogTitle } from '~/components/ui/dialog'
@@ -134,10 +135,8 @@ const PickerNodeCard = memo(
     return (
       <article
         data-picker-node={item.id}
-        className={cn(
-          'picker-node-row grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors hover:border-primary/30',
-          checked && 'border-primary bg-primary/5',
-        )}
+        data-selected={checked}
+        className={cn('picker-node-row', checked && 'picker-node-selected')}
         onClick={(event) => {
           if (!(event.target as Element).closest('button,[role="checkbox"]')) onToggle(item.id)
         }}
@@ -155,7 +154,7 @@ const PickerNodeCard = memo(
           aria-label={`${t('actions.select')} ${item.title}`}
           onClick={() => onToggle(item.id)}
         >
-          <span className="block text-sm font-medium leading-5 [overflow-wrap:anywhere]">{item.title}</span>
+          <NodeName name={item.title} />
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-muted-foreground">
             {item.badge && (
               <span className="shrink-0 text-[10px] font-medium uppercase text-primary">{item.badge}</span>
@@ -245,6 +244,7 @@ export function GroupAddNodesModal({
     >
       <ScrollableDialogContent
         size="xl"
+        className="node-picker-dialog"
         data-node-picker
         onEscapeKeyDown={(event) => {
           if (loading) event.preventDefault()
@@ -286,8 +286,8 @@ export function GroupAddNodesModal({
           </div>
           <LatencyStatus tests={tests} scope="group-picker" />
         </div>
-        <ScrollableDialogBody className="px-4 py-3">
-          <div data-picker-list className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2">
+        <ScrollableDialogBody className="node-picker-body px-4 py-3">
+          <div data-picker-list className="picker-node-grid">
             {filteredItems.map((item) => (
               <PickerNodeCard
                 key={item.id}

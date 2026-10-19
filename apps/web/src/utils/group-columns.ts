@@ -1,6 +1,7 @@
 import type { DraggableLocation } from '@hello-pangea/dnd'
 
-export const groupColumnBase = (id: string) => id.replace(/-column-1-(nodes|subscriptions)$/, '-$1')
+export const groupColumnBase = (id: string) =>
+  id.replace(/-column-1-(nodes|subscriptions)$/, '-$1').replace(/^node-list-column-1$/, 'node-list')
 
 // Columns share one persisted order and retain a fixed halfway split after drop.
 // Clamp a drop after the last left item so it stays in the left column.
