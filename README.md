@@ -1,163 +1,38 @@
-<div align="center">
-  <img src="apps/web/public/logo-rounded.png" alt="daed logo" width="120" />
-  <h1>daed</h1>
-  <p><strong>A modern web dashboard for dae</strong></p>
+# Daed 软路由插件
 
-  <p>
-    <a href="https://github.com/daeuniverse/daed/actions/workflows/release-please.yml"><img src="https://img.shields.io/github/actions/workflow/status/daeuniverse/daed/release-please.yml?style=for-the-badge" alt="Build Status" /></a>
-    <a href="https://github.com/daeuniverse/daed/releases"><img src="https://img.shields.io/github/v/release/daeuniverse/daed?style=for-the-badge" alt="Release" /></a>
-    <a href="https://github.com/daeuniverse/daed/blob/main/LICENSE"><img src="https://img.shields.io/github/license/daeuniverse/daed?style=for-the-badge" alt="License" /></a>
-    <a href="https://github.com/daeuniverse/daed/pulls"><img src="https://img.shields.io/github/issues-pr-closed/daeuniverse/daed?style=for-the-badge" alt="Pull Requests" /></a>
-  </p>
+基于 [daeuniverse/daed](https://github.com/daeuniverse/daed) 二次开发，面向 OpenWrt、ImmortalWrt 和 iStoreOS 的 LuCI 后台使用。
 
-  <p>
-    <a href="#features">Features</a> •
-    <a href="#getting-started">Getting Started</a> •
-    <a href="#development">Development</a> •
-    <a href="#contributing">Contributing</a> •
-    <a href="#license">License</a>
-  </p>
-</div>
+在一个面板里管理节点、订阅和群组，查看实时流量、测试节点延迟，并设置 DNS 与路由规则。支持电脑和手机，多种主题可选，沿用路由器后台登录。
 
----
+## 安装或升级
 
-## 📸 Screenshots
+支持 **x86_64 和 ARM64**，提供 IPK / APK v3 安装包。固件需具备现代 LuCI、受支持的内核、eBPF 和匹配的 BTF；安装器会先检查兼容性，具体条件见[安装说明](https://github.com/slobys/daed/blob/openwrt-v0.6.13/openwrt/README.md)。
 
-<details open>
-<summary><b>Desktop Screenshots</b></summary>
+在路由器 SSH 中以 root 执行：
 
-|                                Setup                                |                                   Orchestrate                                   |
-| :-----------------------------------------------------------------: | :-----------------------------------------------------------------------------: |
-| <img src="docs/screenshots/pc/setup.png" alt="setup" width="400" /> | <img src="docs/screenshots/pc/orchestrate.png" alt="orchestrate" width="400" /> |
-
-</details>
-
-<details>
-<summary><b>Mobile Screenshots</b></summary>
-
-|                                  Setup                                  |                                     Orchestrate                                     |
-| :---------------------------------------------------------------------: | :---------------------------------------------------------------------------------: |
-| <img src="docs/screenshots/mobile/setup.png" alt="setup" width="200" /> | <img src="docs/screenshots/mobile/orchestrate.png" alt="orchestrate" width="200" /> |
-
-</details>
-
----
-
-## ✨ Features
-
-- 🎨 **Beautiful UI** — Modern, intuitive interface with light/dark mode support
-- ⌨️ **Keyboard First** — Built-in keyboard navigation and shortcuts for power users
-- 📱 **Responsive** — Fully mobile-friendly design
-- 🚀 **Fast** — Built with React and optimized for performance
-
-## 🌐 Online Demo
-
-Try daed directly in your browser without installation:
-
-**🔗 [daeuniverse.github.io/daed](https://daeuniverse.github.io/daed)**
-
-> ⚠️ **Important:** Since GitHub Pages uses HTTPS, your dae-wing backend must also be served over HTTPS. Browsers block mixed content (HTTPS page connecting to HTTP backend). Configure a reverse proxy with TLS or use a self-signed certificate for local development.
-
-## 🚀 Getting Started
-
-Please refer to the [Quick Start Guide](./docs/getting-started.md) to start using daed right away!
-
-## 🐳 Docker Deployment
-
-Pull the prebuilt image:
-
-```bash
-docker pull ghcr.io/daeuniverse/daed
+```sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.13/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.6.13
 ```
 
-Run the container:
+已有本项目安装时，执行同一条命令即可升级。升级前自动备份，保留节点、订阅、群组和配置；备份位于 `/root/daed-backups`。其他来源的 Daed 安装请先参阅迁移说明。
 
-```bash
-docker run -d \
-    --privileged \
-    --network=host \
-    --pid=host \
-    --restart=always \
-    -v /sys:/sys \
-    -v /etc/daed:/etc/daed \
-    --name=daed \
-    ghcr.io/daeuniverse/daed:latest
-```
+## 开始使用
 
-Or use Docker Compose:
+1. 打开路由器后台 **服务 → Daed**。
+2. 在 **节点和订阅** 中导入节点或添加订阅，名称可以留空自动识别。
+3. 在 **管理面板** 中将节点或订阅加入群组，测试后选择合适的节点。
+4. 按需调整 **高级设置** 中的接口、DNS 和路由，再点击 **应用配置**。
 
-```yaml
-# docker-compose.yml
-services:
-  daed:
-    image: ghcr.io/daeuniverse/daed
-    container_name: daed
-    privileged: true
-    network_mode: host
-    pid: host
-    restart: always
-    volumes:
-      - /sys:/sys
-      - /etc/daed:/etc/daed
-```
+出现问题可先查看 **运行日志**。节点能否联网还取决于服务器、线路和配置，导入成功不代表连接一定可用。
 
-```bash
-docker compose up -d
-```
+## 交流与反馈
 
-Access the dashboard at `http://localhost:2023`.
+- [YouTube 频道](https://www.youtube.com/@naiyou) · [Telegram 群组](https://t.me/naiyous)
+- [下载新版](https://github.com/slobys/daed/releases) · [反馈问题](https://github.com/slobys/daed/issues)
+- [详细安装、升级和卸载说明](https://github.com/slobys/daed/blob/openwrt-v0.6.13/openwrt/README.md) · [验证记录](https://github.com/slobys/daed/blob/openwrt-v0.6.13/openwrt/VALIDATION.md)
 
-## 💻 Development
+## 致谢与许可
 
-### Prerequisites
+感谢 [daed](https://github.com/daeuniverse/daed)、[dae-wing](https://github.com/daeuniverse/dae-wing) 和 [dae](https://github.com/daeuniverse/dae)。本仓库是独立维护的分支，并非上游官方发行版。
 
-- [Node.js](https://nodejs.org/) >= 20
-- [pnpm](https://pnpm.io/) >= 9
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/daeuniverse/daed.git
-cd daed
-
-# Install dependencies
-pnpm install
-
-# Start development server
-pnpm dev
-```
-
-### Available Scripts
-
-| Command        | Description              |
-| -------------- | ------------------------ |
-| `pnpm dev`     | Start development server |
-| `pnpm build`   | Build for production     |
-| `pnpm lint`    | Lint and fix code        |
-| `pnpm codegen` | Generate GraphQL types   |
-
-## 🤝 Contributing
-
-Contributions are welcome! Whether it's bug reports, feature requests, or pull requests — all are appreciated.
-
-Please read our [Contributing Guide](./CONTRIBUTING.md) before submitting a PR.
-
-Special thanks to all [contributors](https://github.com/daeuniverse/daed/graphs/contributors)! ❤️
-
-<a href="https://github.com/daeuniverse/daed/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=daeuniverse/daed" alt="Contributors" />
-</a>
-
-## 📄 License
-
-This project is dual licensed:
-
-- Frontend (daed): [MIT License](./LICENSE)
-- Backend (dae-wing): [AGPL-3.0 License](https://github.com/daeuniverse/dae-wing/blob/main/LICENSE)
-
----
-
-<div align="center">
-  Made with ❤️ by <a href="https://github.com/daeuniverse">@daeuniverse</a>
-</div>
+前端及安装集成遵循 [MIT](LICENSE)，后端及其修改遵循 [AGPL-3.0](https://github.com/daeuniverse/dae-wing/blob/main/LICENSE)。相关版权声明与子模块版本均保留。
