@@ -854,6 +854,7 @@ form {
 }
 .node-picker-body {
   container-type: inline-size;
+  overscroll-behavior: contain;
 }
 .picker-node-grid {
   display: grid;
@@ -948,11 +949,126 @@ form {
 @media (hover: none), (pointer: coarse) {
   [data-node-picker] .node-name {
     white-space: normal;
-    overflow: visible;
+    overflow: hidden;
     overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
   [data-node-picker] .node-name-text {
     display: inline;
+  }
+}
+
+.picker-node-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.picker-name-toggle {
+  width: 28px;
+  height: 32px;
+  color: var(--muted-foreground);
+}
+.picker-name-expanded .node-name {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: unset;
+}
+.picker-name-expanded .node-name-text {
+  display: inline;
+  animation: none !important;
+}
+.picker-search-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.picker-search-row > div:first-child {
+  flex: 1;
+  min-width: 160px;
+}
+.picker-source-select {
+  width: auto;
+  max-width: 220px;
+  min-width: 130px;
+  height: 32px;
+  padding-block: 4px;
+}
+[data-slot='dialog-close'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  top: 4px;
+  right: 4px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .picker-name-toggle {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .picker-node-row:is(:hover, :focus-within) .picker-name-toggle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .picker-name-toggle {
+    width: 44px;
+    height: 44px;
+  }
+  .picker-source-select {
+    min-height: 44px;
+    font-size: 16px;
+    flex: 1;
+  }
+}
+@media (max-width: 640px) {
+  .picker-search-row > div:first-child {
+    flex-basis: 100%;
+  }
+  .picker-search-row > button {
+    flex: 1;
+  }
+  .picker-bulk-actions {
+    width: 100%;
+  }
+}
+@media (max-width: 640px) and (max-height: 480px) {
+  .node-picker-dialog {
+    width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+  .node-picker-dialog .picker-filters-row,
+  .node-picker-dialog .picker-bulk-actions {
+    display: none;
+  }
+  .node-picker-dialog .picker-search-row > button,
+  .node-picker-dialog .node-picker-count {
+    display: none;
+  }
+  .node-picker-dialog [data-slot='dialog-header'] > div {
+    display: block;
+  }
+  .node-picker-dialog [data-slot='dialog-title'] {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .node-picker-dialog .node-picker-toolbar {
+    flex-shrink: 1;
+    min-height: 64px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .node-picker-dialog .node-picker-body {
+    min-height: 64px;
   }
 }
 

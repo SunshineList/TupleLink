@@ -164,7 +164,10 @@ export function SubscriptionNodes({
           if (qrOpen) setQrOpen(false)
           else if (adding) setAdding(null)
           else if (detail) setDetailId(null)
-          else onClose()
+          else {
+            if (tests.busy && tests.scope === scope) tests.stop()
+            onClose()
+          }
         }}
       >
         <DialogContent

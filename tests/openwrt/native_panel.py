@@ -105,6 +105,11 @@ def main():
                 names = [f"{regions[index % len(regions)]}{index + 1:03d} · 中继 BGP" for index in range(72)]
                 names[0] += " · " + "完整名称查看验证 LongNodeName " * 5
                 links = [f"trojan://fixture-{index}@192.0.2.44:443?security=tls&sni=example.invalid#{quote(name)}" for index, name in enumerate(names)]
+            if self.path.startswith("/sub-recovery"):
+                label = "A" if self.path.startswith("/sub-recovery-a") else "B"
+                names = [f"Recovery-{label}-{index:03d}" for index in range(66)]
+                names[0] += " · " + "完整名称 LongNodeName " * 7
+                links = [f"trojan://recovery-{label}-{index}@192.0.2.44:443?security=tls#{quote(name)}" for index, name in enumerate(names)]
             body = base64.b64encode("\n".join(links).encode())
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")

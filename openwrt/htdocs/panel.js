@@ -51,7 +51,8 @@ return view.extend({
     return E('iframe', {
       src: panel + (route[0] ? '#/' + route[0] : ''),
       title: 'Daed ' + route[1],
-      style: 'display:block;width:100%;height:calc(100vh - 160px);min-height:560px;border:0',
+      style:
+        'display:block;width:100%;height:calc(100vh - 160px);height:calc(100dvh - 160px);min-height:160px;border:0',
     })
   },
 })

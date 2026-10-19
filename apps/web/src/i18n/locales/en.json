@@ -239,7 +239,15 @@
     "testSubscription": "Test subscription nodes",
     "testMatched": "Test matching nodes",
     "fastest": "Lowest latency",
-    "testSummary": "Tested {{count}}/{{total}} · Reachable {{alive}}"
+    "testSummary": "Tested {{count}}/{{total}} · Reachable {{alive}}",
+    "allSources": "All sources",
+    "onlySelected": "Selected only",
+    "testSelected": "Test selected ({{count}})",
+    "selectVisible": "Select matching",
+    "clearSelection": "Clear selection",
+    "matchCount": "{{count}} / {{total}} nodes",
+    "expandName": "Expand full name",
+    "collapseName": "Collapse name"
   },
   "info": "info",
   "interface and kernel options": "Interface and Kernel Options",
@@ -265,7 +273,18 @@
     "colors": "Latency colors",
     "good": "Green: < 200 ms",
     "warning": "Yellow: 200–499 ms",
-    "bad": "Red: ≥ 500 ms / failed"
+    "bad": "Red: ≥ 500 ms / failed",
+    "paused": "Paused {{completed}} / {{total}}",
+    "completed": "Completed {{completed}} / {{total}}",
+    "resume": "Continue unfinished ({{count}})",
+    "retryFailed": "Retry failed ({{count}})",
+    "stopping": "Stopping…",
+    "failure": {
+      "service": "Tests paused after repeated service request failures. Results are kept; continue unfinished nodes when the service is available.",
+      "session": "Your session expired. Sign in again to continue testing.",
+      "target": "The test target could not be resolved. Check DNS or the test URL, then continue.",
+      "request": "The test request is invalid or the nodes changed. Refresh the node list and retry."
+    }
   },
   "link": "Link",
   "logLevel": "Log Level",

@@ -1,6 +1,6 @@
 import type { NodeLatencyProbeResult } from '~/apis'
 import type { LatencyTests } from '~/components/LatencyStatus'
-import { Gauge, Search } from 'lucide-react'
+import { ChevronsUpDown, Gauge, Search } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -26,6 +26,7 @@ export interface GroupPickerItem {
   description?: string
   meta?: string
   source?: string
+  sourceId?: string
   badge?: string
   keywords?: string[]
   previewNodes?: GroupPickerPreviewNode[]
@@ -43,12 +44,14 @@ interface PickerLatencyProps {
 }
 
 // A dialog only stops the queue it started, preserving completed shared results.
-function usePickerTests(tests: LatencyTests) {
+function usePickerTests(tests: LatencyTests, scope: string) {
   const owned = useRef(false)
+  const runningHere = useRef(false)
+  runningHere.current = tests.scope === scope && tests.busy
   const stop = tests.stop
   useEffect(
     () => () => {
-      if (owned.current) stop()
+      if (owned.current || runningHere.current) stop()
     },
     [stop],
   )
@@ -57,17 +60,17 @@ function usePickerTests(tests: LatencyTests) {
       if (owned.current || tests.busy || !ids.length) return
       owned.current = true
       try {
-        await tests.test(ids, 'group-picker')
+        await tests.test(ids, scope)
       } finally {
         owned.current = false
       }
     },
-    [tests.busy, tests.test],
+    [tests.busy, tests.test, scope],
   )
   return {
     test,
     stop: () => {
-      if (owned.current) stop()
+      if (owned.current || runningHere.current) stop()
     },
   }
 }
@@ -126,12 +129,13 @@ const PickerNodeCard = memo(
     onTest: (ids: string[]) => Promise<void>
   }) => {
     const { t } = useTranslation()
+    const [expandedName, setExpandedName] = useState(false)
     return (
       <article
         data-name-card
         data-picker-node={item.id}
         data-selected={checked}
-        className={cn('picker-node-row', checked && 'picker-node-selected')}
+        className={cn('picker-node-row', checked && 'picker-node-selected', expandedName && 'picker-name-expanded')}
         onClick={(event) => {
           if (!(event.target as Element).closest('button,[role="checkbox"]')) onToggle(item.id)
         }}
@@ -161,14 +165,30 @@ const PickerNodeCard = memo(
             </span>
           </span>
         </button>
-        <PickerLatencyButton
-          id={item.id}
-          name={item.title}
-          result={result}
-          pending={pending}
-          busy={busy}
-          onTest={onTest}
-        />
+        <div className="picker-node-actions">
+          <PickerLatencyButton
+            id={item.id}
+            name={item.title}
+            result={result}
+            pending={pending}
+            busy={busy}
+            onTest={onTest}
+          />
+          {item.title.length > 24 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="picker-name-toggle"
+              title={t(expandedName ? 'groupPicker.collapseName' : 'groupPicker.expandName')}
+              aria-label={`${t(expandedName ? 'groupPicker.collapseName' : 'groupPicker.expandName')} ${item.title}`}
+              aria-expanded={expandedName}
+              onClick={() => setExpandedName((value) => !value)}
+            >
+              <ChevronsUpDown className="size-3.5" />
+            </Button>
+          )}
+        </div>
       </article>
     )
   },
@@ -197,22 +217,37 @@ export function GroupAddNodesModal({
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [submitError, setSubmitError] = useState('')
-  const pickerTests = usePickerTests(tests)
+  const [source, setSource] = useState('all')
+  const [onlySelected, setOnlySelected] = useState(false)
+  const scope = `group-picker:${resetKey}:nodes`
+  const pickerTests = usePickerTests(tests, scope)
   useEffect(() => {
     setQuery('')
     setSelectedIds([])
     setSubmitError('')
+    setSource('all')
+    setOnlySelected(false)
   }, [opened, resetKey])
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    return normalized
-      ? items.filter((item) =>
+    return items.filter(
+      (item) =>
+        (source === 'all' || (item.sourceId || 'manual') === source) &&
+        (!onlySelected || selectedIds.includes(item.id)) &&
+        (!normalized ||
           [item.title, item.description, item.meta, ...(item.keywords || [])].some((value) =>
             value?.toLowerCase().includes(normalized),
-          ),
-        )
-      : items
-  }, [items, query])
+          )),
+    )
+  }, [items, query, source, onlySelected, selectedIds])
+  const sources = useMemo(
+    () => [
+      ...new Map(
+        items.map((item) => [item.sourceId || 'manual', item.source || item.meta || t('groupPicker.manualNode')]),
+      ).entries(),
+    ],
+    [items, t],
+  )
   const selected = useMemo(() => new Set(selectedIds), [selectedIds])
   const toggleItem = useCallback((id: string) => {
     setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
@@ -259,7 +294,7 @@ export function GroupAddNodesModal({
           </div>
         </ScrollableDialogHeader>
         <div className="node-picker-toolbar shrink-0 space-y-2 border-b px-4 py-2.5">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+          <div className="picker-search-row">
             <div className="min-w-0">
               <Input
                 type="search"
@@ -281,8 +316,46 @@ export function GroupAddNodesModal({
               <Gauge />
               {t('latency.testFiltered')}
             </Button>
+            {selectedIds.length > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={tests.busy}
+                onClick={() => pickerTests.test(selectedIds)}
+              >
+                {t('groupPicker.testSelected', { count: selectedIds.length })}
+              </Button>
+            )}
           </div>
-          <LatencyStatus tests={tests} scope="group-picker" />
+          <div className="picker-filters-row flex flex-wrap items-center gap-2">
+            <select
+              className="panel-select picker-source-select"
+              aria-label={t('panel.source')}
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+            >
+              <option value="all">{t('groupPicker.allSources')}</option>
+              {sources.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <Button
+              type="button"
+              variant={onlySelected ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={onlySelected}
+              onClick={() => setOnlySelected((value) => !value)}
+            >
+              {t('groupPicker.onlySelected')}
+            </Button>
+            <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+              {t('groupPicker.matchCount', { count: filteredItems.length, total: items.length })}
+            </span>
+          </div>
+          <LatencyStatus tests={tests} scope={scope} />
         </div>
         <ScrollableDialogBody className="node-picker-body px-4 py-3">
           <div data-picker-list className="picker-node-grid">
@@ -311,6 +384,28 @@ export function GroupAddNodesModal({
               {submitError}
             </p>
           )}
+          <div className="picker-bulk-actions mr-auto flex gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!filteredItems.length}
+              onClick={() =>
+                setSelectedIds((previous) => [...new Set([...previous, ...filteredItems.map((item) => item.id)])])
+              }
+            >
+              {t('groupPicker.selectVisible')}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={!selectedIds.length}
+              onClick={() => setSelectedIds([])}
+            >
+              {t('groupPicker.clearSelection')}
+            </Button>
+          </div>
           <Button variant="ghost" onClick={handleClose} disabled={loading}>
             {t('actions.cancel')}
           </Button>
@@ -343,7 +438,8 @@ export function GroupAddSubscriptionsModal({
   onSubmit: (values: { ids: string[]; nameFilterRegex?: string | null }) => Promise<void>
 } & PickerLatencyProps) {
   const { t } = useTranslation()
-  const pickerTests = usePickerTests(tests)
+  const scope = `group-picker:${resetKey}:subscriptions`
+  const pickerTests = usePickerTests(tests, scope)
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [nameFilterRegex, setNameFilterRegex] = useState('')
@@ -479,7 +575,7 @@ export function GroupAddSubscriptionsModal({
             icon={<Search className="h-4 w-4" />}
           />
 
-          <LatencyStatus tests={tests} scope="group-picker" />
+          <LatencyStatus tests={tests} scope={scope} />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-3">
             {filteredItems.map((item) => {
               const checked = selectedIds.includes(item.id)

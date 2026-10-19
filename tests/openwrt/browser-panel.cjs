@@ -469,11 +469,11 @@ async function login(page, url = base) {
     for(const [scope,other,label] of [[subscriptions,nodes,'测试订阅节点'],[nodes,subscriptions,'测试手动节点']]) {
       scopedGate=new Promise(resolve=>{releaseScopedProbes=resolve;});
       await scope.getByRole('button',{name:label,exact:true}).click();
-      await scope.getByText(/测速进度/).waitFor();
-      assert.equal(await other.getByText(/测速进度/).count(),0,'Progress must stay in its originating panel');
+      await scope.getByText(/测试进度/).waitFor();
+      assert.equal(await other.getByText(/测试进度/).count(),0,'Progress must stay in its originating panel');
       assert.equal(await frame.locator('header').getByText(/正在保存更改/).count(),0,'Latency probes must not show configuration saving');
       assert.equal(await nodes.locator('[data-node-id]').count(),7,'Subscription tests must not add nodes to the manual list');
-      await scope.getByRole('button',{name:'停止后续测速',exact:true}).click();
+      await scope.getByRole('button',{name:'停止测试',exact:true}).click();
       releaseScopedProbes();
       await scope.locator('button:not(:disabled)').and(scope.getByRole('button',{name:label,exact:true})).waitFor();
       assert.ok(await scope.getByRole('button',{name:label,exact:true}).isEnabled());
@@ -550,8 +550,8 @@ async function login(page, url = base) {
     let releaseStopProbes;
     probeGate = new Promise(resolve => {releaseStopProbes=resolve;});
     await viewer.getByRole('button', { name: '测试当前结果', exact: true }).click();
-    await viewer.getByText(/测速进度/).waitFor();
-    await viewer.getByRole('button', { name: '停止后续测速', exact: true }).click();
+    await viewer.getByText(/测试进度/).waitFor();
+    await viewer.getByRole('button', { name: '停止测试', exact: true }).click();
     releaseStopProbes();
     probeGate = null;
     await viewer.locator('button:not(:disabled)').filter({ hasText: '测试当前结果' }).waitFor();

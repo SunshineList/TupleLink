@@ -160,6 +160,7 @@ export function GroupResource({
           description: description || undefined,
           meta: t('groupPicker.manualNode'),
           source: t('groupPicker.manualNode'),
+          sourceId: 'manual',
           badge: node.protocol || undefined,
           keywords: [node.name, node.tag, node.address, node.protocol].filter(Boolean) as string[],
         }
@@ -179,6 +180,7 @@ export function GroupResource({
             description: undefined,
             meta: t('groupPicker.fromSubscription', { name: subscriptionName }),
             source: subscriptionName,
+            sourceId: subscription.id,
             badge: node.protocol || undefined,
             keywords: [node.name, node.link, node.protocol, subscriptionName].filter(Boolean) as string[],
           }

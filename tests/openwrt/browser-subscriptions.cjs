@@ -188,9 +188,13 @@ async function preview(page) {
     await picker.getByRole('searchbox').fill(prefix)
     const pickName = picker.locator(`[data-picker-node="${longManual}"] .node-name`)
     assert.equal(await pickName.evaluate((e) => getComputedStyle(e).whiteSpace), 'normal')
+    assert.equal(await pickName.evaluate((e) => getComputedStyle(e).webkitLineClamp), '2')
+    const pickRow = picker.locator(`[data-picker-node="${longManual}"]`)
+    await pickRow.getByRole('button', { name: /^展开完整名称 / }).tap()
+    assert.equal(await pickRow.getByRole('checkbox').isChecked(), false, 'Viewing a name must not select the node')
     assert.ok(
       await pickName.evaluate((e) => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1),
-      'Touch selection shows the complete name without clipping',
+      'Touch selection expands the complete name without clipping',
     )
     await picker.screenshot({ path: path.join(output, 'picker-touch-full-name.png') })
     await picker.getByRole('button', { name: '取消', exact: true }).tap()
