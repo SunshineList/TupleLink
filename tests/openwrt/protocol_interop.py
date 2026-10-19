@@ -102,7 +102,7 @@ def run_fixture(args, http_port, udp_port):
                     raise RuntimeError("independent server exited: " + (work / "server.log").read_text())
                 env = os.environ.copy()
                 env["DAED_PROTOCOL_CASES"] = str(casefile)
-                return subprocess.run(["go", "test", "-count=1", "-v", "./graphql/service/node", "-run", "TestRouterProtocolInteroperability$"], cwd=args.wing, env=env).returncode
+                return subprocess.run(["go", "test", "-count=1", "-v", "./graphql/service/node", "./dae", "-run", "TestRouterProtocolInteroperability$|TestRouterHTTPProtocolDownload$"], cwd=args.wing, env=env).returncode
             finally:
                 process.terminate()
                 process.wait(timeout=5)

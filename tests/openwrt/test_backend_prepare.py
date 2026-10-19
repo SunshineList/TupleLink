@@ -11,6 +11,9 @@ SPEC = importlib.util.spec_from_file_location("prepare_wing", ROOT / "openwrt/pr
 PREPARE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PREPARE)
 SOURCES = (
+    "cmd/run.go",
+    "dae/run.go",
+    "dae/httpclient.go",
     "graphql/service/subscription/mutation_utils.go",
     "graphql/service/node/latency_mutation_utils.go",
     "graphql/service/node/latency_cache.go",
@@ -61,6 +64,19 @@ class BackendPrepareTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown runtime test fixture"):
             PREPARE.prepare(self.root)
         self.assertEqual(path.read_bytes(), before)
+
+    def test_unknown_lifecycle_edits_are_preserved(self):
+        PREPARE.prepare(self.root)
+        for relative in ("cmd/run.go", "dae/run.go", "dae/httpclient.go"):
+            with self.subTest(source=relative):
+                path = self.root / relative
+                original = path.read_bytes()
+                path.write_bytes(original + b"// unreviewed local edit\n")
+                changed = path.read_bytes()
+                with self.assertRaisesRegex(ValueError, "Unknown backend source"):
+                    PREPARE.prepare(self.root)
+                self.assertEqual(path.read_bytes(), changed)
+                path.write_bytes(original)
 
     def test_unknown_protocol_wrapper_edit_is_preserved(self):
         PREPARE.prepare(self.root)

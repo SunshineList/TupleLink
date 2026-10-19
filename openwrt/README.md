@@ -1,9 +1,18 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.15](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.15)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.16](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.16)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.16 连接稳定性
+
+- 网络就绪检测最多等待 10 秒，检测站点不可达时继续加载已有配置，由内核健康检查恢复连接，避免首次应用配置无限等待。
+- 订阅经代理下载时，取消和超时传递到底层拨号；第一个 DNS 地址不可用时尝试后续地址，兼容部分 IPv6 线路不可达的情况。
+- 浏览器断开或取消请求后，后台任务可及时退出；缺少过期时间的登录令牌正常拒绝，不再触发空指针。
+- 重载时原子切换供查询使用的代理实例，服务协程保留所属实例和日志，减少重载与统计读取相互干扰。
+- 默认监听 `wan` / `wan6` 的重新上线事件，恢复后重新识别自动 WAN 绑定；网络重载与安装、卸载互斥，普通 WAN 状态更新不触发重启。自定义逻辑上联可设置 `daed.main.wan_network` / `wan6_network`，与高级配置中的实际设备名称区分。
+- 保留节点、订阅、群组、配置和安装管理菜单，无新依赖或数据库迁移。
 
 ## 0.6.15 中文安装管理菜单
 
@@ -139,7 +148,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/sloby
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.15/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.15
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.16/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.16
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有

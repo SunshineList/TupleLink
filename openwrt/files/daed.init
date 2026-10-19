@@ -31,13 +31,26 @@ start_service() {
 }
 
 reload_service() {
-	restart
+	# Network events can arrive while packages or service state are changing.
+	# The installer explicitly restarts after replacement, using current links.
+	(
+		mkdir -p /var/lock
+		exec 9>/var/lock/daed-install.lock
+		flock -n 9 || exit 0
+		restart
+	)
 }
 
 service_triggers() {
-	local lan
+	local lan wan wan6
 	config_load daed
 	config_get lan main lan_network lan
+	config_get wan main wan_network wan
+	config_get wan6 main wan6_network wan6
 	procd_add_reload_trigger daed
 	procd_add_interface_trigger 'interface.*' "$lan" /etc/init.d/daed reload
+	# Re-evaluate auto WAN bindings after real uplink reconnection. Ordinary
+	# interface.update notifications must not restart working connections.
+	[ -z "$wan" ] || procd_add_interface_trigger 'interface.up' "$wan" /etc/init.d/daed reload
+	[ -z "$wan6" ] || procd_add_interface_trigger 'interface.up' "$wan6" /etc/init.d/daed reload
 }

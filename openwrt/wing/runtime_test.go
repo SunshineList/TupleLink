@@ -7,6 +7,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,10 +16,11 @@ import (
 
 func useRuntimePlane(t *testing.T) *control.ControlPlane {
 	t.Helper()
-	previous := c
-	c = control.NewRuntimeStatsFixture()
-	t.Cleanup(func() { c = previous })
-	return c
+	previous := currentControlPlane.Load()
+	plane := control.NewRuntimeStatsFixture()
+	currentControlPlane.Store(plane)
+	t.Cleanup(func() { currentControlPlane.Store(previous) })
+	return plane
 }
 
 func runtimeTCPPair(t *testing.T) (net.Conn, net.Conn) {
@@ -157,7 +159,7 @@ func TestRuntimeOverviewReadsUDPAndNewInstance(t *testing.T) {
 	}
 	assertRuntimeTraffic(t, uint64(len(payload)), uint64(len(payload)))
 	// Reload selects the new instance; the old plane's bytes must not leak in.
-	c = control.NewRuntimeStatsFixture()
+	currentControlPlane.Store(control.NewRuntimeStatsFixture())
 	overview, err := GetRuntimeOverview(60, 240)
 	if err != nil || overview.UploadTotal != 0 || overview.DownloadTotal != 0 {
 		t.Fatal("old plane leaked into overview", err)
@@ -165,9 +167,9 @@ func TestRuntimeOverviewReadsUDPAndNewInstance(t *testing.T) {
 }
 
 func TestRuntimeOverviewWithoutProxyIgnoresLegacyTraffic(t *testing.T) {
-	previous := c
-	c = nil
-	defer func() { c = previous }()
+	previous := currentControlPlane.Load()
+	currentControlPlane.Store(nil)
+	defer currentControlPlane.Store(previous)
 	control.RecordUploadTraffic(101)
 	control.RecordDownloadTraffic(103)
 	overview, err := GetRuntimeOverview(60, 240)
@@ -177,4 +179,26 @@ func TestRuntimeOverviewWithoutProxyIgnoresLegacyTraffic(t *testing.T) {
 	if overview.UploadTotal != 0 || overview.DownloadTotal != 0 || overview.ActiveConnections != 0 || overview.UDPSessions != 0 || overview.UpdatedAt.IsZero() {
 		t.Fatalf("invalid stopped overview: %+v", overview)
 	}
+}
+
+func TestRuntimeOverviewConcurrentPlaneReplacement(t *testing.T) {
+	previous := currentControlPlane.Load()
+	defer currentControlPlane.Store(previous)
+	planes := []*control.ControlPlane{control.NewRuntimeStatsFixture(), control.NewRuntimeStatsFixture(), nil}
+	var workers sync.WaitGroup
+	for worker := 0; worker < 4; worker++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for attempt := 0; attempt < 200; attempt++ {
+				if _, err := GetRuntimeOverview(60, 20); err != nil {
+					t.Error(err)
+				}
+			}
+		}()
+	}
+	for attempt := 0; attempt < 600; attempt++ {
+		currentControlPlane.Store(planes[attempt%len(planes)])
+	}
+	workers.Wait()
 }
