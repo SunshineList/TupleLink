@@ -273,7 +273,7 @@ export function GroupResource({
             </span>
             <span>{t('groupPicker.nodesCount', { count: groupNodes.length })}</span>
             <span>{t('groupPicker.subscriptionGroupsCount', { count: groupSubscriptions.length })}</span>
-            {!!groupNodes.length && (
+            {!!groupNodes.length && !expandedGroupIds.has(groupId) && (
               <span
                 className="max-w-full basis-full whitespace-normal [overflow-wrap:anywhere]"
                 title={groupNodes.map((node) => node.tag || node.name).join(' · ')}

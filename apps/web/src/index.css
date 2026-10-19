@@ -814,9 +814,15 @@ form {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-@media (min-width: 640px) {
-  .panel-workspace[data-workspace='dashboard'] [data-group-card-id] > [data-slot='card'] {
-    padding: 16px;
+.group-member-card [data-latency-tone] {
+  padding: 1px 5px;
+  font-size: 10px;
+}
+@media (pointer: coarse) {
+  .group-member-handle,
+  .group-member-remove {
+    min-height: 36px;
+    min-width: 28px;
   }
 }
 @media (max-width: 479px) {

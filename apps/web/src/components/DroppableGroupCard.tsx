@@ -87,7 +87,7 @@ export function DroppableGroupCard({
         shadow="none"
         padding="sm"
         className={cn(
-          'gap-3 rounded-xl transition-colors',
+          'gap-2 rounded-xl transition-colors',
           onToggleCollapsed && !isEditing && 'cursor-pointer hover:border-primary/40',
         )}
         onClick={(event) => {
@@ -103,7 +103,7 @@ export function DroppableGroupCard({
           onToggleCollapsed()
         }}
       >
-        <div className="border-b pb-2">
+        <div className={cn(!collapsed && 'border-b pb-2')}>
           <div className="flex flex-wrap items-start justify-between gap-2">
             {isEditing ? (
               <div className="flex w-full min-w-0 items-center gap-2">
@@ -212,7 +212,10 @@ export function DroppableGroupCard({
             </div>
           </div>
           {summary && (
-            <div data-group-summary className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <div
+              data-group-summary
+              className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+            >
               {summary}
             </div>
           )}

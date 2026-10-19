@@ -28,6 +28,7 @@ import type { NodeLatencyProbeResult } from '~/apis'
 import { DraggableResourceType } from '~/constants'
 import { appStateAtom, groupSortOrdersAtom } from '~/store'
 import { deriveTime } from '~/utils'
+import { groupColumnBase, groupColumnLocations } from '~/utils/group-columns'
 import { useLatencyTests } from '~/hooks/useLatencyTests'
 import { Config } from './Config'
 import { DNS } from './DNS'
@@ -344,7 +345,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
 
   const onDragStart = (start: { draggableId: string; source: { droppableId: string } }) => {
     const draggableId = start.draggableId
-    const droppableId = start.source.droppableId
+    const droppableId = groupColumnBase(start.source.droppableId)
 
     setIsDragging(true)
     setDragNodes(filteredNodes)
@@ -389,7 +390,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
 
   const onDragUpdate = useCallback(
     (update: DragUpdate) => {
-      const nextDroppableId = update.destination?.droppableId ?? null
+      const nextDroppableId = update.destination ? groupColumnBase(update.destination.droppableId) : null
       setDragDestinationDroppableId((current) => (current === nextDroppableId ? current : nextDroppableId))
       ensureEdgeAutoScroll()
     },
@@ -397,7 +398,11 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
   )
 
   const onDragEnd = (result: DropResult) => {
-    const { source, destination, draggableId } = result
+    const { draggableId } = result
+    const { source, destination } = groupColumnLocations(result.source, result.destination, (id) => {
+      const column = document.querySelector(`[data-rfd-droppable-id="${CSS.escape(id)}"]`)
+      return Number(column?.getAttribute('data-group-column-offset')) || 0
+    })
     const pointer = dragPointerRef.current
     const fallbackGroupId = pointer
       ? document
