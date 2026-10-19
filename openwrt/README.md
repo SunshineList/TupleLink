@@ -1,9 +1,16 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.14](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.14)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.15](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.15)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.15 中文安装管理菜单
+
+- 提供安装/更新、卸载、环境检查和退出；交互终端无操作参数时显示菜单，也可显式使用 `--menu`。
+- 安装后运行 `nailink` 打开本地菜单。安装/更新时从本仓库默认分支获取最新发布脚本；显式指定 `--release` 或 `--asset-dir` 时按指定版本/本地文件执行。
+- 卸载只使用本地脚本，不依赖网络、BTF 或 LuCI 页面；确认后自动备份，再清理插件与配置，保留已有备份和共享依赖。
+- 等待选择时不占安装锁；取消、退出、输入结束或下载失败均不停止现有服务。非交互命令行用法保持兼容。
 
 ## 0.6.14 NaiLink 品牌更新
 
@@ -110,13 +117,15 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 
 ## 安装和保留数据升级
 
-以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
+以 root 在路由器 SSH 中执行，打开中文菜单后选择 **1 安装 / 更新**：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.14/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.6.14
+uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/slobys/daed/main/openwrt/install.sh && sh /tmp/nailink-install.sh --menu
 ```
 
-升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
+安装后可直接运行 `nailink` 再次打开菜单。选择安装/更新时才联网获取最新发布脚本；卸载可以离线执行。
+
+升级先停止 NaiLink 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
 `/root/daed-backups`，然后更新程序；保留既有节点、规则、账户数据和自启选择。
 新入口复用原用户的面板存储；没有用户时自动准备本地服务身份。
 不需要删除旧版或重新建立账户。失败时提示备份位置，不自动回滚。
@@ -127,19 +136,30 @@ uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/do
 升级后刷新后台，再进入 **服务 → NaiLink**（0.6.13 及更早版本为 **Daed**）；仍显示旧内容时按 `Ctrl+F5`。
 无需修改监听地址。保留旧数据及原有排序、配色偏好，不重建数据库。
 
+固定版本的非交互安装/升级仍可执行：
+
+```sh
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.15/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.15
+```
+
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
 软件源索引模拟依赖。预检失败不会停止或卸载现有 Daed。正式安装会先更新
 固件自身的索引。APK 不使用离线参数屏蔽未缓存的远端依赖，不强制忽略内核 ABI。
 
 ## 卸载和清空重装
 
+推荐运行 `nailink`，选择 **2 卸载**，输入 `y` 确认。也可使用上面的在线菜单，直接卸载旧版而不先安装新版。
+卸载将停止服务并删除插件和当前节点、订阅、群组与配置；备份保留在 `/root/daed-backups`。
+
+命令行直接执行（不经过菜单确认）：
+
 ```sh
 # 安装成功后无需重新下载脚本
 daed-router-setup --uninstall
 # 也可以使用下载的脚本
-sh /tmp/daed-install.sh --uninstall
+sh /tmp/nailink-install.sh --uninstall
 # 仅在需要清空旧配置、或替换其他来源的 daed 包时使用
-sh /tmp/daed-install.sh --reinstall
+sh /tmp/nailink-install.sh --reinstall
 ```
 
 卸载、全新重装会先备份配置、数据库及 WAL，再移除 Daed 包和原数据。
@@ -265,12 +285,12 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.6.14 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
+CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.6.15 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
 # 从 wing/ 构建，复用已锁定的 Go 依赖
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../btf-probe ../openwrt/btf-probe.go)
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../luci-proxy ../openwrt/luci-proxy.go)
-python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.6.14 --work /path/to/sdk-cache --output /path/to/packages
-python3 openwrt/manifest.py /path/to/packages --version 0.6.14
+python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.6.15 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/manifest.py /path/to/packages --version 0.6.15
 node --test tests/openwrt/ui.test.cjs
 ```
 

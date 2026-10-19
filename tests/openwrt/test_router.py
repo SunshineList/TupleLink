@@ -82,6 +82,7 @@ esac''')
         self.write("/fixtures/check", (OPENWRT / "files/daed-check").read_bytes(), True)
         self.script("/fixtures/btf-probe", '[ ! -e /tmp/btf-bad ] || { echo "invalid BTF fixture" >&2; exit 1; }')
         self.write("/installer/install.sh", (OPENWRT / "install.sh").read_bytes(), True)
+        self.write("/fixtures/nailink", (OPENWRT / "files/nailink").read_bytes(), True)
         self.script("/fixtures/install", '''[ ! -e /tmp/pm-fail ] || exit 17
 mkdir -p /usr/libexec/daed /usr/share/daed-router /etc/daed
 mkdir -p /www/cgi-bin
@@ -90,6 +91,7 @@ cp /fixtures/btf-probe /www/cgi-bin/daed-router
 cp /fixtures/check /usr/libexec/daed/check
 cp /fixtures/btf-probe /usr/libexec/daed/btf-probe
 cp /installer/install.sh /usr/sbin/daed-router-setup
+cp /fixtures/nailink /usr/sbin/nailink
 cp /fixtures/daed-init /etc/init.d/daed
 echo '#!/bin/sh' > /usr/bin/daed
 chmod +x /usr/bin/daed

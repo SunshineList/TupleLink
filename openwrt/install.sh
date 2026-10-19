@@ -5,25 +5,101 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.6.14
+release=openwrt-v0.6.15
 asset_dir=''
 mode=install
 action=install
 stage=''
 backup=''
 stopped=0
+menu=auto
+explicit_action=0
+explicit_release=0
+latest_install=0
 
 fail() { printf 'NaiLink: %s\n' "$*" >&2; exit 1; }
 usage() {
 	cat <<'EOF'
 Usage: sh install.sh [--install | --uninstall | --reinstall] [--release TAG] [--asset-dir DIRECTORY] [--check | --dry-run]
-  --install     Install or upgrade this project's packages (default).
+  --menu        Open the Chinese install/update, uninstall and check menu.
+  --install     Install or upgrade this script's release without the menu.
   --uninstall   Back up data, remove NaiLink packages and clear its config/data.
   --reinstall   Verify new assets, then back up/uninstall and install fresh.
   --check       Read-only compatibility check; no package/repository changes.
   --dry-run     Verify assets; APK also simulates dependencies using cached feeds.
   --asset-dir   Use downloaded release assets (dependencies still use firmware feeds).
+With no action flag, a terminal opens the menu; non-interactive callers retain
+the direct install behavior. Menu install/update fetches the latest installer
+unless --release or --asset-dir is supplied. Uninstall works offline.
 EOF
+}
+show_menu() {
+	current='未安装或版本未知'
+	if [ -r /usr/share/daed-router/version ]; then
+		IFS= read -r current </usr/share/daed-router/version || :
+		case "$current" in ''|*[!a-zA-Z0-9._+-]*) current='版本未知' ;; esac
+	fi
+	while :; do
+		printf '\nNaiLink · 奶油互联\n当前版本：%s\n' "$current"
+		if [ "$explicit_release" = 1 ] || [ -n "$asset_dir" ]; then
+			printf '目标版本：%s\n' "${release#openwrt-v}"
+		else
+			printf '安装/更新时联网获取最新发布版；卸载可离线执行。\n'
+		fi
+		printf '\n  1) 安装 / 更新（保留节点和配置）\n  2) 卸载（先备份，再清理插件和配置）\n  3) 检查环境（不修改系统）\n  0) 退出\n\n请选择 [0-3]：'
+		if ! IFS= read -r choice; then printf '\n已退出，未执行操作。\n'; exit 0; fi
+		case "$choice" in
+		1)
+			action=install; mode=install
+			if [ "$explicit_release" = 0 ] && [ -z "$asset_dir" ]; then latest_install=1; fi
+			return ;;
+		2)
+			printf '\n卸载将停止服务，备份到 /root/daed-backups，再删除插件、节点和配置。\n已有备份和共享依赖将保留。确认卸载？[y/N]：'
+			confirm=''
+			IFS= read -r confirm || :
+			case "$confirm" in y|Y|yes|YES) action=uninstall; mode=install; return ;;
+			*) printf '已取消卸载。\n' ;; esac ;;
+		3) action=install; mode=check; return ;;
+		0|'') printf '已退出，未执行操作。\n'; exit 0 ;;
+		*) printf '输入无效，请选择 0、1、2 或 3。\n' ;;
+		esac
+	done
+}
+install_latest() {
+	stage=$(mktemp -d /tmp/daed-install.XXXXXX) || fail 'Cannot create staging directory.'
+	url="https://raw.githubusercontent.com/$REPOSITORY/main/openwrt/install.sh"
+	printf '\n正在获取最新安装脚本，现有服务和数据尚未改动…\n'
+	if command -v curl >/dev/null 2>&1; then
+		curl --fail --location --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 60 \
+			--output "$stage/install.sh" "$url" || fail 'Cannot download the latest installer. Existing service/data were not changed.'
+	elif command -v uclient-fetch >/dev/null 2>&1; then
+		uclient-fetch -T 60 -O "$stage/install.sh" "$url" || fail 'Cannot download the latest installer. Existing service/data were not changed.'
+	else
+		fail 'Requires curl or uclient-fetch with working HTTPS certificate verification.'
+	fi
+	if [ ! -s "$stage/install.sh" ] || ! sh -n "$stage/install.sh"; then
+		fail 'Downloaded installer is empty or invalid.'
+	fi
+	target=$(awk '/^release=openwrt-v[0-9]+\.[0-9]+\.[0-9]+$/ {sub(/^release=openwrt-v/, ""); print; count++} END {if(count!=1) exit 1}' "$stage/install.sh") || fail 'Downloaded installer has no unique release version.'
+	installed_version=''
+	if [ -r /usr/share/daed-router/version ]; then
+		IFS= read -r installed_version </usr/share/daed-router/version || :
+		installed_version=${installed_version%%-*}
+	fi
+	for minimum in "${release#openwrt-v}" "$installed_version"; do
+		if ! awk -v target="$target" -v minimum="$minimum" 'BEGIN {
+			if (minimum !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) exit 0;
+			split(target, newer, "."); split(minimum, older, ".");
+			for (i=1; i<=3; i++) {
+				if (newer[i]+0 > older[i]+0) exit 0;
+				if (newer[i]+0 < older[i]+0) exit 1;
+			}
+		}' ; then
+			fail 'Downloaded installer is older than this script/installation. Retry after the upstream cache refreshes; existing service/data were not changed.'
+		fi
+	done
+	printf '目标版本：%s，开始安装/更新。\n' "$target"
+	sh "$stage/install.sh" --install
 }
 cleanup() {
 	result=$?
@@ -41,18 +117,29 @@ trap 'exit 1' HUP INT TERM
 
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-	--release) [ "$#" -ge 2 ] || fail 'Missing release tag.'; release=$2; shift 2 ;;
+	--release) [ "$#" -ge 2 ] || fail 'Missing release tag.'; release=$2; explicit_release=1; shift 2 ;;
 	--asset-dir) [ "$#" -ge 2 ] || fail 'Missing asset directory.'; asset_dir=$2; shift 2 ;;
-	--install|--uninstall|--reinstall) action=${1#--}; shift ;;
-	--check) mode=check; shift ;;
-	--dry-run) mode=dry-run; shift ;;
+	--menu) menu=1; shift ;;
+	--install|--uninstall|--reinstall) action=${1#--}; explicit_action=1; shift ;;
+	--check) mode=check; explicit_action=1; shift ;;
+	--dry-run) mode=dry-run; explicit_action=1; shift ;;
 	--help|-h) usage; exit 0 ;;
 	*) usage; fail "Unknown option: $1" ;;
 	esac
 done
+[ "$menu" != 1 ] || [ "$explicit_action" = 0 ] || fail '--menu cannot be combined with action/check/dry-run flags.'
+if [ "$menu" = auto ]; then
+	menu=0
+	if [ "$explicit_action" = 0 ] && [ -t 0 ]; then menu=1; fi
+fi
 [ "$mode" != check ] || [ "$action" = install ] || fail '--check cannot be combined with uninstall/reinstall.'
 case "$release" in ''|*[!a-zA-Z0-9._-]*) fail 'Invalid release tag.' ;; esac
 [ "$(id -u)" = 0 ] || fail 'Run on the router as root.'
+if [ ! -r /etc/openwrt_release ] || ! command -v uci >/dev/null 2>&1; then
+	fail 'Requires OpenWrt / ImmortalWrt / iStoreOS.'
+fi
+[ "$menu" != 1 ] || show_menu
+if [ "$latest_install" = 1 ]; then install_latest; exit 0; fi
 # Kernel-held lock: it also releases on interruption/SIGKILL. Never unlink the
 # file, otherwise a second process could lock a different inode at the same path.
 if [ "$mode" = install ]; then
@@ -60,9 +147,6 @@ if [ "$mode" = install ]; then
 	mkdir -p /var/lock
 	exec 9>/var/lock/daed-install.lock
 	flock -n 9 || fail 'Another NaiLink installation/removal is running. Try again after it finishes.'
-fi
-if [ ! -r /etc/openwrt_release ] || ! command -v uci >/dev/null 2>&1; then
-	fail 'Requires OpenWrt / ImmortalWrt / iStoreOS.'
 fi
 if [ "$action" != uninstall ]; then
 	[ -r /www/luci-static/resources/luci.js ] || fail 'Install the firmware-provided LuCI first.'
@@ -172,7 +256,7 @@ uninstall_daed() {
 	if pidof daed >/dev/null 2>&1; then fail 'NaiLink restarted during removal; data was retained.'; fi
 	# Fixed paths only; never follow data directory symlinks or touch other apps.
 	rm -rf /etc/daed
-	rm -f /etc/config/daed /etc/config/daed.apk-new /etc/config/daed.opkg-dist /etc/init.d/daed /usr/bin/daed /usr/sbin/daed-router-setup
+	rm -f /etc/config/daed /etc/config/daed.apk-new /etc/config/daed.opkg-dist /etc/init.d/daed /usr/bin/daed /usr/sbin/daed-router-setup /usr/sbin/nailink
 	rm -f /usr/libexec/daed/check /usr/libexec/daed/btf-probe /usr/share/daed-router/version
 	rm -f /usr/libexec/daed/luci-proxy /www/cgi-bin/daed-router
 	for link in /etc/rc.d/[SK][0-9][0-9]daed; do [ ! -L "$link" ] || rm -f "$link"; done

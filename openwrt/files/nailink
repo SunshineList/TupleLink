@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Keep uninstall available offline through the installed setup script.
+[ "$#" -gt 0 ] || set -- --menu
+exec /usr/sbin/daed-router-setup "$@"

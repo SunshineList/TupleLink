@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.6.14)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.6.15)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -54,6 +54,7 @@ define Package/daed-router/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/daed $(1)/usr/bin/daed
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./install.sh $(1)/usr/sbin/daed-router-setup
+	$(INSTALL_BIN) ./files/nailink $(1)/usr/sbin/nailink
 	$(INSTALL_BIN) ./files/daed.init $(1)/etc/init.d/daed
 	$(INSTALL_CONF) ./files/daed.config $(1)/etc/config/daed
 	$(INSTALL_DIR) $(1)/usr/libexec/daed $(1)/usr/share/daed-router

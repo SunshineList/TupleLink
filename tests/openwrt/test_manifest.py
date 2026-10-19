@@ -20,7 +20,9 @@ class ManifestTests(unittest.TestCase):
         version = re.search(r"^release=openwrt-v(\d+\.\d+\.\d+)$", (OPENWRT / "install.sh").read_text(), re.MULTILINE).group(1)
         self.assertIn("," + version + ")", (OPENWRT / "Makefile").read_text())
         self.assertIn("default: '" + version + "'", (OPENWRT.parent / ".github/workflows/openwrt.yml").read_text())
-        self.assertIn("--release openwrt-v" + version, (OPENWRT.parent / "README.md").read_text(encoding="utf-8"))
+        readme = (OPENWRT.parent / "README.md").read_text(encoding="utf-8")
+        self.assertIn("/releases/tag/openwrt-v" + version, readme)
+        self.assertIn("https://raw.githubusercontent.com/slobys/daed/main/openwrt/install.sh", readme)
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

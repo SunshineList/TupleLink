@@ -106,6 +106,7 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             verify_elf(root / "usr/bin/daed", cpu)
             expected = {"etc/init.d/daed": "files/daed.init", "usr/libexec/daed/check": "files/daed-check", "lib/upgrade/keep.d/daed-router": "files/keep-daed"}
             expected["usr/libexec/daed/subscription-proxy"] = "files/subscription-proxy"
+            expected["usr/sbin/nailink"] = "files/nailink"
             verify_elf(root / "usr/libexec/daed/btf-probe", cpu)
             verify_elf(root / "usr/libexec/daed/luci-proxy", cpu)
             executables = ["usr/bin/daed", "etc/init.d/daed", "usr/libexec/daed/check", "usr/libexec/daed/btf-probe", "usr/libexec/daed/luci-proxy"]
@@ -115,6 +116,7 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             if (root / "usr/sbin/daed-router-setup").read_text() != installer:
                 raise ValueError("Packaged setup script differs from the versioned installer")
             executables.append("usr/sbin/daed-router-setup")
+            executables.append("usr/sbin/nailink")
         else:
             expected = {"usr/share/luci/menu.d/luci-app-daed-router.json": "files/menu.json", "usr/share/rpcd/acl.d/luci-app-daed-router.json": "files/acl.json", "usr/libexec/rpcd/daed-router": "files/rpcd-daed"}
             expected.update({"www/luci-static/resources/view/daed-router/" + path.name: "htdocs/" + path.name for path in (HERE / "htdocs").glob("*.js")})
