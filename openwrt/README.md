@@ -1,7 +1,15 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.12](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.12)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.13](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.13)。
+
+## 0.6.13 稳定性与社区入口
+
+- 订阅下载支持取消；同一订阅的手动与定时更新串行执行，下载后重新核对订阅，拒绝已删除或修改链接的过期响应。提交失败正确返回错误，保留原数据。
+- 清理已删除节点的测试缓存，按查询范围复制结果；切换页面时取消概况与测试结果请求，隐藏页面暂停结果轮询。
+- 安装、卸载和服务操作共用内核文件锁，阻止并行操作相互干扰；源码安装器默认版本与发行版保持一致。
+- 四个菜单均提供 YouTube / Telegram 入口，服务未启动时也可访问。重写项目首页说明，保留上游致谢与许可证。
+- 无新增依赖、无数据库迁移。机场 SS / AnyTLS 可用性不在本轮修改范围。
 
 ## 0.6.12 无响应 SS 测试取消修复
 
@@ -85,7 +93,7 @@ IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.12](https://github.co
 - **高级设置**：配置、DNS 和路由。
 - **运行日志**：自动刷新最近日志，保留大小限制与凭据遮盖。
 
-不再显示 Daed 首次向导、接口地址输入、注册登录、账户菜单、版本及外链工具栏。
+隐藏首次向导、接口地址输入、注册登录和账户菜单；顶部保留主题、社区入口及代理操作。
 浏览器沿用当前 LuCI 登录，不需要另设一套密码。HTTP 和 HTTPS 后台都通过同源
 CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面板提供启动按钮。
 
@@ -97,7 +105,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.12/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.13/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.6.13
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

@@ -153,6 +153,29 @@ for package in "$@"; do rm -f "/tmp/installed-$package"; done''')
     def install(self, *args):
         return self.run_router("/bin/sh", "/installer/install.sh", "--asset-dir", "/assets", *args)
 
+    def test_concurrent_installer_and_rpc_leave_running_service_untouched(self):
+        self.managed()
+        self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
+        holder = subprocess.Popen(["chroot", str(self.root), "/bin/sh", "-c", "mkdir -p /var/lock; exec 9>/var/lock/daed-install.lock; flock -n 9 || exit 1; echo ready; read -r wait"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(holder.stdout.readline().strip(), "ready")
+            self.write("/tmp/pm-calls", "")
+            before = (self.root / "tmp/pm-calls").read_bytes()
+            for action in ("--install", "--uninstall", "--reinstall"):
+                result = self.install(action)
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn("Another Daed", result.stderr)
+            rpc = self.run_router("/usr/libexec/rpcd/daed-router", "call", "action", input='{"action":"stop"}')
+            self.assertFalse(json.loads(rpc.stdout)["success"])
+            self.assertTrue((self.root / "tmp/daemon-running").exists())
+            self.assertEqual((self.root / "tmp/pm-calls").read_bytes(), before)
+        finally:
+            holder.kill()
+            holder.communicate(timeout=3)
+        # The persistent lock file is harmless after an interrupted installer.
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def check(self, *args):
         return self.run_router("/bin/sh", "/fixtures/check", *args)
 

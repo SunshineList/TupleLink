@@ -66,9 +66,28 @@ def prepare(root):
     text = text.replace("links, err := fetchLinks(argument.Link)", "var detectedName string\n\tlinks, err := fetchLinks(argument.Link, &detectedName)")
     if "argument.Tag = &detectedName" not in text:
         text = text.replace("\t/// Create a subscription model.", '\tif argument.Tag == nil && detectedName != "" { argument.Tag = &detectedName }\n\t/// Create a subscription model.')
+    begin, end = text.index("func UpdateById("), text.index("\nfunc Remove(")
+    text = text[:begin] + '''func UpdateById(ctx context.Context, subId uint) (*db.Subscription, error) {
+    return updateSubscriptionSafely(ctx, subId)
+}
+''' + text[end:]
+    text = text.replace('func fetchLinksDirect(subscriptionLink string, names ...*string) (links []string, err error) {', '''func fetchLinksDirect(subscriptionLink string, names ...*string) ([]string, error) {
+    return fetchLinksDirectContext(context.Background(), subscriptionLink, names...)
+}
+
+func fetchLinksDirectContext(ctx context.Context, subscriptionLink string, names ...*string) (links []string, err error) {''')
+    text = text.replace('_fetchLinks(subscriptionLink,', '_fetchLinksContext(ctx, subscriptionLink,')
+    text = text.replace('func _fetchLinks(subscriptionLink string, transport http.RoundTripper, timeout time.Duration, names ...*string) (links []string, err error) {', '''func _fetchLinks(subscriptionLink string, transport http.RoundTripper, timeout time.Duration, names ...*string) ([]string, error) {
+    return _fetchLinksContext(context.Background(), subscriptionLink, transport, timeout, names...)
+}
+
+func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport http.RoundTripper, timeout time.Duration, names ...*string) (links []string, err error) {''')
+    text = text.replace('http.NewRequest("GET", subscriptionLink, nil)', 'http.NewRequestWithContext(ctx, "GET", subscriptionLink, nil)')
+    text = text.replace('// Retry with dae routing.', 'if ctx.Err() != nil { return nil, ctx.Err() }\n\t\t// Retry with dae routing.') if 'if ctx.Err() != nil' not in text else text
+    text = text.replace('links, err := fetchLinks(argument.Link, &detectedName)', 'links, err := fetchLinksContext(c.Statement.Context, argument.Link, &detectedName)')
     source.write_text(text, encoding="utf-8", newline="\n")
     generated = {"mutation_utils.go": digest(text.encode())}
-    for name in ("subscription_transport.go", "subscription_transport_test.go", "subscription_name.go", "subscription_name_test.go"):
+    for name in ("subscription_transport.go", "subscription_transport_test.go", "subscription_name.go", "subscription_name_test.go", "subscription_update.go", "subscription_update_test.go"):
         destination = target / name
         data = (HERE / "wing" / name).read_bytes()
         if destination.exists() and destination.read_bytes() != data and previous.get(name) != digest(destination.read_bytes()):
@@ -97,6 +116,17 @@ def prepare(root):
             data = (HERE / "wing" / replacement).read_bytes()
         destination.write_bytes(data)
         generated[relative] = digest(data)
+    mutation_file = root / "graphql/mutation.go"
+    mutation_text = mutation_file.read_text(encoding="utf-8")
+    mutation_text = mutation_text.replace('ImportSubscription(args *struct', 'ImportSubscription(ctx context.Context, args *struct')
+    begin, end = mutation_text.index('func (r *MutationResolver) ImportSubscription('), mutation_text.index('func (r *MutationResolver) UpdateSubscriptionLink(')
+    subscription_mutations = mutation_text[begin:end].replace('db.BeginTx(context.TODO())', 'db.BeginTx(ctx)')
+    subscription_mutations = subscription_mutations.replace('\ttx.Commit()', '\tif err := tx.Commit().Error; err != nil { return nil, err }')
+    subscription_mutations = subscription_mutations.replace('ctx, cancel := context.WithTimeout(', 'schedulerCtx, cancel := context.WithTimeout(').replace('subscription.UpdateAll(ctx)', 'subscription.UpdateAll(schedulerCtx)')
+    subscription_mutations = subscription_mutations.replace('UpdateSubscription(args *struct', 'UpdateSubscription(ctx context.Context, args *struct').replace('subscription.Update(context.TODO(), args.ID)', 'subscription.Update(ctx, args.ID)')
+    mutation_text = mutation_text[:begin] + subscription_mutations + mutation_text[end:]
+    mutation_file.write_text(mutation_text, encoding="utf-8", newline="\n")
+    generated["graphql/mutation.go"] = digest(mutation_text.encode())
     destination = root / "graphql/service/node/router_latency_test.go"
     key = "graphql/service/node/router_latency_test.go"
     data = (HERE / "wing/node_latency_test.go").read_bytes()
@@ -105,6 +135,8 @@ def prepare(root):
     destination.write_bytes(data)
     generated[key] = digest(data)
     for relative, source in (
+        ("graphql/service/node/router_latency_cache.go", "node_latency_cache.go"),
+        ("graphql/service/node/router_latency_cache_test.go", "node_latency_cache_test.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat.go", "protocol_compat.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat_test.go", "protocol_compat_test.go"),
         ("dae-core/common/subscription/router_sip008.go", "sip008.go"),
@@ -117,6 +149,12 @@ def prepare(root):
             raise ValueError("Unknown protocol compatibility source: " + relative)
         destination.write_bytes(data)
         generated[relative] = digest(data)
+    cache_file = root / "graphql/service/node/latency_cache.go"
+    cache_text = cache_file.read_text(encoding="utf-8")
+    cache_text = cache_text.replace('// Reading results must never start network probes.', '// Reading results must never start network probes.\n\tbefore := latencyCacheEntriesBeforeQuery(ids)') if 'before := latencyCacheEntriesBeforeQuery(ids)' not in cache_text else cache_text
+    cache_text = cache_text.replace('merged := snapshotCachedLatencyResults()', 'merged := latencyCacheForNodes(nodes, ids == nil, before)')
+    cache_file.write_text(cache_text, encoding="utf-8", newline="\n")
+    generated["graphql/service/node/latency_cache.go"] = digest(cache_text.encode())
     # Tagged socket fixtures validate the real per-plane recorders and adapter.
     # They are not compiled into release binaries and never initialize eBPF.
     for relative, source in (

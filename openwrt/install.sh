@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.6.10
+release=openwrt-v0.6.13
 asset_dir=''
 mode=install
 action=install
@@ -53,6 +53,14 @@ done
 [ "$mode" != check ] || [ "$action" = install ] || fail '--check cannot be combined with uninstall/reinstall.'
 case "$release" in ''|*[!a-zA-Z0-9._-]*) fail 'Invalid release tag.' ;; esac
 [ "$(id -u)" = 0 ] || fail 'Run on the router as root.'
+# Kernel-held lock: it also releases on interruption/SIGKILL. Never unlink the
+# file, otherwise a second process could lock a different inode at the same path.
+if [ "$mode" = install ]; then
+	command -v flock >/dev/null 2>&1 || fail 'Requires the firmware-provided flock utility.'
+	mkdir -p /var/lock
+	exec 9>/var/lock/daed-install.lock
+	flock -n 9 || fail 'Another Daed installation/removal is running. Try again after it finishes.'
+fi
 if [ ! -r /etc/openwrt_release ] || ! command -v uci >/dev/null 2>&1; then
 	fail 'Requires OpenWrt / ImmortalWrt / iStoreOS.'
 fi

@@ -23,6 +23,18 @@ call)
 		json_load "${input:-\{\}}" || exit 1
 		action=''
 		json_get_var action action
+		case "$action" in start|restart|stop|boot_enable|boot_disable) ;; *)
+			json_init; json_add_boolean success 0; json_dump; exit 0 ;;
+		esac
+		mkdir -p /var/lock
+		exec 9>/var/lock/daed-install.lock
+		if ! flock -n 9; then
+			json_init
+			json_add_boolean success 0
+			json_add_string message 'Daed 正在安装或执行其他服务操作，请稍后重试。'
+			json_dump
+			exit 0
+		fi
 		success=1
 		case "$action" in
 		start|restart)

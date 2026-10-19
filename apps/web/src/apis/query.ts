@@ -121,7 +121,7 @@ export function useGeneralQuery() {
 
   return useQuery({
     queryKey: QUERY_KEY_GENERAL,
-    queryFn: async () =>
+    queryFn: async ({ signal }) =>
       gqlClient.request(
         graphql(`
           query General($up: Boolean) {
@@ -147,6 +147,7 @@ export function useGeneralQuery() {
         {
           up: true,
         },
+        signal,
       ),
   })
 }
@@ -172,7 +173,7 @@ export function useTrafficOverviewQuery(windowSec: number, maxPoints: number) {
 
   return useQuery({
     queryKey: [...QUERY_KEY_TRAFFIC, windowSec, maxPoints],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const data = await gqlClient.request<
         { general: { runtimeOverview: TrafficOverviewQueryData } },
         { windowSec: number; maxPoints: number }
@@ -201,6 +202,7 @@ export function useTrafficOverviewQuery(windowSec: number, maxPoints: number) {
           windowSec,
           maxPoints,
         },
+        signal,
       )
 
       return data.general.runtimeOverview
@@ -216,7 +218,7 @@ export function useNodeLatenciesQuery(refetchIntervalMs: number) {
 
   return useQuery({
     queryKey: QUERY_KEY_NODE_LATENCY,
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const data = await gqlClient.request<{ nodeLatencies: NodeLatencyProbeResult[] }>(
         `
           query NodeLatencies {
@@ -229,13 +231,15 @@ export function useNodeLatenciesQuery(refetchIntervalMs: number) {
             }
           }
         `,
+        undefined,
+        signal,
       )
 
       return data.nodeLatencies
     },
     placeholderData: (previousData) => previousData,
     refetchInterval: safeInterval,
-    refetchIntervalInBackground: true,
+    refetchIntervalInBackground: false,
   })
 }
 

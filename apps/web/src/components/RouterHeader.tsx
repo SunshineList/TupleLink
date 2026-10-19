@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useGeneralQuery, useRunMutation } from '~/apis'
+import { CommunityLinks } from '~/components/CommunityLinks'
 import { ThemePicker } from '~/components/ThemePicker'
 import { Button } from '~/components/ui/button'
 
@@ -38,11 +39,12 @@ export function RouterHeader() {
   }
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-sm">
-      <div className="router-toolbar mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-8">
+      <div className="router-toolbar mx-auto grid max-w-[1400px] items-center gap-3 px-4 py-3 lg:px-8">
         <div className="flex min-w-0 items-center gap-2.5">
           <Activity className="h-5 w-5 text-primary" aria-hidden="true" />
           <h1 className="text-base font-semibold tracking-tight">{title}</h1>
         </div>
+        <CommunityLinks />
         <div className="router-toolbar-actions flex flex-wrap items-center gap-2">
           <ThemePicker variant="compact" />
           <span
@@ -87,7 +89,7 @@ export function RouterHeader() {
         {(failed || query.isError) && (
           <div
             role="alert"
-            className="flex w-full flex-wrap items-center gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm"
+            className="col-span-full flex w-full flex-wrap items-center gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm"
           >
             <span>{failed ? t('panel.runFailed') : t('panel.loadFailed')}</span>
             <Button

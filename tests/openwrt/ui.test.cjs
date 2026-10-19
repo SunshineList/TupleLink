@@ -19,6 +19,7 @@ function load(name, protocol = 'http:', page = 'dashboard') {
     L: { env: { sessionid: '1234567890abcdef1234567890abcdef' } },
     fetch: async (url, options) => { fetchCalls.push([url, options]); return {ok: authorized}; },
     view: { extend: value => value },
+    baseclass: { extend: value => value },
     rpc: { declare: spec => async (...args) => { calls.push([spec.method, ...args]); return result; } },
     poll: { add: fn => polls.push(fn) },
     ui: { createHandlerFn: (self, fn) => fn.bind(self), addNotification: () => {} },
@@ -26,6 +27,7 @@ function load(name, protocol = 'http:', page = 'dashboard') {
     E: (tag, attrs, children) => ({ tag, attrs, children }),
   });
   vm.runInContext("String.prototype.format = function(...args) { let i=0; return this.replace(/%s/g, () => args[i++]); };", context);
+  context.community = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'community.js'), 'utf8') + '\n})()', context);
   const view = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, name + '.js'), 'utf8') + '\n})()', context);
   return { view, polls, calls, fetchCalls, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; } };
 }
@@ -106,4 +108,18 @@ test('logs are rendered as text instead of executable HTML', async () => {
   module.setResult({ logs: '<script>alert(1)</script>' });
   await module.polls[0]();
   assert.equal(elements(tree, 'pre')[0].textContent, '<script>alert(1)</script>');
+});
+
+test('community links are reachable from logs and service fallback pages', () => {
+  for (const name of ['logs', panelModule, 'panel']) {
+    const module = load(name);
+    const tree = name === 'logs' ? module.view.render() : module.view.render({running:false});
+    const links = elements(tree, 'a');
+    assert.deepEqual(links.map(link => link.attrs.href), ['https://www.youtube.com/@naiyou', 'https://t.me/naiyous']);
+    for (const link of links) {
+      assert.equal(link.attrs.target, '_blank');
+      assert.equal(link.attrs.rel, 'noopener noreferrer');
+      assert.ok(link.attrs['aria-label']);
+    }
+  }
 });

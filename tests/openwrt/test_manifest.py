@@ -2,6 +2,7 @@
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -15,6 +16,12 @@ BUILD_SPEC.loader.exec_module(BUILD)
 
 
 class ManifestTests(unittest.TestCase):
+    def test_source_installer_default_matches_build_and_workflow(self):
+        version = re.search(r"^release=openwrt-v(\d+\.\d+\.\d+)$", (OPENWRT / "install.sh").read_text(), re.MULTILINE).group(1)
+        self.assertIn("," + version + ")", (OPENWRT / "Makefile").read_text())
+        self.assertIn("default: '" + version + "'", (OPENWRT.parent / ".github/workflows/openwrt.yml").read_text())
+        self.assertIn("--release openwrt-v" + version, (OPENWRT.parent / "README.md").read_text(encoding="utf-8"))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name)

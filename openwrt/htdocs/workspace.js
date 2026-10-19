@@ -2,6 +2,7 @@
 'require view'
 'require rpc'
 'require ui'
+'require view.daed-router.community as community'
 
 // New module URL for the four-page workspace; panel.js remains a legacy entry.
 var status = rpc.declare({ object: 'daed-router', method: 'status', expect: {} })
@@ -32,13 +33,18 @@ return view.extend({
     var route = routes[page] || ['', '管理面板']
     if (!data.running)
       return E('div', {}, [
+        community.render(),
         E('p', {}, 'Daed 服务未运行。'),
         E(
           'button',
           {
             class: 'cbi-button cbi-button-action',
             click: ui.createHandlerFn(this, function () {
-              return action('start').then(function () {
+              return action('start').then(function (result) {
+                if (!result.success) {
+                  ui.addNotification(null, E('p', {}, result.message || '启动失败，请查看运行日志。'), 'error')
+                  return
+                }
                 window.location.reload()
               })
             }),
@@ -47,7 +53,11 @@ return view.extend({
         ),
         E('p', {}, '启动失败时可查看“运行日志”。'),
       ])
-    if (!data.authorized) return E('p', {}, '路由器登录已失效或当前账户无管理权限，请刷新后台重新登录。')
+    if (!data.authorized)
+      return E('div', {}, [
+        community.render(),
+        E('p', {}, '路由器登录已失效或当前账户无管理权限，请刷新后台重新登录。'),
+      ])
     return E('iframe', {
       src: panel + (route[0] ? '#/' + route[0] : ''),
       title: 'Daed ' + route[1],
