@@ -2,14 +2,14 @@
 
 一个适用于 **OpenWrt、ImmortalWrt、iStoreOS** 的代理管理插件。管理节点、订阅和群组，查看实时流量，测试节点延迟，配置 DNS 与路由。支持电脑、手机和多种主题，沿用路由器后台登录。
 
-基于 [daed](https://github.com/daeuniverse/daed) 二次开发，独立维护。当前为 [0.6.15 测试版](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.15)。支持 x86_64 / ARM64、IPK / APK v3；安装前会检查内核、eBPF 和 BTF 等条件，详见[兼容性说明](openwrt/README.md)。
+基于 [daed](https://github.com/daeuniverse/daed) 二次开发，独立维护。当前为 [0.6.15 测试版](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.15)。支持 x86_64 / ARM64、IPK / APK v3；安装前会检查内核、eBPF 和 BTF 等条件，详见[兼容性说明](openwrt/README.md)。
 
 ## 安装、更新与卸载
 
 用 SSH 以 **root** 登录路由器，执行下面的命令打开中文菜单：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/slobys/daed/main/openwrt/install.sh && sh /tmp/nailink-install.sh --menu
+uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/slobys/NaiLink/main/openwrt/install.sh && sh /tmp/nailink-install.sh --menu
 ```
 
 - **1 安装 / 更新**：获取最新发布版；已有安装会先备份，并保留节点、订阅、群组和配置。
@@ -37,12 +37,12 @@ daed-router-setup --uninstall
 
 ## 下载与源码
 
-[下载安装包](https://github.com/slobys/daed/releases) · [完整源码包](https://github.com/slobys/daed/releases/download/openwrt-v0.6.15/daed-openwrt-source.tar.gz) · [详细说明](openwrt/README.md) · [验证记录](openwrt/VALIDATION.md)
+[下载安装包](https://github.com/slobys/NaiLink/releases) · [完整源码包](https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.15/daed-openwrt-source.tar.gz) · [详细说明](openwrt/README.md) · [验证记录](openwrt/VALIDATION.md)
 
-编译源码请使用完整源码包，或运行 `git clone --recurse-submodules https://github.com/slobys/daed.git`。GitHub 的 **Download ZIP** 不包含后端子模块。
+编译源码请使用完整源码包，或运行 `git clone --recurse-submodules https://github.com/slobys/NaiLink.git`。GitHub 的 **Download ZIP** 不包含后端子模块。
 
 ## 交流与致谢
 
-[YouTube 频道](https://www.youtube.com/@naiyou) · [Telegram 群组](https://t.me/naiyous) · [反馈问题](https://github.com/slobys/daed/issues)
+[YouTube 频道](https://www.youtube.com/@naiyou) · [Telegram 群组](https://t.me/naiyous) · [反馈问题](https://github.com/slobys/NaiLink/issues)
 
 感谢 [daed](https://github.com/daeuniverse/daed)、[dae-wing](https://github.com/daeuniverse/dae-wing) 和 [dae](https://github.com/daeuniverse/dae)。本项目并非上游官方发行版。前端及安装集成遵循 [MIT](LICENSE)，后端及其修改遵循 [AGPL-3.0](https://github.com/daeuniverse/dae-wing/blob/main/LICENSE)，保留相关版权声明。

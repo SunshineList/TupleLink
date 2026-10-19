@@ -3,14 +3,14 @@
   "type": "module",
   "private": true,
   "packageManager": "pnpm@10.24.0",
-  "description": "A Web Dashboard For dae",
+  "description": "NaiLink - Proxy management for OpenWrt",
   "author": {
     "email": "dae@v2raya.org",
     "name": "daeuniverse"
   },
   "license": "MIT",
-  "homepage": "https://daeuniverse.github.io/daed",
-  "repository": "https://github.com/daeuniverse/daed",
+  "homepage": "https://github.com/slobys/NaiLink#readme",
+  "repository": "https://github.com/slobys/NaiLink",
   "scripts": {
     "build": "turbo run build",
     "build:mock": "turbo run build --env-mode=loose -- --mode mock",

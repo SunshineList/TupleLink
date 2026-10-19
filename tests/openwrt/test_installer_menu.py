@@ -161,8 +161,8 @@ while [ "$#" -gt 0 ]; do
 done
 printf '%s\\n' "$url" >> /tmp/download-urls
 case "$url" in
- https://raw.githubusercontent.com/slobys/daed/main/openwrt/install.sh) cp /fixtures/latest-installer "$output" ;;
- https://github.com/slobys/daed/releases/download/openwrt-v0.7.99/*) cp "/assets/${url##*/}" "$output" ;;
+ https://raw.githubusercontent.com/slobys/NaiLink/main/openwrt/install.sh) cp /fixtures/latest-installer "$output" ;;
+ https://github.com/slobys/NaiLink/releases/download/openwrt-v0.7.99/*) cp "/assets/${url##*/}" "$output" ;;
  *) exit 44 ;;
 esac''')
         result = self.menu('1\n')

@@ -14,7 +14,7 @@ define Package/daed-router
   SECTION:=net
   CATEGORY:=Network
   TITLE:=NaiLink router runtime
-  URL:=https://github.com/slobys/daed
+  URL:=https://github.com/slobys/NaiLink
   DEPENDS:=+ca-bundle +jshn +jsonfilter +uclient-fetch +kmod-sched-core +kmod-sched-bpf +kmod-veth +v2ray-geoip +v2ray-geosite
   CONFLICTS:=daed
   PKGARCH:=$(if $(DAED_PKGARCH),$(DAED_PKGARCH),$(ARCH_PACKAGES))

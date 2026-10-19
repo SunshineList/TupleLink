@@ -1,7 +1,7 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.15](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.15)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.15](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.15)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
 
@@ -120,7 +120,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，打开中文菜单后选择 **1 安装 / 更新**：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/slobys/daed/main/openwrt/install.sh && sh /tmp/nailink-install.sh --menu
+uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/slobys/NaiLink/main/openwrt/install.sh && sh /tmp/nailink-install.sh --menu
 ```
 
 安装后可直接运行 `nailink` 再次打开菜单。选择安装/更新时才联网获取最新发布脚本；卸载可以离线执行。
@@ -139,7 +139,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/sloby
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.15/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.15
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.15/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.15
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
