@@ -504,6 +504,11 @@
     "subscriptionNodes": "Subscription nodes",
     "subscriptionNodesHint": "Search and scroll through all nodes. Test any node or add it directly to a group.",
     "dashboard": "Dashboard",
-    "resources": "Nodes & subscriptions"
+    "resources": "Nodes & subscriptions",
+    "live": "Live updates",
+    "trafficTrend": "Traffic trend",
+    "timeRange": "Time range",
+    "totalTrafficShort": "Session traffic",
+    "statsUnavailable": "Updates unavailable"
   }
 }

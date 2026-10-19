@@ -767,7 +767,7 @@ form {
 /* LuCI owns page navigation; each embedded page has a single task. */
 .panel-workspace[data-workspace='dashboard'] {
   display: grid;
-  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
   align-items: start;
 }
 .panel-workspace[data-workspace='dashboard'] #panel-monitor {
@@ -832,5 +832,14 @@ form {
   }
   .router-toolbar-actions > [role='status']:first-child {
     margin-right: auto;
+  }
+}
+
+.traffic-chart {
+  height: clamp(160px, 27vh, 230px);
+}
+@media (min-width: 900px) {
+  .panel-workspace[data-workspace='dashboard'] .traffic-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

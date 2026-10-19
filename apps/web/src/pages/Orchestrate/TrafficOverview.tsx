@@ -98,13 +98,30 @@ function TrafficMetricCard({
   unit,
   icon,
   colorVar,
+  compact = false,
 }: {
   title: string
   amount: string
   unit: string
   icon: ReactNode
   colorVar: string
+  compact?: boolean
 }) {
+  if (compact)
+    return (
+      <div className="rounded-xl border px-3 py-2.5" style={createTintStyle(colorVar)}>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5" style={{ color: colorVar }}>
+            {icon}
+          </span>
+          <span>{title}</span>
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
+          <span className="text-xl font-semibold tabular-nums leading-none tracking-tight">{amount}</span>
+          <span className="text-[11px] text-muted-foreground">{unit}</span>
+        </div>
+      </div>
+    )
   return (
     <div
       className="h-full rounded-xl border bg-card px-4 py-3 shadow-sm transition-colors"
@@ -150,7 +167,8 @@ function TrafficRangeButton({ active, onClick, children }: { active: boolean; on
 export function TrafficOverview({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation()
   const [selectedRange, setSelectedRange] = useState<TimeRangeKey>('1m')
-  const [trendsOpen, setTrendsOpen] = useState(false)
+  const [showTrends, setTrendsOpen] = useState(false)
+  const trendsOpen = compact || showTrends
 
   const chartConfig = useMemo(
     () =>
@@ -192,19 +210,12 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
     [runtimeOverview],
   )
 
-  const uploadChartData = useMemo(
+  const trafficChartData = useMemo(
     () =>
       (runtimeOverview?.samples ?? []).map((sample) => ({
         timestamp: dayjs(sample.timestamp).valueOf(),
-        value: sample.uploadRate,
-      })),
-    [runtimeOverview?.samples],
-  )
-  const downloadChartData = useMemo(
-    () =>
-      (runtimeOverview?.samples ?? []).map((sample) => ({
-        timestamp: dayjs(sample.timestamp).valueOf(),
-        value: sample.downloadRate,
+        upload: sample.uploadRate,
+        download: sample.downloadRate,
       })),
     [runtimeOverview?.samples],
   )
@@ -220,16 +231,29 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{t('panel.monitor')}</h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-expanded={trendsOpen}
-          aria-controls="panel-traffic-trends"
-          onClick={() => setTrendsOpen((value) => !value)}
-        >
-          {trendsOpen ? t('panel.hideTrends') : t('panel.trends')}
-          <ChevronDown aria-hidden="true" className={cn('h-4 w-4', trendsOpen && 'rotate-180')} />
-        </Button>
+        {compact ? (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              aria-hidden="true"
+              className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                available && !trafficOverviewQuery.isError ? 'bg-emerald-500' : 'bg-muted-foreground',
+              )}
+            />
+            {t(trafficOverviewQuery.isError ? 'panel.statsUnavailable' : available ? 'panel.live' : 'panel.loading')}
+          </span>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={trendsOpen}
+            aria-controls="panel-traffic-trends"
+            onClick={() => setTrendsOpen((value) => !value)}
+          >
+            {trendsOpen ? t('panel.hideTrends') : t('panel.trends')}
+            <ChevronDown aria-hidden="true" className={cn('h-4 w-4', trendsOpen && 'rotate-180')} />
+          </Button>
+        )}
       </div>
       {trafficOverviewQuery.isError && (
         <div
@@ -242,8 +266,9 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
           </Button>
         </div>
       )}
-      <div className={cn('grid grid-cols-2 gap-3', !compact && 'xl:grid-cols-4')}>
+      <div className={cn('traffic-summary-grid grid grid-cols-2 gap-2', !compact && 'xl:grid-cols-4')}>
         <TrafficMetricCard
+          compact={compact}
           title={t('trafficOverview.uploadSpeed')}
           amount={available ? uploadRateDisplay.amount : '—'}
           unit={available ? uploadRateDisplay.unit : ''}
@@ -251,6 +276,7 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
           colorVar="var(--chart-1)"
         />
         <TrafficMetricCard
+          compact={compact}
           title={t('trafficOverview.downloadSpeed')}
           amount={available ? downloadRateDisplay.amount : '—'}
           unit={available ? downloadRateDisplay.unit : ''}
@@ -258,6 +284,7 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
           colorVar="var(--chart-2)"
         />
         <TrafficMetricCard
+          compact={compact}
           title={t('trafficOverview.activeConnections')}
           amount={available ? latestSample.activeConnections.toLocaleString() : '—'}
           unit={t('trafficOverview.connectionsUnit')}
@@ -265,7 +292,8 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
           colorVar="var(--primary)"
         />
         <TrafficMetricCard
-          title={t('panel.totalTraffic')}
+          compact={compact}
+          title={t(compact ? 'panel.totalTrafficShort' : 'panel.totalTraffic')}
           amount={available ? sessionTraffic.amount : '—'}
           unit={available ? sessionTraffic.unit : ''}
           icon={<Download aria-hidden="true" className="h-4 w-4" />}
@@ -279,162 +307,123 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
       )}
       {trendsOpen && (
         <Card id="panel-traffic-trends" padding="none" className="overflow-hidden rounded-2xl">
-          <div className="flex flex-wrap gap-2 border-b p-4">
-            {TIME_RANGE_OPTIONS.map((option) => (
-              <TrafficRangeButton
-                key={option.key}
-                active={selectedRange === option.key}
-                onClick={() => setSelectedRange(option.key)}
-              >
-                {t(`trafficOverview.ranges.${option.key}`)}
-              </TrafficRangeButton>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5">
+            <h3 className="text-sm font-medium">{t('panel.trafficTrend')}</h3>
+            <div className="flex gap-1" role="group" aria-label={t('panel.timeRange')}>
+              {TIME_RANGE_OPTIONS.map((option) => (
+                <TrafficRangeButton
+                  key={option.key}
+                  active={selectedRange === option.key}
+                  onClick={() => setSelectedRange(option.key)}
+                >
+                  {t(`trafficOverview.ranges.${option.key}`)}
+                </TrafficRangeButton>
+              ))}
+            </div>
           </div>
-          <CardContent className="space-y-4 p-4">
-            {!runtimeOverview?.samples.length && (
-              <p className="text-sm text-muted-foreground">
-                {trafficOverviewQuery.isPending ? t('panel.loading') : t('panel.emptyStats')}
-              </p>
-            )}
-            <div className={cn('grid h-full gap-4', !compact && 'md:grid-cols-2')}>
-              <div className="flex h-full flex-col rounded-2xl border border-border/70 bg-background/70 p-3.5 shadow-sm">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{t('trafficOverview.uploadChart')}</p>
-                  </div>
-                </div>
-                <ChartContainer config={chartConfig} className="mt-2 flex-1 aspect-auto min-h-[180px] w-full">
-                  <AreaChart data={uploadChartData} margin={{ left: 4, right: 4, top: 4, bottom: 2 }}>
-                    <defs>
-                      <linearGradient id="traffic-upload-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-upload)" stopOpacity={0.22} />
-                        <stop offset="100%" stopColor="var(--color-upload)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                    <XAxis
-                      type="number"
-                      scale="time"
-                      dataKey="timestamp"
-                      axisLine={false}
-                      tickLine={false}
-                      minTickGap={24}
-                      tickMargin={18}
-                      height={34}
-                      domain={[chartWindowStart, chartWindowEnd]}
-                      allowDataOverflow
-                      tickFormatter={(value) => dayjs(value).format('HH:mm')}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={10}
-                      width={60}
-                      tickFormatter={(value) => formatAxisRate(Number(value))}
-                      domain={[0, (dataMax: number) => Math.max(16 * 1024, dataMax * 1.15)]}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          labelFormatter={(value) => dayjs(Number(value)).format('HH:mm:ss')}
-                          formatter={(value) => formatRate(Number(value))}
-                          indicator="line"
-                        />
-                      }
-                    />
-                    <Area
-                      dataKey="value"
-                      type="monotone"
-                      stroke="var(--color-upload)"
-                      strokeWidth={2.5}
-                      fill="url(#traffic-upload-fill)"
-                      isAnimationActive={false}
-                    />
-                  </AreaChart>
-                </ChartContainer>
-              </div>
-
-              <div className="flex h-full flex-col rounded-2xl border border-border/70 bg-background/70 p-3.5 shadow-sm">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{t('trafficOverview.downloadChart')}</p>
-                  </div>
-                </div>
-                <ChartContainer config={chartConfig} className="mt-2 flex-1 aspect-auto min-h-[180px] w-full">
-                  <AreaChart data={downloadChartData} margin={{ left: 4, right: 4, top: 4, bottom: 2 }}>
-                    <defs>
-                      <linearGradient id="traffic-download-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--color-download)" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="var(--color-download)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                    <XAxis
-                      type="number"
-                      scale="time"
-                      dataKey="timestamp"
-                      axisLine={false}
-                      tickLine={false}
-                      minTickGap={24}
-                      tickMargin={18}
-                      height={34}
-                      domain={[chartWindowStart, chartWindowEnd]}
-                      allowDataOverflow
-                      tickFormatter={(value) => dayjs(value).format('HH:mm')}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tickMargin={10}
-                      width={60}
-                      tickFormatter={(value) => formatAxisRate(Number(value))}
-                      domain={[0, (dataMax: number) => Math.max(32 * 1024, dataMax * 1.15)]}
-                    />
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          labelFormatter={(value) => dayjs(Number(value)).format('HH:mm:ss')}
-                          formatter={(value) => formatRate(Number(value))}
-                          indicator="line"
-                        />
-                      }
-                    />
-                    <Area
-                      dataKey="value"
-                      type="monotone"
-                      stroke="var(--color-download)"
-                      strokeWidth={2.5}
-                      fill="url(#traffic-download-fill)"
-                      isAnimationActive={false}
-                    />
-                  </AreaChart>
-                </ChartContainer>
-              </div>
+          <CardContent className="space-y-3 p-3">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              {(['upload', 'download'] as const).map((key, index) => (
+                <span key={key} className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: `var(--chart-${index + 1})` }}
+                  />
+                  {t(`trafficOverview.${key}Legend`)}
+                </span>
+              ))}
+              {!runtimeOverview?.samples.length && (
+                <span>{trafficOverviewQuery.isPending ? t('panel.loading') : t('panel.emptyStats')}</span>
+              )}
             </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <TrafficMetricCard
-                title={t('trafficOverview.totalUpload')}
-                amount={available ? uploadTotalDisplay.amount : '—'}
-                unit={uploadTotalDisplay.unit}
-                icon={<Upload aria-hidden="true" className="h-4 w-4" />}
-                colorVar="var(--chart-1)"
-              />
-              <TrafficMetricCard
-                title={t('trafficOverview.totalDownload')}
-                amount={available ? downloadTotalDisplay.amount : '—'}
-                unit={downloadTotalDisplay.unit}
-                icon={<Download aria-hidden="true" className="h-4 w-4" />}
-                colorVar="var(--chart-2)"
-              />
-              <TrafficMetricCard
-                title={t('trafficOverview.udpSessions')}
-                amount={available ? latestSample.udpSessions.toLocaleString() : '—'}
-                unit={t('trafficOverview.sessionsUnit')}
-                icon={<Radio aria-hidden="true" className="h-4 w-4" />}
-                colorVar="var(--chart-3)"
-              />
-            </div>
+            <ChartContainer config={chartConfig} className="traffic-chart aspect-auto w-full">
+              <AreaChart data={trafficChartData} margin={{ left: 0, right: 8, top: 6, bottom: 0 }}>
+                <defs>
+                  {(['upload', 'download'] as const).map((key) => (
+                    <linearGradient key={key} id={`traffic-${key}-fill`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={`var(--color-${key})`} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={`var(--color-${key})`} stopOpacity={0} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  scale="time"
+                  dataKey="timestamp"
+                  axisLine={false}
+                  tickLine={false}
+                  minTickGap={24}
+                  tickMargin={10}
+                  height={30}
+                  domain={[chartWindowStart, chartWindowEnd]}
+                  allowDataOverflow
+                  tickFormatter={(value) => dayjs(value).format('HH:mm')}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tickMargin={6}
+                  width={48}
+                  tickFormatter={(value) => formatAxisRate(Number(value))}
+                  domain={[0, (dataMax: number) => Math.max(32 * 1024, dataMax * 1.15)]}
+                />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      labelFormatter={(value) => dayjs(Number(value)).format('HH:mm:ss')}
+                      formatter={(value) => formatRate(Number(value))}
+                      indicator="line"
+                    />
+                  }
+                />
+                {(['upload', 'download'] as const).map((key) => (
+                  <Area
+                    key={key}
+                    dataKey={key}
+                    type="monotone"
+                    stroke={`var(--color-${key})`}
+                    strokeWidth={2}
+                    fill={`url(#traffic-${key}-fill)`}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </AreaChart>
+            </ChartContainer>
+            <dl className="grid grid-cols-3 gap-2 border-t pt-3">
+              {[
+                [
+                  t('trafficOverview.totalUpload'),
+                  available ? uploadTotalDisplay.amount : '—',
+                  available ? uploadTotalDisplay.unit : '',
+                  <Upload key="upload" className="h-3.5 w-3.5" />,
+                ],
+                [
+                  t('trafficOverview.totalDownload'),
+                  available ? downloadTotalDisplay.amount : '—',
+                  available ? downloadTotalDisplay.unit : '',
+                  <Download key="download" className="h-3.5 w-3.5" />,
+                ],
+                [
+                  t('trafficOverview.udpSessions'),
+                  available ? latestSample.udpSessions.toLocaleString() : '—',
+                  t('trafficOverview.sessionsUnit'),
+                  <Radio key="udp" className="h-3.5 w-3.5" />,
+                ],
+              ].map(([label, amount, unit, icon]) => (
+                <div key={String(label)} className="min-w-0">
+                  <dt className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                    {icon}
+                    {label}
+                  </dt>
+                  <dd className="mt-1 flex flex-wrap items-baseline gap-1 text-sm font-semibold tabular-nums">
+                    {amount}
+                    <span className="text-[10px] font-normal text-muted-foreground">{unit}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </CardContent>
         </Card>
       )}

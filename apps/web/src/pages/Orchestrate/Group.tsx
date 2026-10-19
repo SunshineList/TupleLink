@@ -7,7 +7,7 @@ import type { GroupsQuery, NodesQuery, SubscriptionsQuery } from '~/schemas/gql/
 import { Draggable, Droppable } from '@hello-pangea/dnd'
 import { useStore } from '@nanostores/react'
 
-import { Settings2, Table2 } from 'lucide-react'
+import { Plus, Settings2, Table2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -44,12 +44,14 @@ export function GroupResource({
   dragDestinationDroppableId,
   hoveredGroupId,
   nodeLatencies,
+  quickAdd = false,
 }: {
   highlight?: boolean
   draggingResource?: DraggingResource | null
   dragDestinationDroppableId?: string | null
   hoveredGroupId?: string | null
   nodeLatencies?: Record<string, NodeLatencyProbeResult>
+  quickAdd?: boolean
 }) {
   const { t } = useTranslation()
   const groupsRequest = useGroupsQuery()
@@ -300,6 +302,20 @@ export function GroupResource({
         onToggleCollapsed={() => setGroupExpanded(groupId, !expandedGroupIds.has(groupId))}
         onRemove={defaultGroupID !== groupId ? () => removeGroupMutation.mutate(groupId) : undefined}
         onRename={(newName) => renameGroupMutation.mutate({ id: groupId, name: newName })}
+        quickActions={
+          quickAdd && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setAddingNodesGroupId(groupId)}>
+                <Plus className="h-3.5 w-3.5" />
+                {t('groupPicker.openNodePicker')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setAddingSubscriptionsGroupId(groupId)}>
+                <Plus className="h-3.5 w-3.5" />
+                {t('groupPicker.openSubscriptionPicker')}
+              </Button>
+            </>
+          )
+        }
         actions={
           <SimpleTooltip label={t('actions.settings')}>
             <Button
@@ -324,6 +340,7 @@ export function GroupResource({
         }
       >
         <SortableGroupContent
+          showAddButtons={!quickAdd}
           groupId={groupId}
           nodes={groupNodes}
           subscriptions={groupSubscriptions}
@@ -436,6 +453,7 @@ export function GroupResource({
             id: addingNodesGroupId,
             nodeIDs,
           })
+          setGroupExpanded(addingNodesGroupId, true)
         }}
       />
 
@@ -454,6 +472,7 @@ export function GroupResource({
             subscriptionIDs,
             nameFilterRegex,
           })
+          setGroupExpanded(addingSubscriptionsGroupId, true)
         }}
       />
     </Section>

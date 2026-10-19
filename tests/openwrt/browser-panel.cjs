@@ -61,6 +61,8 @@ async function login(page, url = base) {
       localStorage.setItem('APP_STATEcolsPerRow', '3');
       return { order: localStorage.getItem('APP_STATEnodeSortableKeys'), cols: localStorage.getItem('APP_STATEcolsPerRow') };
     }, nodeIds);
+    await page.evaluate(async () => (await L.require('session')).setLocalData('daed-unrelated-preference','retained'));
+    if (process.env.DAED_PANEL_TEST_LEGACY_MENU === '1') {
     // Reproduce the user's upgrade: the browser keeps the former two-item
     // LuCI menu although the installed menu JSON already has all four pages.
     await page.evaluate(async () => {
@@ -81,6 +83,7 @@ async function login(page, url = base) {
     assert.equal(await page.getByRole('link', {name:'节点和订阅',exact:true}).count(), 0);
     assert.ok(legacyLoads > 0, 'Reproduction must use the actual pre-workspace LuCI module');
     console.log('REPRODUCED: cached LuCI menu still has only dashboard/logs with four-page menu JSON installed');
+    }
     const baseline = await control('snapshot');
     assert.ok(baseline.tables > 5);
     const upgraded = await control('upgrade');
@@ -128,7 +131,16 @@ async function login(page, url = base) {
     assert.equal(await frame.locator('#workspace-nodes').isVisible(), false);
     const monitorBox = await frame.locator('#panel-monitor').boundingBox();
     const groupsBox = await frame.locator('#workspace-groups').boundingBox();
+    assert.ok(monitorBox.width > groupsBox.width * 1.5);
+    assert.ok(await frame.locator('#panel-traffic-trends').isVisible());
     assert.ok(Math.abs(monitorBox.y-groupsBox.y) < 3 && monitorBox.x+monitorBox.width <= groupsBox.x, 'Desktop overview and groups must sit side by side');
+    await page.setViewportSize({width:1600,height:800});
+    await page.waitForTimeout(200);
+    const initialViewport = await page.locator('iframe').boundingBox();
+    const initialOverview = await frame.locator('#panel-monitor').boundingBox();
+    assert.ok(initialOverview.y+initialOverview.height <= initialViewport.y+initialViewport.height+1, 'Overview must fit the initial 800px desktop viewport');
+    await page.screenshot({path:path.join(output,'dashboard-first-screen.png'),fullPage:true});
+    await page.setViewportSize({width:1600,height:1100});
     await page.screenshot({path:path.join(output,'dashboard-desktop.png'),fullPage:true});
     await navigate('advanced');
     assert.equal(await frame.locator('#panel-advanced-content [data-testid=section]').count(), 3);
@@ -138,7 +150,7 @@ async function login(page, url = base) {
     await navigate('resources');
     assert.ok(await frame.locator('#workspace-nodes').isVisible());
     assert.equal(await frame.locator('#workspace-groups').isVisible(), false);
-    await page.unroute('**/view/daed-router/panel.js*');
+    if (process.env.DAED_PANEL_TEST_LEGACY_MENU === '1') await page.unroute('**/view/daed-router/panel.js*');
     console.log('PASS: four native LuCI menus, overview beside groups on dashboard, isolated resource and advanced pages');
     const sections = frame.locator('#panel-common [data-testid=section]');
     await sections.nth(2).getByRole('heading', { name: '订阅', exact: true }).waitFor();
@@ -182,12 +194,35 @@ async function login(page, url = base) {
 
     await navigate('dashboard');
     const groupCard = sections.nth(0).locator('[data-group-card-id]').filter({hasText:'LegacyGroup'});
-    await groupCard.getByRole('button', {name:'管理成员 LegacyGroup',exact:true}).click();
+    const groupToggle = groupCard.getByRole('button', {name:'管理成员 LegacyGroup',exact:true,includeHidden:true});
+    const groupSurface = groupCard.locator('[data-slot=card]').first();
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'false');
+    await groupSurface.click({position:{x:6,y:6}});
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'true');
+    await groupSurface.click({position:{x:6,y:6}});
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'false');
+    await groupCard.getByRole('button', {name:/展开.*群组.*LegacyGroup/}).focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'true');
+    await groupCard.getByRole('button', {name:'设置 LegacyGroup',exact:true}).click();
+    await dialog.waitFor();
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({state:'hidden'});
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'true', 'Settings must not toggle card');
+    await groupToggle.click();
+    await groupCard.getByRole('button', {name:'添加订阅组',exact:true}).click();
+    await dialog.waitFor();
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'false', 'Quick subscription action must not toggle card');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({state:'hidden'});
     await groupCard.getByRole('button', {name:'添加节点',exact:true}).click();
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'false', 'Quick add must work while collapsed');
     await dialog.getByRole('checkbox').first().click();
     await dialog.getByRole('button', {name:'添加所选节点',exact:true}).click();
     await dialog.waitFor({state:'hidden'});
     assert.ok((await gql('query {groups{id nodes{id}}}')).groups.find(item=>item.id===groupId).nodes.length > 2);
+    assert.equal(await groupToggle.getAttribute('aria-expanded'),'true', 'Successful add must reveal members');
+    console.log('PASS: card padding click, keyboard expansion, isolated settings, quick add while collapsed, and successful add reveals members');
     console.log('PASS: dashboard manages group members through the real API without requiring a resource column');
     await navigate('resources');
 
@@ -379,10 +414,10 @@ async function login(page, url = base) {
     await page.keyboard.press('Escape');
     await viewer.waitFor({ state: 'hidden' });
     await navigate('dashboard');
-    await frame.getByRole('button', { name: '查看流量趋势', exact: true }).click();
+    assert.equal(await frame.getByRole('button', { name: '查看流量趋势', exact: true }).count(),0);
     await frame.locator('#panel-traffic-trends svg.recharts-surface').first().waitFor();
     for (const name of ['10 分钟', '30 分钟', '1 小时']) await frame.getByRole('button', { name, exact: true }).click();
-    await frame.getByRole('button', { name: '收起流量趋势', exact: true }).click();
+    for(const label of ['累计上传','累计下载','UDP 会话']) assert.ok(await frame.getByText(label,{exact:true}).isVisible());
     await navigate('resources');
     for (const width of [320, 390, 768, 1024, 1600]) {
       await page.setViewportSize({ width, height: 1100 });
@@ -416,6 +451,16 @@ async function login(page, url = base) {
       if (panelWidth >= 900) assert.ok(Math.abs(overview.y-groupPanel.y)<3 && overview.x+overview.width <= groupPanel.x);
       else assert.ok(overview.y+overview.height <= groupPanel.y);
       assert.ok(await frame.locator('body').evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+      assert.ok(await frame.locator('#panel-traffic-trends').isVisible());
+      if(panelWidth>=900) {
+        assert.ok(overview.width > groupPanel.width*1.5);
+        await page.setViewportSize({width,height:800});
+        await page.waitForTimeout(200);
+        const viewport=await page.locator('iframe').boundingBox();
+        const visibleOverview=await frame.locator('#panel-monitor').boundingBox();
+        assert.ok(visibleOverview.y+visibleOverview.height <= viewport.y+viewport.height+1,'Desktop overview must fit its first screen');
+        await page.setViewportSize({width,height:1100});
+      }
       await page.screenshot({path:path.join(output,'dashboard-'+width+'.png'),fullPage:true});
       await navigate('resources');
       if (await tabs.isVisible()) await tabs.getByRole('tab', {name:/节点/}).click();
@@ -504,6 +549,21 @@ async function login(page, url = base) {
     const touchContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'zh-CN' });
     const touchPage = await touchContext.newPage();
     const touchFrame = await login(touchPage);
+    await touchFrame.getByRole('heading', {name:'运行概况',exact:true}).waitFor();
+    assert.ok(await touchFrame.locator('#panel-traffic-trends').isVisible());
+    await touchPage.screenshot({path:path.join(output,'dashboard-touch-dark.png'),fullPage:true});
+    const touchGroup=touchFrame.locator('[data-group-card-id]').filter({hasText:'LegacyGroup'});
+    const touchToggle=touchGroup.getByRole('button',{name:'管理成员 LegacyGroup',exact:true});
+    const touchSurface=touchGroup.locator('[data-slot=card]').first();
+    assert.equal(await touchToggle.getAttribute('aria-expanded'),'false');
+    await touchSurface.tap({position:{x:6,y:6}});
+    assert.equal(await touchToggle.getAttribute('aria-expanded'),'true');
+    await touchSurface.tap({position:{x:6,y:6}});
+    assert.equal(await touchToggle.getAttribute('aria-expanded'),'false');
+    await touchGroup.getByRole('button',{name:'添加节点',exact:true}).tap();
+    await touchFrame.getByRole('dialog').getByRole('button',{name:'取消',exact:true}).tap();
+    assert.equal(await touchToggle.getAttribute('aria-expanded'),'false');
+    console.log('PASS: mobile dark dashboard directly shows trends, card surface expands by touch, and quick add works without expansion');
     await touchPage.goto(base + '/cgi-bin/luci/admin/services/daed/resources');
     await touchFrame.locator('[data-node-scroll]').waitFor();
     const touchTabs = touchFrame.getByRole('tablist', { name: '常用功能' });

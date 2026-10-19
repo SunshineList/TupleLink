@@ -1,6 +1,6 @@
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import { Check, ChevronDown, GripVertical, Trash2, Type, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -19,6 +19,7 @@ export function DroppableGroupCard({
   onRemove,
   onRename,
   actions,
+  quickActions,
   children,
 }: {
   id: string
@@ -30,6 +31,7 @@ export function DroppableGroupCard({
   onRemove?: () => void
   onRename?: (newName: string) => void
   actions?: React.ReactNode
+  quickActions?: React.ReactNode
   children?: React.ReactNode
 }) {
   const { t } = useTranslation()
@@ -37,6 +39,7 @@ export function DroppableGroupCard({
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(name)
   const inputRef = useRef<HTMLInputElement>(null)
+  const membersId = useId()
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -79,7 +82,27 @@ export function DroppableGroupCard({
 
   return (
     <>
-      <Card withBorder shadow="none" padding="sm" className="gap-3 rounded-xl">
+      <Card
+        withBorder
+        shadow="none"
+        padding="sm"
+        className={cn(
+          'gap-3 rounded-xl transition-colors',
+          onToggleCollapsed && !isEditing && 'cursor-pointer hover:border-primary/40',
+        )}
+        onClick={(event) => {
+          if (!onToggleCollapsed || isEditing || event.defaultPrevented) return
+          const target = event.target as Element
+          if (
+            target.closest(
+              'button,a,input,select,textarea,[role="button"],[role="checkbox"],[data-rfd-drag-handle-draggable-id],[data-group-members]',
+            )
+          )
+            return
+          if (window.getSelection()?.toString()) return
+          onToggleCollapsed()
+        }}
+      >
         <div className="border-b pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
             {isEditing ? (
@@ -117,11 +140,18 @@ export function DroppableGroupCard({
                 </SimpleTooltip>
               </div>
             ) : (
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-sm font-semibold" title={name}>
+              <h3 className="min-w-0 flex-1 text-sm font-semibold" title={name}>
+                <button
+                  type="button"
+                  className="block w-full truncate py-1 text-left"
+                  aria-expanded={!collapsed}
+                  aria-controls={membersId}
+                  aria-label={`${t(collapsed ? 'actions.expand' : 'collapse')} ${t('group')} ${name}`}
+                  onClick={onToggleCollapsed}
+                >
                   {name}
-                </h3>
-              </div>
+                </button>
+              </h3>
             )}
 
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
@@ -158,6 +188,7 @@ export function DroppableGroupCard({
                     size="xs"
                     onClick={onToggleCollapsed}
                     aria-expanded={!collapsed}
+                    aria-controls={membersId}
                     aria-label={`${t('panel.manageMembers')} ${name}`}
                   >
                     <ChevronDown className={cn('h-4 w-4 transition-transform', collapsed && '-rotate-90')} />
@@ -188,7 +219,16 @@ export function DroppableGroupCard({
         </div>
 
         {/* Keep drop targets registered before their member draggables mount. */}
-        {children && <div hidden={collapsed}>{children}</div>}
+        {children && (
+          <div id={membersId} data-group-members hidden={collapsed} className="cursor-default">
+            {children}
+          </div>
+        )}
+        {quickActions && (
+          <div className="flex flex-wrap items-center gap-2" data-group-quick-actions>
+            {quickActions}
+          </div>
+        )}
       </Card>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

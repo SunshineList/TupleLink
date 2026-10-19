@@ -52,6 +52,7 @@ function GroupDropZone({
   onAdd,
   emptyLabel,
   children,
+  showAddButtons,
 }: {
   droppableId: string
   type: 'NODE' | 'SUBSCRIPTION'
@@ -65,6 +66,7 @@ function GroupDropZone({
   onAdd: () => void
   emptyLabel: string
   children: React.ReactNode[]
+  showAddButtons: boolean
 }) {
   const compact = collapsed || !open
 
@@ -119,12 +121,14 @@ function GroupDropZone({
               </>
             ) : (
               <>
-                <div className="mb-1 flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="xs" onClick={onAdd}>
-                    <Plus className="h-3.5 w-3.5" />
-                    {addButtonLabel}
-                  </Button>
-                </div>
+                {showAddButtons && (
+                  <div className="mb-1 flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="xs" onClick={onAdd}>
+                      <Plus className="h-3.5 w-3.5" />
+                      {addButtonLabel}
+                    </Button>
+                  </div>
+                )}
 
                 {children.length > 0 ? (
                   children
@@ -154,6 +158,7 @@ export function SortableGroupContent({
   onDelSubscription,
   onOpenAddNodes,
   onOpenAddSubscriptions,
+  showAddButtons = true,
 }: {
   groupId: string
   nodes: GroupNode[]
@@ -167,6 +172,7 @@ export function SortableGroupContent({
   onDelSubscription: (subscriptionId: string) => void
   onOpenAddNodes: () => void
   onOpenAddSubscriptions: () => void
+  showAddButtons?: boolean
 }) {
   const { t } = useTranslation()
   const groupSortOrders = useStore(groupSortOrdersAtom)
@@ -228,6 +234,7 @@ export function SortableGroupContent({
   return (
     <div className={cn(collapsed ? 'grid grid-cols-2 gap-2' : 'flex flex-col gap-3')}>
       <GroupDropZone
+        showAddButtons={showAddButtons}
         droppableId={`${groupId}-nodes`}
         type="NODE"
         label={t('node')}
@@ -260,6 +267,7 @@ export function SortableGroupContent({
       </GroupDropZone>
 
       <GroupDropZone
+        showAddButtons={showAddButtons}
         droppableId={`${groupId}-subscriptions`}
         type="SUBSCRIPTION"
         label={t('groupPicker.subscriptionGroupLabel')}

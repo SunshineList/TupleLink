@@ -1,15 +1,15 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.1)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.2)。
 
-## 0.6.1 菜单升级修复与左右布局
+## 0.6.2 管理面板交互优化
 
-- LuCI 入口依次为 **管理面板、节点和订阅、高级设置、运行日志**。升级后检测浏览器里旧的两项菜单缓存，只清理菜单数据并自动刷新一次，不退出登录或清除其他偏好。
-- 电脑端管理面板左侧显示运行概况、右侧管理群组，窄屏自动堆叠；紧凑工具栏保留代理状态、启停和应用配置。
-- 手动节点与订阅在独立双栏管理；手机切换查看两个列表，保留连续浏览、搜索、排序、单独测速及群组绑定。
-- 配置、DNS、路由移到独立高级设置页。现有数据、配色和排序偏好沿用。
-- 测速采用最多 8 路并发的滑动队列，每完成一个节点就更新结果；IPv4/IPv6 HTTP 探测同时进行，先成功的返回，不等待失效的另一条路径。单次 HTTP 探测共享 3 秒期限，不再使用后台健康检查重试。检查目标 DNS 成功解析复用 30 秒，配置更改立即失效。
+- 电脑端左侧运行概况约占三分之二宽度，右侧群组更紧凑；手机按概况、群组顺序显示。
+- 上传、下载、连接、本次流量及双向趋势默认直接显示；累计上传、累计下载和 UDP 会话一起展示，保留四档时间范围。
+- 点击群组名称、摘要或卡片空白即可展开/收起，也支持键盘操作；设置、重命名、删除及拖拽独立响应。
+- 群组收起时仍可直接添加节点或订阅组，支持现有搜索和多选；添加成功自动展开，立即看到新成员。
+- 保留管理面板、节点和订阅、高级设置、运行日志四项菜单，以及原有节点管理、测速、排序和界面偏好；不更改数据库或网络配置逻辑。
 
 ## 使用
 
@@ -32,7 +32,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.1/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.2/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
@@ -41,7 +41,7 @@ uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/do
 不需要删除旧版或重新建立账户。失败时提示备份位置，不自动回滚。
 
 修改群组、节点或高级配置后，按顶部“应用配置”使其生效；该操作可能启动代理。
-代理状态取自后端；流量概况默认直接展示，趋势可按需展开。
+代理状态取自后端；管理面板的流量指标、趋势和累计数据默认直接展示。
 
 升级后刷新后台，再进入 **服务 → Daed**；仍显示旧内容时按 `Ctrl+F5`。
 无需修改监听地址。保留旧数据及原有排序、配色偏好，不重建数据库。

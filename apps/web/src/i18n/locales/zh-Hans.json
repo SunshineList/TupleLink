@@ -504,6 +504,11 @@
     "subscriptionNodes": "订阅节点",
     "subscriptionNodesHint": "搜索或连续滚动查看全部节点，支持单独测速和加入群组。",
     "dashboard": "管理面板",
-    "resources": "节点和订阅"
+    "resources": "节点和订阅",
+    "live": "实时更新",
+    "trafficTrend": "流量趋势",
+    "timeRange": "统计时间范围",
+    "totalTrafficShort": "本次流量",
+    "statsUnavailable": "数据暂不可用"
   }
 }
