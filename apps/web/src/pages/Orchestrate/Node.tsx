@@ -76,6 +76,7 @@ function NodeRow({
       style={getInstantDropStyle(provided, snapshot)}
       className={cn('panel-node-row', snapshot.isDragging && 'panel-node-dragging')}
       data-node-id={node.id}
+      data-name-card
       data-density={compact ? 'compact' : 'normal'}
       role="listitem"
     >

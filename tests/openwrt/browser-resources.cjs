@@ -89,7 +89,7 @@ fs.mkdirSync(output, { recursive: true })
     await page.setViewportSize({ width: 1800, height: 1100 })
     await page.waitForTimeout(250)
     const normal = await first.evaluate((e) => getComputedStyle(e).backgroundColor)
-    await name.hover()
+    await first.hover({ position: { x: 3, y: 3 } })
     await page.waitForTimeout(200)
     assert.notEqual(await first.evaluate((e) => getComputedStyle(e).backgroundColor), normal)
     assert.equal(await name.locator('.node-name').getAttribute('data-overflow'), 'true')
@@ -102,6 +102,14 @@ fs.mkdirSync(output, { recursive: true })
       await name.locator('.node-name-text').evaluate((e) => getComputedStyle(e).transform),
       'matrix(1, 0, 0, 1, 0, 0)',
     )
+    await page.mouse.move(0, 0)
+    assert.equal(
+      await name.locator('.node-name-text').evaluate((e) => getComputedStyle(e).animationName),
+      'none',
+      'Leaving the whole card restores its name',
+    )
+    assert.equal(await name.locator('.node-name-text').evaluate((e) => getComputedStyle(e).transform), 'none')
+    await first.hover({ position: { x: 3, y: 3 } })
     await page.emulateMedia({ reducedMotion: 'reduce' })
     assert.equal(await name.locator('.node-name-text').evaluate((e) => getComputedStyle(e).animationName), 'none')
     await page.emulateMedia({ reducedMotion: 'no-preference' })

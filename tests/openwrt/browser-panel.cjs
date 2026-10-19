@@ -506,7 +506,8 @@ async function login(page, url = base) {
     await page.keyboard.press('Escape');
     await detail.waitFor({ state: 'hidden' });
     assert.equal(await subscriptionSearch.inputValue(), 'Workspace-0999');
-    await grid.getByRole('button', { name: /二维码/ }).click();
+    await grid.getByRole('button', { name: /^更多操作 / }).click();
+    await frame.getByRole('menuitem', { name: '查看二维码', exact: true }).click();
     await frame.getByRole('dialog').locator('canvas').waitFor();
     await page.keyboard.press('Escape');
     await frame.getByRole('dialog').locator('canvas').waitFor({ state: 'hidden' });

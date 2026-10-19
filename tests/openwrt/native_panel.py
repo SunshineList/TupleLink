@@ -16,6 +16,7 @@ import stat
 import subprocess
 import threading
 import time
+from urllib.parse import quote
 import urllib.request
 
 from socks_fixture import serve_socks
@@ -99,6 +100,11 @@ def main():
                 links = [f"socks5://127.0.0.1:{socks.server_address[1]}#Picker-sub-{name}" for name in ("HK", "JP")]
             if self.path.startswith("/sub-large"):
                 links = [f"vless://44444444-4444-4444-8444-{index:012d}@192.0.2.12:443?encryption=none&security=tls&type=tcp#Workspace-{index:04d}-Long-node-name-for-layout-testing" for index in range(1000)]
+            if self.path.startswith("/sub-layout"):
+                regions = ["香港", "狮城", "台湾", "日本", "美国", "英国"]
+                names = [f"{regions[index % len(regions)]}{index + 1:03d} · 中继 BGP" for index in range(72)]
+                names[0] += " · " + "完整名称查看验证 LongNodeName " * 5
+                links = [f"trojan://fixture-{index}@192.0.2.44:443?security=tls&sni=example.invalid#{quote(name)}" for index, name in enumerate(names)]
             body = base64.b64encode("\n".join(links).encode())
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")

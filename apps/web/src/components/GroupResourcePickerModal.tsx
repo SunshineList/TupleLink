@@ -25,6 +25,7 @@ export interface GroupPickerItem {
   title: string
   description?: string
   meta?: string
+  source?: string
   badge?: string
   keywords?: string[]
   previewNodes?: GroupPickerPreviewNode[]
@@ -93,21 +94,14 @@ const PickerLatencyButton = memo(
         type="button"
         size="sm"
         variant="ghost"
-        className="picker-latency-button min-h-9 min-w-16 gap-1 px-1.5 text-xs"
+        className="picker-latency-button min-h-9 min-w-11 gap-1 px-1.5 text-xs text-muted-foreground"
         loading={pending}
         disabled={busy}
         aria-busy={pending}
         aria-label={`${t('latency.testNode')} ${name}`}
         onClick={() => onTest([id])}
       >
-        {result ? (
-          <LatencyBadge result={result} />
-        ) : (
-          <>
-            {!pending && <Gauge aria-hidden="true" />}
-            <span>{t('latency.test')}</span>
-          </>
-        )}
+        {result ? <LatencyBadge result={result} /> : <span>{t('latency.test')}</span>}
       </Button>
     )
   },
@@ -134,6 +128,7 @@ const PickerNodeCard = memo(
     const { t } = useTranslation()
     return (
       <article
+        data-name-card
         data-picker-node={item.id}
         data-selected={checked}
         className={cn('picker-node-row', checked && 'picker-node-selected')}
@@ -157,10 +152,12 @@ const PickerNodeCard = memo(
           <NodeName name={item.title} />
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-muted-foreground">
             {item.badge && (
-              <span className="shrink-0 text-[10px] font-medium uppercase text-primary">{item.badge}</span>
+              <span className="picker-node-protocol shrink-0 text-[10px] uppercase text-muted-foreground">
+                {item.badge}
+              </span>
             )}
             <span className="min-w-0 truncate" title={[item.meta, item.description].filter(Boolean).join(' · ')}>
-              {[item.meta, item.description].filter(Boolean).join(' · ')}
+              {item.source || item.meta}
             </span>
           </span>
         </button>
@@ -256,7 +253,7 @@ export function GroupAddNodesModal({
         <ScrollableDialogHeader className="px-4 py-3 text-left">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pr-8">
             <DialogTitle className="text-base">{t('groupPicker.addNodesTitle', { name: groupName })}</DialogTitle>
-            <p className="text-xs text-muted-foreground">
+            <p className="node-picker-count text-xs text-muted-foreground">
               {t('groupPicker.selectedCount', { count: selectedIds.length })}
             </p>
           </div>
@@ -266,6 +263,7 @@ export function GroupAddNodesModal({
             <div className="min-w-0">
               <Input
                 type="search"
+                className="focus-visible:ring-2 focus-visible:ring-ring/30"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label={t('groupPicker.searchNodesPlaceholder')}

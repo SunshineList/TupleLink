@@ -522,6 +522,8 @@
     "manualNodesHint": "这里只显示手动添加的节点；订阅节点请从对应订阅查看。",
     "subscriptionNodes": "订阅节点",
     "subscriptionNodesHint": "搜索或连续滚动查看全部节点，支持单独测速和加入群组。",
+    "subscriptionDetails": "订阅详情",
+    "details": "详情",
     "dashboard": "管理面板",
     "resources": "节点和订阅",
     "live": "实时更新",

@@ -5,14 +5,14 @@ import { toast } from 'sonner'
 import { useUpdateSubscriptionsMutation } from '~/apis'
 import { Button } from '~/components/ui/button'
 
-export function UpdateSubscriptionAction({ id, loading }: { id: string; loading?: boolean }) {
+export function UpdateSubscriptionAction({ id, loading, quiet }: { id: string; loading?: boolean; quiet?: boolean }) {
   const { t } = useTranslation()
   const updateSubscriptionsMutation = useUpdateSubscriptionsMutation()
 
   return (
     <div className="space-y-2">
       <Button
-        variant="outline"
+        variant={quiet ? 'ghost' : 'outline'}
         size="sm"
         loading={loading || updateSubscriptionsMutation.isPending}
         onClick={() =>

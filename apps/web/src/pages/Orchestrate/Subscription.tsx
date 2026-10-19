@@ -4,7 +4,7 @@ import type { QRCodeModalRef } from '~/components/QRCodeModal'
 import type { SubscriptionsQuery } from '~/schemas/gql/graphql'
 import { Droppable } from '@hello-pangea/dnd'
 import dayjs from 'dayjs'
-import { CloudCog, CloudUpload, Download, Eye, Gauge, Pencil } from 'lucide-react'
+import { ChevronDown, ChevronRight, CloudCog, CloudUpload, Download, Eye, Gauge, Pencil } from 'lucide-react'
 import { Fragment, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -25,6 +25,7 @@ import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Section } from '~/components/Section'
 import { SortableSubscriptionCard } from '~/components/SortableSubscriptionCard'
 import { Button } from '~/components/ui/button'
+import { DropdownMenuItem } from '~/components/ui/dropdown-menu'
 import { SimpleTooltip } from '~/components/ui/tooltip'
 import { UpdateSubscriptionAction } from '~/components/UpdateSubscriptionAction'
 import { useDisclosure } from '~/hooks'
@@ -47,6 +48,7 @@ export function SubscriptionResource({
     type: 'subscription'
   } | null>(null)
   const [limit, setLimit] = useState(30)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [viewingId, setViewingId] = useState<string | null>(null)
   const viewing = sortedSubscriptions.find((subscription) => subscription.id === viewingId)
 
@@ -154,70 +156,63 @@ export function SubscriptionResource({
                   key={subscriptionID}
                   id={`subscription-${subscriptionID}`}
                   index={index}
-                  name={tag || link}
+                  name={tag || t('subscription')}
                   leftSection={`${nodes.edges.length} ${t('node')}`}
                   actions={
                     <Fragment>
-                      <SimpleTooltip label={t('actions.edit')}>
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                          aria-label={`${t('actions.edit')} ${tag || t('subscription')}`}
-                          onClick={() => {
-                            setEditingSubscription({
-                              id: subscriptionID,
-                              link,
-                              tag: tag || '',
-                              cronExp,
-                              cronEnable,
-                            })
-                            openEditSubscriptionFormModal()
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      </SimpleTooltip>
-                      <SimpleTooltip label={t('actions.viewQRCode')}>
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                          aria-label={`${t('actions.viewQRCode')} ${tag || t('subscription')}`}
-                          onClick={() => {
-                            qrCodeModalRef.current?.setProps({
-                              name: tag!,
-                              link,
-                            })
-                            openQRCodeModal()
-                          }}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                        </Button>
-                      </SimpleTooltip>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setEditingSubscription({ id: subscriptionID, link, tag: tag || '', cronExp, cronEnable })
+                          openEditSubscriptionFormModal()
+                        }}
+                      >
+                        <Pencil />
+                        {t('actions.edit')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          qrCodeModalRef.current?.setProps({ name: tag!, link })
+                          openQRCodeModal()
+                        }}
+                      >
+                        <Eye />
+                        {t('actions.viewQRCode')}
+                      </DropdownMenuItem>
                     </Fragment>
                   }
                   onRemove={() => removeSubscriptionsMutation.mutate([subscriptionID])}
                 >
-                  <div className="flex flex-wrap items-center gap-2 text-xs opacity-70">
-                    <span>
-                      {t('panel.lastUpdated')}：{dayjs(updatedAt).format('YYYY-MM-DD HH:mm:ss')}
-                    </span>
-                    {status === 'ok' && (
-                      <span className="text-emerald-700 dark:text-emerald-400">{t('panel.updateSuccess')}</span>
-                    )}
+                  <div className="subscription-card-meta">
+                    <time
+                      dateTime={dayjs(updatedAt).toISOString()}
+                      title={dayjs(updatedAt).format('YYYY-MM-DD HH:mm:ss')}
+                    >
+                      {t('panel.lastUpdated')} {dayjs(updatedAt).format('MM-DD HH:mm')}
+                    </time>
+                    {status === 'ok' && <span className="subscription-update-ok">{t('panel.updateSuccess')}</span>}
                     {cronEnable && (
-                      <span className="inline-flex items-center gap-1 text-primary">
-                        <span>{t('panel.autoUpdate')}</span>
-                        <span>{cronExp}</span>
+                      <span className="subscription-auto" title={cronExp}>
+                        {t('panel.autoUpdate')}
                       </span>
                     )}
                   </div>
-
-                  <div className="my-3 flex flex-wrap items-start justify-between gap-2">
-                    <UpdateSubscriptionAction id={subscriptionID} loading={updateSubscriptionsMutation.isPending} />
+                  <div className="subscription-card-footer">
                     <Button
-                      variant="outline"
+                      variant="secondary"
+                      size="sm"
+                      className="subscription-view"
+                      onClick={() => setViewingId(subscriptionID)}
+                    >
+                      {t('panel.viewSubscriptionNodes')}
+                      <ChevronRight />
+                    </Button>
+                    <UpdateSubscriptionAction
+                      id={subscriptionID}
+                      loading={updateSubscriptionsMutation.isPending}
+                      quiet
+                    />
+                    <Button
+                      variant="ghost"
                       size="sm"
                       onClick={() =>
                         setAddingSubscription({
@@ -229,18 +224,33 @@ export function SubscriptionResource({
                     >
                       {t('panel.addToGroup')}
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="subscription-details-toggle"
+                      aria-label={t('panel.subscriptionDetails')}
+                      aria-expanded={expandedId === subscriptionID}
+                      aria-controls={`subscription-details-${subscriptionID}`}
+                      onClick={() => setExpandedId(expandedId === subscriptionID ? null : subscriptionID)}
+                    >
+                      {t('panel.details')}
+                      <ChevronDown className={cn(expandedId === subscriptionID && 'rotate-180')} />
+                    </Button>
                   </div>
-                  <Spoiler label={link} showLabel={t('actions.show sensitive')} hideLabel={t('actions.hide')} />
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 w-full justify-between"
-                    onClick={() => setViewingId(subscriptionID)}
-                  >
-                    {t('panel.viewSubscriptionNodes')}
-                    <span className="tabular-nums text-muted-foreground">{nodes.edges.length}</span>
-                  </Button>
+                  {expandedId === subscriptionID && (
+                    <div id={`subscription-details-${subscriptionID}`} className="subscription-card-details">
+                      <p className="break-words font-medium text-foreground">{tag || t('subscription')}</p>
+                      <p>
+                        {t('panel.lastUpdated')}：{dayjs(updatedAt).format('YYYY-MM-DD HH:mm:ss')}
+                      </p>
+                      {cronEnable && (
+                        <p>
+                          {t('panel.autoUpdate')} <code>{cronExp}</code>
+                        </p>
+                      )}
+                      <Spoiler label={link} showLabel={t('actions.show sensitive')} hideLabel={t('actions.hide')} />
+                    </div>
+                  )}
                 </SortableSubscriptionCard>
               ))}
             {!subscriptionsRequest.isPending && !subscriptionsRequest.isError && !sortedSubscriptions.length && (

@@ -858,7 +858,7 @@ form {
 .picker-node-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 12px;
   align-items: start;
 }
 @container (min-width: 520px) {
@@ -882,9 +882,9 @@ form {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
   border-radius: 10px;
-  padding: 6px 8px;
+  padding: 8px 10px;
   background: var(--card);
   cursor: pointer;
   transition:
@@ -930,8 +930,9 @@ form {
   min-width: 0;
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  button:is(:hover, :focus-visible) .node-name[data-overflow='true'] .node-name-text {
-    animation: node-name-pan var(--name-duration, 4s) 800ms ease-in-out infinite alternate;
+  [data-name-card]:is(:hover, :has(:focus-visible)) .node-name[data-overflow='true'] .node-name-text {
+    animation: node-name-pan var(--name-duration, 4s) 600ms ease-in-out infinite alternate;
+    will-change: transform;
   }
 }
 @keyframes node-name-pan {
@@ -944,16 +945,17 @@ form {
     transform: translateX(var(--name-travel));
   }
 }
-@media (prefers-reduced-motion: reduce), (hover: none) {
-  .picker-node-select:focus .node-name {
+@media (hover: none), (pointer: coarse) {
+  [data-node-picker] .node-name {
     white-space: normal;
+    overflow: visible;
     overflow-wrap: anywhere;
   }
-  .picker-node-select:focus .node-name {
-    max-height: 4.5em;
-    overflow-y: auto;
+  [data-node-picker] .node-name-text {
+    display: inline;
   }
 }
+
 .manual-node-columns {
   display: grid;
   gap: 8px;
@@ -993,31 +995,37 @@ form {
   width: 28px;
 }
 .subscription-node-grid {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+  padding: 3px;
 }
 .subscription-node-tile {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  border-radius: 12px;
   background: var(--card);
-  padding: 8px 10px;
+  padding: 12px 14px;
   transition:
     border-color 150ms,
-    background-color 150ms,
-    box-shadow 150ms;
+    background-color 150ms;
+}
+.subscription-node-tile:hover {
+  border-color: color-mix(in oklab, var(--primary) 40%, var(--border));
+  background: color-mix(in oklab, var(--primary) 4%, var(--card));
+  box-shadow: none;
 }
 .subscription-browser .subscription-node-name {
   min-height: 28px;
   width: 100%;
+  font-weight: 500;
 }
 .subscription-node-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 .subscription-node-protocol {
@@ -1025,8 +1033,7 @@ form {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 10px;
-  text-transform: uppercase;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 .subscription-node-actions button {
@@ -1036,14 +1043,127 @@ form {
   width: 32px;
   padding-inline: 4px;
 }
-.subscription-node-actions .subscription-node-test {
+.subscription-node-actions :is(.subscription-node-test, .subscription-node-join) {
   width: auto;
-  min-width: 64px;
+  min-width: 56px;
   font-size: 12px;
 }
 .subscription-node-test [data-latency-tone] {
   font-size: 11px;
-  padding: 2px 5px;
+  padding: 2px 6px;
+}
+.subscription-node-secondary {
+  color: var(--muted-foreground);
+}
+@media (hover: hover) and (pointer: fine) {
+  .subscription-node-secondary {
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+  .subscription-node-tile:is(:hover, :focus-within) .subscription-node-secondary {
+    opacity: 1;
+  }
+}
+/* Subscription sources have one clear entry and keep technical details on demand. */
+.subscription-card {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 12px;
+  container-type: inline-size;
+}
+.subscription-card-header {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 6px;
+}
+.subscription-card-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  color: var(--muted-foreground);
+  cursor: grab;
+  touch-action: none;
+}
+.subscription-card .subscription-card-more {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  color: var(--muted-foreground);
+}
+.subscription-card-content {
+  padding-left: 26px;
+}
+.subscription-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 4px 0 10px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.subscription-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.subscription-auto::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.subscription-update-ok {
+  color: var(--muted-foreground);
+}
+.subscription-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 4px;
+}
+.subscription-card-footer button {
+  height: 32px;
+  min-height: 32px;
+  padding-inline: 8px;
+  font-size: 12px;
+}
+.subscription-card-footer .subscription-view {
+  background: color-mix(in oklab, var(--primary) 9%, var(--card));
+  color: var(--foreground);
+}
+.subscription-card-footer .subscription-details-toggle {
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+.subscription-card-details {
+  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.subscription-card-details > * + * {
+  margin-top: 8px;
+}
+@container (max-width: 370px) {
+  .subscription-card-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .subscription-card-footer > button,
+  .subscription-card-footer > div > button {
+    width: 100%;
+    margin-left: 0;
+  }
 }
 @media (max-width: 640px), (pointer: coarse) {
   .panel-node-row[data-density='compact'] {
@@ -1064,4 +1184,38 @@ form {
   .subscription-browser .subscription-node-name {
     min-height: 32px;
   }
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .subscription-card-footer button,
+  .subscription-card .subscription-card-more,
+  .subscription-card-handle {
+    min-height: 44px;
+    height: 44px;
+  }
+  .subscription-card .subscription-card-more {
+    min-width: 44px;
+  }
+  .subscription-card-header {
+    grid-template-columns: 20px minmax(0, 1fr) 44px;
+  }
+  .subscription-card-meta {
+    font-size: 12px;
+  }
+  .subscription-actions-menu [role='menuitem'] {
+    min-height: 44px;
+  }
+}
+
+.node-picker-count {
+  background: var(--muted);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.picker-node-row:not(.picker-node-selected):hover {
+  box-shadow: none;
+  background: color-mix(in oklab, var(--primary) 4%, var(--card));
+}
+.picker-latency-button:hover {
+  color: var(--foreground);
 }

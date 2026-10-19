@@ -1,7 +1,16 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.7](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.7)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.8](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.8)。
+
+## 0.6.8 节点与订阅视觉整理
+
+- 鼠标移到整张节点卡片即可触发溢出名称移动，离开复位；键盘聚焦也能查看。名称使用局部测量，只有当前卡片观察尺寸变化，遵守系统减少动态效果设置。
+- 手机添加节点列表直接换行显示完整名称；手动节点、订阅节点可点击名称查看完整详情。测速、勾选与查看互不代替。
+- 群组添加节点窗口保留三/四列和连续滚动，增加条目间距，弱化协议/来源及边框，去除重复测速图标；原始描述与地址仍可搜索、悬停查看。
+- 订阅节点增加间距、减少同时出现的图标，桌面在卡片悬停/聚焦时显示快捷加入等辅助操作，手机保持可见。二维码归入更多菜单，已有单项/批量测速与彩色结果保留。
+- 订阅列表突出名称、节点数量、更新时间和自动更新状态；查看节点、更新及加入群组保留直达入口，编辑/二维码/移除集中到更多菜单，链接和 Cron 放进可展开详情。
+- 保留管理面板群组布局、主题、配置与排序，不增加依赖或迁移数据库。
 
 ## 0.6.7 节点密度和交互
 
@@ -58,7 +67,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.7/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.8/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

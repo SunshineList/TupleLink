@@ -522,6 +522,8 @@
     "manualNodesHint": "Only manually added nodes are shown here. Browse subscription nodes from their subscription.",
     "subscriptionNodes": "Subscription nodes",
     "subscriptionNodesHint": "Search and scroll through all nodes. Test any node or add it directly to a group.",
+    "subscriptionDetails": "Subscription details",
+    "details": "Details",
     "dashboard": "Dashboard",
     "resources": "Nodes & subscriptions",
     "live": "Live updates",

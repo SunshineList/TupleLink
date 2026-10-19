@@ -3,7 +3,7 @@ import type { LatencyTests } from '~/components/LatencyStatus'
 import type { QRCodeModalRef } from '~/components/QRCodeModal'
 import type { SubscriptionsQuery } from '~/schemas/gql/graphql'
 import type { LibraryNode } from '~/utils/node-library'
-import { Eye, Gauge, Plus, Search } from 'lucide-react'
+import { Eye, Gauge, MoreHorizontal, Plus, Search } from 'lucide-react'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LatencyBadge } from '~/components/LatencyBadge'
@@ -13,6 +13,7 @@ import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '~/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '~/components/ui/sheet'
 import { buildNodeLibrary, defaultNodeFilters, filterNodeLibrary } from '~/utils/node-library'
 
@@ -41,7 +42,7 @@ const SubscriptionNodeTile = memo(
     const { t } = useTranslation()
     const name = node.tag || node.name || node.id
     return (
-      <article role="listitem" data-subscription-node={node.id} className="subscription-node-tile">
+      <article role="listitem" data-name-card data-subscription-node={node.id} className="subscription-node-tile">
         <button
           type="button"
           className="subscription-node-name min-w-0 text-left text-sm font-medium hover:text-primary"
@@ -73,23 +74,39 @@ const SubscriptionNodeTile = memo(
             )}
           </Button>
           <Button
-            size="icon"
+            size="sm"
             variant="ghost"
+            className="subscription-node-secondary subscription-node-join"
             title={t('panel.addToGroup')}
             aria-label={t('panel.addToGroup')}
             onClick={() => onJoin(node)}
           >
             <Plus />
+            <span>{t('panel.join')}</span>
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            title={t('actions.viewQRCode')}
-            aria-label={`${t('actions.viewQRCode')} ${name}`}
-            onClick={() => onQR(node)}
-          >
-            <Eye />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="subscription-node-secondary"
+                title={t('panel.moreActions')}
+                aria-label={`${t('panel.moreActions')} ${name}`}
+              >
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="subscription-actions-menu" data-subscription-node-menu>
+              <DropdownMenuItem onSelect={() => onDetails(node)}>
+                <Eye />
+                {t('panel.nodeDetails')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onQR(node)}>
+                <Eye />
+                {t('actions.viewQRCode')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </article>
     )
@@ -153,8 +170,15 @@ export function SubscriptionNodes({
         <DialogContent
           className="subscription-browser"
           data-subscription-browser={subscription.id}
+          onEscapeKeyDown={(event) => {
+            if (document.querySelector('[data-subscription-node-menu]')) event.preventDefault()
+          }}
           onInteractOutside={(event) => {
-            if (nestedOpen || (event.target as Element).closest('[data-slot="sheet-content"]')) event.preventDefault()
+            if (
+              nestedOpen ||
+              (event.target as Element).closest('[data-slot="sheet-content"],[data-subscription-node-menu]')
+            )
+              event.preventDefault()
           }}
         >
           <DialogHeader className="shrink-0 pr-8 text-left">

@@ -142,6 +142,10 @@ const base = process.env.DAED_PANEL_URL || 'http://localhost:18080'
       .locator('[data-group-member]')
       .evaluateAll((es) => es.map((e) => e.getAttribute('data-rfd-draggable-id')))
     const subHandles = subs.locator('[data-rfd-drag-handle-draggable-id]')
+    // Earlier regression suites can leave many groups above this fixture. Keep
+    // both columns inside the iframe viewport before directional keyboard drag.
+    await subs.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+    await page.waitForTimeout(200)
     await subHandles.first().scrollIntoViewIfNeeded()
     await subHandles.first().focus()
     await page.keyboard.press('Space')
