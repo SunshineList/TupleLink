@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/daed
-release=openwrt-v0.6.13
+release=openwrt-v0.6.14
 asset_dir=''
 mode=install
 action=install
@@ -13,12 +13,12 @@ stage=''
 backup=''
 stopped=0
 
-fail() { printf 'Daed: %s\n' "$*" >&2; exit 1; }
+fail() { printf 'NaiLink: %s\n' "$*" >&2; exit 1; }
 usage() {
 	cat <<'EOF'
 Usage: sh install.sh [--install | --uninstall | --reinstall] [--release TAG] [--asset-dir DIRECTORY] [--check | --dry-run]
   --install     Install or upgrade this project's packages (default).
-  --uninstall   Back up data, remove Daed packages and clear its config/data.
+  --uninstall   Back up data, remove NaiLink packages and clear its config/data.
   --reinstall   Verify new assets, then back up/uninstall and install fresh.
   --check       Read-only compatibility check; no package/repository changes.
   --dry-run     Verify assets; APK also simulates dependencies using cached feeds.
@@ -32,7 +32,7 @@ cleanup() {
 	if [ "$result" -ne 0 ] && [ "$stopped" = 1 ]; then
 		# Package maintainer scripts may have restarted the managed service.
 		if [ -x /etc/init.d/daed ]; then /etc/init.d/daed stop >/dev/null 2>&1 || :; fi
-		printf 'Daed: Operation did not complete. Service was stopped. Backup: %s\n' "${backup:-not created}" >&2
+		printf 'NaiLink: Operation did not complete. Service was stopped. Backup: %s\n' "${backup:-not created}" >&2
 	fi
 	exit "$result"
 }
@@ -59,7 +59,7 @@ if [ "$mode" = install ]; then
 	command -v flock >/dev/null 2>&1 || fail 'Requires the firmware-provided flock utility.'
 	mkdir -p /var/lock
 	exec 9>/var/lock/daed-install.lock
-	flock -n 9 || fail 'Another Daed installation/removal is running. Try again after it finishes.'
+	flock -n 9 || fail 'Another NaiLink installation/removal is running. Try again after it finishes.'
 fi
 if [ ! -r /etc/openwrt_release ] || ! command -v uci >/dev/null 2>&1; then
 	fail 'Requires OpenWrt / ImmortalWrt / iStoreOS.'
@@ -104,7 +104,7 @@ installed() {
 }
 
 uninstall_daed() {
-	# Only package names belonging to Daed are eligible; never recurse through
+	# Only package names belonging to NaiLink are eligible; never recurse through
 	# reverse dependencies or force removal of another application's packages.
 	if [ "$format" = apk ]; then names=$(apk info); else names=$(opkg list-installed | awk '{print $1}'); fi
 	remove=''
@@ -116,7 +116,7 @@ uninstall_daed() {
 		if installed "$package"; then remove="$remove $package"; fi
 	done
 	if [ "$mode" = dry-run ]; then
-		printf 'Daed: Uninstall dry run; eligible packages:%s. Data would be backed up and cleared.\n' "${remove:- none}"
+		printf 'NaiLink: Uninstall dry run; eligible packages:%s. Data would be backed up and cleared.\n' "${remove:- none}"
 		return
 	fi
 	for directory in /etc/daed /root/daed-backups; do
@@ -124,14 +124,14 @@ uninstall_daed() {
 	done
 	if [ -x /etc/init.d/daed ]; then
 		stopped=1
-		/etc/init.d/daed stop || fail 'Cannot stop Daed before uninstall.'
+		/etc/init.d/daed stop || fail 'Cannot stop NaiLink before uninstall.'
 	elif pidof daed >/dev/null 2>&1; then
 		stopped=1
-		killall -TERM daed || fail 'Cannot stop unmanaged Daed.'
+		killall -TERM daed || fail 'Cannot stop unmanaged NaiLink.'
 	fi
 	waited=0
 	while pidof daed >/dev/null 2>&1; do
-		[ "$waited" -lt 35 ] || fail 'Daed is still running; uninstall and backup were not attempted.'
+		[ "$waited" -lt 35 ] || fail 'NaiLink is still running; uninstall and backup were not attempted.'
 		sleep 1; waited=$((waited + 1))
 	done
 	set --
@@ -142,14 +142,14 @@ uninstall_daed() {
 		mkdir -p /root/daed-backups
 		chmod 700 /root/daed-backups
 		backup="/root/daed-backups/uninstall-$(date -u +%Y%m%dT%H%M%SZ)-$$.tar.gz"
-		tar -czf "$backup" -C / "$@" || fail 'Backup failed; Daed was not removed.'
+		tar -czf "$backup" -C / "$@" || fail 'Backup failed; NaiLink was not removed.'
 		chmod 600 "$backup"
-		tar -tzf "$backup" >/dev/null || fail 'Backup verification failed; Daed was not removed.'
+		tar -tzf "$backup" >/dev/null || fail 'Backup verification failed; NaiLink was not removed.'
 	fi
 	if [ -n "$remove" ]; then
 		if [ "$format" = apk ]; then
 			# APK automatically removes orphan dependencies. Keep existing BTF
-			# and networking/runtime dependencies in world before deleting Daed.
+			# and networking/runtime dependencies in world before deleting NaiLink.
 			keep=''
 			for package in vmlinux-btf ca-bundle jshn jsonfilter uclient-fetch kmod-sched-core kmod-sched-bpf kmod-veth v2ray-geoip v2ray-geosite luci-base luci-compat rpcd rpcd-mod-luci uhttpd uhttpd-mod-ubus; do
 				if installed "$package"; then keep="$keep $package"; fi
@@ -168,8 +168,8 @@ uninstall_daed() {
 		done
 	fi
 	[ ! -x /etc/init.d/daed ] || /etc/init.d/daed disable
-	# Package scripts must not have restarted Daed before data is cleared.
-	if pidof daed >/dev/null 2>&1; then fail 'Daed restarted during removal; data was retained.'; fi
+	# Package scripts must not have restarted NaiLink before data is cleared.
+	if pidof daed >/dev/null 2>&1; then fail 'NaiLink restarted during removal; data was retained.'; fi
 	# Fixed paths only; never follow data directory symlinks or touch other apps.
 	rm -rf /etc/daed
 	rm -f /etc/config/daed /etc/config/daed.apk-new /etc/config/daed.opkg-dist /etc/init.d/daed /usr/bin/daed /usr/sbin/daed-router-setup
@@ -177,7 +177,7 @@ uninstall_daed() {
 	rm -f /usr/libexec/daed/luci-proxy /www/cgi-bin/daed-router
 	for link in /etc/rc.d/[SK][0-9][0-9]daed; do [ ! -L "$link" ] || rm -f "$link"; done
 	/etc/init.d/rpcd reload >/dev/null 2>&1 || :
-	printf 'Daed: Uninstalled. Configuration/database backup: %s. Existing BTF retained.\n' "${backup:-no existing data}"
+	printf 'NaiLink: Uninstalled. Configuration/database backup: %s. Existing BTF retained.\n' "${backup:-no existing data}"
 	stopped=0
 }
 
@@ -256,28 +256,28 @@ case "$runtime_file:$plugin_file" in *.$format:*.$format) ;; *) fail 'Package ex
 
 managed=0
 if [ "$action" = reinstall ]; then
-	printf 'Daed: Fresh reinstall requested. Existing Daed will be backed up, removed and reset.\n'
+	printf 'NaiLink: Fresh reinstall requested. Existing NaiLink will be backed up, removed and reset.\n'
 elif installed daed-router; then
 	[ -r /usr/share/daed-router/version ] || fail 'Managed runtime marker is missing; repair the existing installation first.'
 	managed=1
 elif [ -e /usr/bin/daed ] || [ -e /etc/config/daed ] || [ -e /etc/init.d/daed ] || [ -d /etc/daed ]; then
-	fail 'An existing unmanaged Daed installation was found. Back it up and migrate explicitly; it will not be overwritten.'
+	fail 'An existing unmanaged NaiLink installation was found. Back it up and migrate explicitly; it will not be overwritten.'
 fi
-if [ "$action" != reinstall ] && { installed daed || installed luci-app-daed; }; then fail 'Another Daed package is installed; use --reinstall for a backed-up fresh installation.'; fi
-printf 'Daed: %s / %s / %s, release %s\n' "$machine" "$format" "$selected_arch" "$version"
+if [ "$action" != reinstall ] && { installed daed || installed luci-app-daed; }; then fail 'Another NaiLink package is installed; use --reinstall for a backed-up fresh installation.'; fi
+printf 'NaiLink: %s / %s / %s, release %s\n' "$machine" "$format" "$selected_arch" "$version"
 
 # Native package managers resolve kmods against the router's own feeds/kernel ABI.
 # Never force dependencies or add a feed for a different firmware.
 if [ "$mode" != dry-run ]; then
 	if [ "$format" = apk ]; then apk update; else opkg update; fi
 fi
-# APK resolves architecture and dependencies before stopping/uninstalling Daed.
+# APK resolves architecture and dependencies before stopping/uninstalling NaiLink.
 # --simulate opens the database read-only and uses existing index caches.
 # Do not add --no-network: APK would mask uncached packages in HTTP(S) feeds.
 if [ "$format" = apk ]; then
-	apk add --simulate --allow-untrusted "$stage/$runtime_file" "$stage/$plugin_file" || fail 'Package preflight failed. Daed was not stopped or uninstalled. Check firmware feeds/dependencies; dry runs require cached indexes.'
+	apk add --simulate --allow-untrusted "$stage/$runtime_file" "$stage/$plugin_file" || fail 'Package preflight failed. NaiLink was not stopped or uninstalled. Check firmware feeds/dependencies; dry runs require cached indexes.'
 fi
-[ "$mode" != dry-run ] || { printf 'Daed: Dry run passed; no packages, configuration or services changed.\n'; exit 0; }
+[ "$mode" != dry-run ] || { printf 'NaiLink: Dry run passed; no packages, configuration or services changed.\n'; exit 0; }
 if [ "$action" = reinstall ]; then uninstall_daed; stopped=1; fi
 was_running=0
 was_autostart=0
@@ -288,7 +288,7 @@ if [ "$managed" = 1 ]; then
 	stopped=1
 	waited=0
 	while pidof daed >/dev/null 2>&1; do
-		[ "$waited" -lt 35 ] || fail 'Daed is still running; database backup was not attempted.'
+		[ "$waited" -lt 35 ] || fail 'NaiLink is still running; database backup was not attempted.'
 		sleep 1; waited=$((waited + 1))
 	done
 	mkdir -p /root/daed-backups
@@ -330,10 +330,10 @@ if [ "$was_running" = 1 ]; then
 	waited=0
 	until /usr/libexec/daed/check | jsonfilter -e '@.running' | grep -q '^true$' && \
 		uclient-fetch -T 2 -O /dev/null "http://$listen/" >/dev/null 2>&1; do
-		[ "$waited" -lt 20 ] || { /etc/init.d/daed stop; fail 'Management HTTP did not become ready. Check Services > Daed > Logs.'; }
+		[ "$waited" -lt 20 ] || { /etc/init.d/daed stop; fail 'Management HTTP did not become ready. Check Services > NaiLink > Logs.'; }
 		sleep 1; waited=$((waited + 1))
 	done
 fi
 stopped=0
-printf 'Daed: Installed. Refresh LuCI and open Services > Daed. Management readiness does not prove LAN proxy traffic.\n'
-[ -z "$backup" ] || printf 'Daed: Configuration backup (contains secrets): %s\n' "$backup"
+printf 'NaiLink: Installed. Refresh LuCI and open Services > NaiLink. Management readiness does not prove LAN proxy traffic.\n'
+[ -z "$backup" ] || printf 'NaiLink: Configuration backup (contains secrets): %s\n' "$backup"

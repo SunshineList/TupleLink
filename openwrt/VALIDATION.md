@@ -1,3 +1,19 @@
+# 0.6.14 NaiLink 改名验证
+
+日期：2026-10-20；分支：`codex/nailink-brand`。
+测试发行：[openwrt-v0.6.14](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.14)。
+
+- 侧边栏显示 NaiLink，网页标题显示 NaiLink · 奶油互联；日志页、服务错误提示、安装器与说明文件同步更新。
+- 保留原有软件包名、LuCI 路由与 ACL、服务、配置路径和数据库结构，避免改名影响升级与已有数据；无新依赖。
+- 78 项 OpenWrt 测试全部通过、无跳过；10 项 LuCI 检查、Web 67 项测试、TypeScript、ShellCheck 和前端构建通过；Go 网关测试及 x86_64 / ARM64 构建通过。
+- 22 个 IPK/APK 安装包通过 ELF、版本、内容和可执行权限检查；保留已有包名与文件布局。
+- 使用最终 IPK 程序执行 0.6.13 → 0.6.14 的原生 API-only 升级，10 张用户数据表摘要一致；确认旧 Daed 菜单变为 NaiLink，最终程序内嵌页面标题为 NaiLink · 奶油互联。
+- 最终程序的两轮八节点无响应 SS 测试约 3 秒返回全部超时，随后正常 SOCKS/HTTP 测试成功。
+
+本轮验证在本机隔离环境执行，未在用户路由器上安装或更改网络配置。
+
+---
+
 # 0.6.13 稳定性检查与优化
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。

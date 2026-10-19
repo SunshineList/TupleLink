@@ -279,7 +279,7 @@
     "testFiltered": "测试当前结果",
     "progress": "测试进度 {{completed}} / {{total}}",
     "stop": "停止测试",
-    "requestFailed": "测试中断，已保留已有结果。请确认 Daed 服务及测试地址可用后重试。",
+    "requestFailed": "测试中断，已保留已有结果。请确认 NaiLink 服务及测试地址可用后重试。",
     "testSubscriptions": "测试订阅节点",
     "colors": "延迟颜色说明",
     "good": "绿色：低于 200 ms",
@@ -417,7 +417,7 @@
   "warn": "警告",
   "welcome back": "欢迎回来！",
   "welcome to": "欢迎来到 {{ name }}",
-  "what for": "daed 是 <dae>dae</dae> 的 Web 控制面板。",
+  "what for": "NaiLink（奶油互联）是基于 <dae>dae</dae> 的网络管理面板。",
   "shortcuts": {
     "title": "快捷键",
     "categories": {

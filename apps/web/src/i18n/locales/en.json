@@ -279,7 +279,7 @@
     "testFiltered": "Test matching nodes",
     "progress": "Testing {{completed}} / {{total}}",
     "stop": "Stop queued tests",
-    "requestFailed": "Latency test interrupted. Previous results are kept. Check that Daed is running and the check URL is reachable, then retry.",
+    "requestFailed": "Latency test interrupted. Previous results are kept. Check that NaiLink is running and the check URL is reachable, then retry.",
     "testSubscriptions": "Test subscription nodes",
     "colors": "Latency colors",
     "good": "Green: < 200 ms",
@@ -417,7 +417,7 @@
   "warn": "warn",
   "welcome back": "Welcome Back!",
   "welcome to": "Welcome to {{ name }}",
-  "what for": "daed is a web dashboard for <dae>dae</dae>.",
+  "what for": "NaiLink is a network management dashboard based on <dae>dae</dae>.",
   "shortcuts": {
     "title": "Keyboard Shortcuts",
     "categories": {

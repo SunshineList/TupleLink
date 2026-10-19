@@ -34,7 +34,7 @@ return view.extend({
     if (!data.running)
       return E('div', {}, [
         community.render(),
-        E('p', {}, 'Daed 服务未运行。'),
+        E('p', {}, 'NaiLink 服务未运行。'),
         E(
           'button',
           {
@@ -60,7 +60,7 @@ return view.extend({
       ])
     return E('iframe', {
       src: panel + (route[0] ? '#/' + route[0] : ''),
-      title: 'Daed ' + route[1],
+      title: 'NaiLink ' + route[1],
       style:
         'display:block;width:100%;height:calc(100vh - 160px);height:calc(100dvh - 160px);min-height:160px;border:0',
     })

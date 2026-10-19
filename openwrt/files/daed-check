@@ -4,7 +4,7 @@
 set -e
 
 if ! command -v jsonfilter >/dev/null 2>&1 || [ ! -r /usr/share/libubox/jshn.sh ]; then
-	echo 'Daed requires jsonfilter and jshn (normally installed with LuCI).' >&2
+	echo 'NaiLink requires jsonfilter and jshn (normally installed with LuCI).' >&2
 	exit 1
 fi
 . /usr/share/libubox/jshn.sh
@@ -138,7 +138,7 @@ for asset in geosite.dat geoip.dat; do
 	if [ -n "$asset_path" ]; then
 		add_check "$asset" ok "Rule data is readable at $asset_path; rule parsing is verified when applying configuration."
 	elif [ -s "/usr/share/v2ray/$asset" ]; then
-		add_check "$asset" warning "OpenWrt rule data exists, but the Daed search-path link is missing. Upgrade or repair daed-router."
+		add_check "$asset" warning "OpenWrt rule data exists, but the NaiLink search-path link is missing. Upgrade or repair daed-router."
 	else
 		add_check "$asset" warning "Default rule data is missing. Install the firmware's v2ray-geosite/v2ray-geoip packages before using geodata rules."
 	fi

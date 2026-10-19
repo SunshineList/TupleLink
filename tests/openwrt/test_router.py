@@ -164,7 +164,7 @@ for package in "$@"; do rm -f "/tmp/installed-$package"; done''')
             for action in ("--install", "--uninstall", "--reinstall"):
                 result = self.install(action)
                 self.assertNotEqual(result.returncode, 0, result.stdout)
-                self.assertIn("Another Daed", result.stderr)
+                self.assertIn("Another NaiLink", result.stderr)
             rpc = self.run_router("/usr/libexec/rpcd/daed-router", "call", "action", input='{"action":"stop"}')
             self.assertFalse(json.loads(rpc.stdout)["success"])
             self.assertTrue((self.root / "tmp/daemon-running").exists())

@@ -288,12 +288,12 @@ export function HeaderWithActions() {
             <div className="relative">
               <img
                 src="/logo.webp"
-                alt="daed"
+                alt="NaiLink"
                 className="w-9 h-9 rounded-lg shadow-sm group-hover:shadow-md transition-shadow"
               />
               <div className="absolute inset-0 rounded-lg ring-1 ring-black/5 dark:ring-white/10" />
             </div>
-            <h1 className={cn('font-semibold tracking-tight', matchSmallScreen ? 'text-lg' : 'text-xl')}>daed</h1>
+            <h1 className={cn('font-semibold tracking-tight', matchSmallScreen ? 'text-lg' : 'text-xl')}>NaiLink</h1>
           </Link>
 
           {!matchSmallScreen && (
@@ -381,7 +381,7 @@ export function HeaderWithActions() {
           ) : (
             <Fragment>
               <SimpleTooltip label="GitHub">
-                <a href="https://github.com/daeuniverse/daed" target="_blank" rel="noopener noreferrer">
+                <a href="https://github.com/slobys/daed" target="_blank" rel="noopener noreferrer">
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <GithubIcon className="h-5 w-5" />
                   </Button>
@@ -529,7 +529,7 @@ export function HeaderWithActions() {
                 <span className="text-sm">{t('shortcuts.title')}</span>
               </Button>
 
-              <a href="https://github.com/daeuniverse/daed" target="_blank" rel="noopener noreferrer">
+              <a href="https://github.com/slobys/daed" target="_blank" rel="noopener noreferrer">
                 <Button variant="ghost" className="w-full justify-start gap-2 h-9 px-2">
                   <GithubIcon className="h-4 w-4" />
                   <span className="text-sm">GitHub</span>

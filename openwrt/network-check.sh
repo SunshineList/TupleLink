@@ -1,14 +1,14 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 # Inspect the current datapath and make bounded public connectivity requests.
-# Never change UCI, services, routing, firewall, qdiscs or the Daed database.
+# Never change UCI, services, routing, firewall, qdiscs or the NaiLink database.
 set +x
 
 for tool in ubus jsonfilter; do
 	command -v "$tool" >/dev/null 2>&1 || { echo "Missing command: $tool"; exit 1; }
 done
-printf 'Daed network check v2 (configuration read-only)\n'
-echo 'traffic_owner=unknown; HTTPS success tests the current path, not Daed specifically.'
+printf 'NaiLink network check v2 (configuration read-only)\n'
+echo 'traffic_owner=unknown; HTTPS success tests the current path, not NaiLink specifically.'
 echo 'Service records, processes and firewall markers are observations, not proof of traffic ownership.'
 printf 'time='; date -Iseconds
 printf 'kernel='; uname -r
@@ -168,5 +168,5 @@ else
 			}
 		}' | tail -n 71
 fi
-echo 'traffic_owner=unknown; these observations alone cannot validate Daed forwarding.'
+echo 'traffic_owner=unknown; these observations alone cannot validate NaiLink forwarding.'
 printf '\nFinished. No configuration, service, routing or firewall changes were made.\n'

@@ -1,6 +1,6 @@
 {
   "admin/services/daed": {
-    "title": "Daed",
+    "title": "NaiLink",
     "order": 60,
     "action": { "type": "firstchild" },
     "depends": { "acl": ["luci-app-daed-router"], "uci": { "daed": true } }

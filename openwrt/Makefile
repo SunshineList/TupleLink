@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.6.13)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.6.14)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -13,7 +13,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/daed-router
   SECTION:=net
   CATEGORY:=Network
-  TITLE:=Daed router runtime
+  TITLE:=NaiLink router runtime
   URL:=https://github.com/slobys/daed
   DEPENDS:=+ca-bundle +jshn +jsonfilter +uclient-fetch +kmod-sched-core +kmod-sched-bpf +kmod-veth +v2ray-geoip +v2ray-geosite
   CONFLICTS:=daed
@@ -24,7 +24,7 @@ define Package/luci-app-daed-router
   SECTION:=luci
   CATEGORY:=LuCI
   SUBMENU:=3. Applications
-  TITLE:=LuCI support for Daed router
+  TITLE:=LuCI support for NaiLink
   DEPENDS:=+daed-router +luci-base +rpcd
   CONFLICTS:=luci-app-daed
   PKGARCH:=all

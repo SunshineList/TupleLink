@@ -1,4 +1,4 @@
-# Daed 软路由插件
+# NaiLink · 奶油互联
 
 基于 [daeuniverse/daed](https://github.com/daeuniverse/daed) 二次开发，面向 OpenWrt、ImmortalWrt 和 iStoreOS 的 LuCI 后台使用。
 
@@ -11,7 +11,7 @@
 在路由器 SSH 中以 root 执行：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.13/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.6.13
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.14/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.6.14
 ```
 
 已有本项目安装时，执行同一条命令即可升级。升级前自动备份，保留节点、订阅、群组和配置；备份位于 `/root/daed-backups`。其他来源的 Daed 安装请先参阅迁移说明。
@@ -23,11 +23,11 @@ git clone --recurse-submodules https://github.com/slobys/daed.git
 cd daed
 ```
 
-也可以直接下载 [0.6.13 完整源码包](https://github.com/slobys/daed/releases/download/openwrt-v0.6.13/daed-openwrt-source.tar.gz)，其中已包含后端子模块。GitHub 的 **Code → Download ZIP** 不包含子模块；编译请使用上述任一方式，步骤见[开发说明](openwrt/README.md#开发)。
+也可以直接下载 [0.6.14 完整源码包](https://github.com/slobys/daed/releases/download/openwrt-v0.6.14/daed-openwrt-source.tar.gz)，其中已包含后端子模块。GitHub 的 **Code → Download ZIP** 不包含子模块；编译请使用上述任一方式，步骤见[开发说明](openwrt/README.md#开发)。
 
 ## 开始使用
 
-1. 打开路由器后台 **服务 → Daed**。
+1. 打开路由器后台 **服务 → NaiLink**（已发布的 0.6.13 及更早版本显示为 **Daed**）。
 2. 在 **节点和订阅** 中导入节点或添加订阅，名称可以留空自动识别。
 3. 在 **管理面板** 中将节点或订阅加入群组，测试后选择合适的节点。
 4. 按需调整 **高级设置** 中的接口、DNS 和路由，再点击 **应用配置**。

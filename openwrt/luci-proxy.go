@@ -205,7 +205,7 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 		r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
 		identity, err := readCredentials(configDir)
 		if err != nil {
-			http.Error(w, "Daed 尚未就绪，请重新启动服务。", 503)
+			http.Error(w, "NaiLink 尚未就绪，请重新启动服务。", 503)
 			return
 		}
 		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"sub": identity.Username, "role": "admin", "exp": time.Now().Add(time.Minute).Unix()}).SignedString([]byte(identity.Secret))
@@ -231,7 +231,7 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 			return nil
 		}
 		proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, _ error) {
-			http.Error(w, "Daed 服务暂时不可用，请重试或查看运行日志。", 502)
+			http.Error(w, "NaiLink 服务暂时不可用，请重试或查看运行日志。", 502)
 		}
 		proxy.Transport = &http.Transport{Proxy: nil, ResponseHeaderTimeout: 30 * time.Second, DisableKeepAlives: true}
 		proxy.ServeHTTP(w, r)
@@ -239,8 +239,8 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 }
 
 func main() {
-	configDir := flag.String("config", "/etc/daed", "Daed configuration directory")
-	initialize := flag.Bool("prepare", false, "Prepare local identity before starting Daed")
+	configDir := flag.String("config", "/etc/daed", "NaiLink configuration directory")
+	initialize := flag.Bool("prepare", false, "Prepare local identity before starting NaiLink")
 	flag.Parse()
 	if *initialize {
 		if err := prepare(*configDir); err != nil {
@@ -254,6 +254,6 @@ func main() {
 		err = cgi.Serve(gateway(*configDir, target, sessionAccess))
 	}
 	if err != nil {
-		io.WriteString(os.Stdout, "Status: 503 Service Unavailable\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nDaed 服务尚未就绪。\n")
+		io.WriteString(os.Stdout, "Status: 503 Service Unavailable\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nNaiLink 服务尚未就绪。\n")
 	}
 }

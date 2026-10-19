@@ -180,7 +180,7 @@ export function SetupPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center p-4">
       <div className="flex w-full max-w-2xl flex-col gap-4">
-        <h1 className="text-center text-3xl font-bold">{t('welcome to', { name: 'daed' })}</h1>
+        <h1 className="text-center text-3xl font-bold">{t('welcome to', { name: 'NaiLink' })}</h1>
         <p className="text-center text-muted-foreground">
           <Trans
             i18nKey="what for"

@@ -108,8 +108,8 @@ probe() {
 	printf '\n'
 }
 
-echo 'Daed subscription check v1 (read-only, up to 3 subscriptions)'
-echo 'system_* uses curl and may still be affected by transparent proxy rules; it is not the Daed route transport.'
+echo 'NaiLink subscription check v1 (read-only, up to 3 subscriptions)'
+echo 'system_* uses curl and may still be affected by transparent proxy rules; it is not the NaiLink route transport.'
 localhost_proxy=$(uci -q get 'passwall.@global[0].localhost_proxy')
 printf 'localhost_proxy=%s socks_available=%s\n' "${localhost_proxy:-unset}" "$(if [ -n "$socks" ]; then echo yes; else echo no; fi)"
 for section in $sections; do

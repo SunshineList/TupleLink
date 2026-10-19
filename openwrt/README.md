@@ -1,7 +1,15 @@
-# Daed 软路由插件
+# NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.13](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.13)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.14](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.14)。
+
+本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.14 NaiLink 品牌更新
+
+- 侧边栏统一显示 NaiLink，网页标题显示 NaiLink · 奶油互联；同步更新日志页、服务提示、安装器和自述文件。
+- 沿用 `daed-router` / `luci-app-daed-router` 包名、`daed` 服务、管理地址与数据目录；已有用户直接升级，不用卸载或重新导入节点。
+- 保留 0.6.13 的稳定性优化、全部主题和社区入口，无新依赖或数据库迁移。
 
 ## 0.6.13 稳定性与社区入口
 
@@ -86,7 +94,7 @@ IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.13](https://github.co
 
 ## 使用
 
-安装后进入 **服务 → Daed**，默认显示管理面板：
+安装后进入 **服务 → NaiLink**（0.6.13 及更早版本为 **Daed**），默认显示管理面板：
 
 - **管理面板**：上传、下载、连接及流量，群组创建、成员管理和代理启停。
 - **节点和订阅**：手动节点、订阅及各订阅节点的独立管理。
@@ -105,7 +113,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.13/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.6.13
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.14/install.sh && sh /tmp/daed-install.sh --release openwrt-v0.6.14
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
@@ -116,7 +124,7 @@ uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/do
 修改群组、节点或高级配置后，按顶部“应用配置”使其生效；该操作可能启动代理。
 代理状态取自后端；管理面板的流量指标、趋势和累计数据默认直接展示。
 
-升级后刷新后台，再进入 **服务 → Daed**；仍显示旧内容时按 `Ctrl+F5`。
+升级后刷新后台，再进入 **服务 → NaiLink**（0.6.13 及更早版本为 **Daed**）；仍显示旧内容时按 `Ctrl+F5`。
 无需修改监听地址。保留旧数据及原有排序、配色偏好，不重建数据库。
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
@@ -257,12 +265,12 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.6.13 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
+CGO_ENABLED=0 make -C wing APPNAME=daed VERSION=0.6.14 WEB_DIST="$PWD/apps/web/dist-openwrt" OUTPUT="$PWD/daed" bundle
 # 从 wing/ 构建，复用已锁定的 Go 依赖
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../btf-probe ../openwrt/btf-probe.go)
 (cd wing && CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../luci-proxy ../openwrt/luci-proxy.go)
-python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.6.13 --work /path/to/sdk-cache --output /path/to/packages
-python3 openwrt/manifest.py /path/to/packages --version 0.6.13
+python3 openwrt/build.py --target ipk-x86_64 --binary ./daed --btf-probe ./btf-probe --luci-proxy ./luci-proxy --version 0.6.14 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/manifest.py /path/to/packages --version 0.6.14
 node --test tests/openwrt/ui.test.cjs
 ```
 

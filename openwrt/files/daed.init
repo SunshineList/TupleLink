@@ -10,7 +10,7 @@ start_service() {
 	config_get_bool enabled main enabled 0
 	[ "$enabled" = 1 ] || return 0
 	if ! /usr/libexec/daed/check --check; then
-		logger -t daed 'Compatibility/configuration check failed; see Services > Daed.'
+		logger -t daed 'Compatibility/configuration check failed; see Services > NaiLink.'
 		return 1
 	fi
 	listen=$(/usr/libexec/daed/check --listen) || return 1

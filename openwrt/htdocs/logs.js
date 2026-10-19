@@ -33,7 +33,7 @@ return view.extend({
           style:
             'display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px',
         },
-        [E('h2', { style: 'margin:0' }, 'Daed 运行日志'), community.render()],
+        [E('h2', { style: 'margin:0' }, 'NaiLink 运行日志'), community.render()],
       ),
       output,
     ])
