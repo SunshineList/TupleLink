@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("rootfs", "old-runtime", "runtime", "proxy", "workspace", "control"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--old-menu", type=Path, help="Use a real previous-release LuCI menu until upgrade")
     args = parser.parse_args()
     if os.geteuid() != 0:
         parser.error("Run as root with an isolated, checksum-verified OpenWrt rootfs")
@@ -59,6 +60,8 @@ def main():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
         destination.chmod(0o755 if relative.startswith(("www/cgi-bin", "usr/libexec")) else 0o644)
+    if args.old_menu:
+        shutil.copyfile(args.old_menu, root / "usr/share/luci/menu.d/luci-app-daed-router.json")
     views = root / "www/luci-static/resources/view/daed-router"
     views.mkdir(parents=True)
     for source in (project / "openwrt/htdocs").glob("*.js"):
@@ -175,6 +178,12 @@ def main():
                         raise RuntimeError("Take a seeded database snapshot before upgrading")
                     daemon.terminate()
                     daemon.wait(timeout=10)
+                    shutil.copyfile(project / "openwrt/files/menu.json", root / "usr/share/luci/menu.d/luci-app-daed-router.json")
+                    # Model the installed LuCI package's postinst invalidation.
+                    # The browser session menu intentionally remains untouched.
+                    for cache in (root / "tmp").glob("luci-indexcache*"):
+                        if cache.is_file():
+                            cache.unlink()
                     subprocess.run([str(args.proxy), "--config", str(root / "etc/daed"), "--prepare"], check=True)
                     daemon = start_daemon(args.runtime)
                     after = snapshot()

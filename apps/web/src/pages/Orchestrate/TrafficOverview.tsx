@@ -147,7 +147,7 @@ function TrafficRangeButton({ active, onClick, children }: { active: boolean; on
   )
 }
 
-export function TrafficOverview() {
+export function TrafficOverview({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation()
   const [selectedRange, setSelectedRange] = useState<TimeRangeKey>('1m')
   const [trendsOpen, setTrendsOpen] = useState(false)
@@ -242,7 +242,7 @@ export function TrafficOverview() {
           </Button>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className={cn('grid grid-cols-2 gap-3', !compact && 'xl:grid-cols-4')}>
         <TrafficMetricCard
           title={t('trafficOverview.uploadSpeed')}
           amount={available ? uploadRateDisplay.amount : '—'}
@@ -296,7 +296,7 @@ export function TrafficOverview() {
                 {trafficOverviewQuery.isPending ? t('panel.loading') : t('panel.emptyStats')}
               </p>
             )}
-            <div className="grid h-full gap-4 md:grid-cols-2">
+            <div className={cn('grid h-full gap-4', !compact && 'md:grid-cols-2')}>
               <div className="flex h-full flex-col rounded-2xl border border-border/70 bg-background/70 p-3.5 shadow-sm">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>

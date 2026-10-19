@@ -668,7 +668,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
     <div className="panel-workspace flex flex-col gap-5" data-workspace={area}>
       {area === 'dashboard' && (
         <section id="panel-monitor">
-          <TrafficOverview />
+          <TrafficOverview compact />
         </section>
       )}
       {area === 'all' && (

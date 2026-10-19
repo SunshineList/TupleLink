@@ -61,12 +61,34 @@ async function login(page, url = base) {
       localStorage.setItem('APP_STATEcolsPerRow', '3');
       return { order: localStorage.getItem('APP_STATEnodeSortableKeys'), cols: localStorage.getItem('APP_STATEcolsPerRow') };
     }, nodeIds);
+    // Reproduce the user's upgrade: the browser keeps the former two-item
+    // LuCI menu although the installed menu JSON already has all four pages.
+    await page.evaluate(async () => {
+      const ui = await L.require('ui');
+      const session = await L.require('session');
+      const menu = JSON.parse(JSON.stringify(await ui.menu.load()));
+      menu.children.admin.children.services.children.daed.children.dashboard.action.path = 'daed-router/panel';
+      delete menu.children.admin.children.services.children.daed.children.resources;
+      delete menu.children.admin.children.services.children.daed.children.advanced;
+      session.setLocalData('menu', menu);
+      session.setLocalData('daed-unrelated-preference', 'retained');
+    });
+    const legacyModule = fs.readFileSync(path.join(__dirname, 'legacy-panel.js.fixture'), 'utf8');
+    let legacyLoads = 0;
+    await page.route('**/view/daed-router/panel.js*', route => { legacyLoads++; return route.fulfill({contentType:'application/javascript',body:legacyModule}); });
+    await page.reload({waitUntil:'domcontentloaded'});
+    await frame.getByRole('heading', {name:'管理面板',exact:true}).waitFor();
+    assert.equal(await page.getByRole('link', {name:'节点和订阅',exact:true}).count(), 0);
+    assert.ok(legacyLoads > 0, 'Reproduction must use the actual pre-workspace LuCI module');
+    console.log('REPRODUCED: cached LuCI menu still has only dashboard/logs with four-page menu JSON installed');
     const baseline = await control('snapshot');
     assert.ok(baseline.tables > 5);
     const upgraded = await control('upgrade');
     assert.ok(upgraded.unchanged, 'Upgrade changed user-data tables: ' + upgraded.changed_tables.join(', '));
     await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.getByRole('link', {name:'节点和订阅',exact:true}).waitFor({timeout:45000});
     await frame.getByRole('heading', { name: '管理面板', exact: true }).waitFor({ timeout: 45000 });
+    assert.equal(await page.evaluate(async()=> (await L.require('session')).getLocalData('daed-unrelated-preference')), 'retained');
     const after = await gql('query {nodes{edges{id name tag link}} subscriptions{id tag link nodes{edges{id name}}} groups{id name policy nodes{id} subscriptions{subscription{id} nameFilterRegex}} configs{id name selected global{logLevel tproxyPort lanInterface wanInterface}} dnss{id name selected dns{string}} routings{id name selected routing{string}}}');
     assert.deepEqual(after, before);
     const preferences = await frame.locator('body').evaluate(() => ({ order: localStorage.getItem('APP_STATEnodeSortableKeys'), cols: localStorage.getItem('APP_STATEcolsPerRow') }));
@@ -106,7 +128,7 @@ async function login(page, url = base) {
     assert.equal(await frame.locator('#workspace-nodes').isVisible(), false);
     const monitorBox = await frame.locator('#panel-monitor').boundingBox();
     const groupsBox = await frame.locator('#workspace-groups').boundingBox();
-    assert.ok(monitorBox.y < groupsBox.y);
+    assert.ok(Math.abs(monitorBox.y-groupsBox.y) < 3 && monitorBox.x+monitorBox.width <= groupsBox.x, 'Desktop overview and groups must sit side by side');
     await page.screenshot({path:path.join(output,'dashboard-desktop.png'),fullPage:true});
     await navigate('advanced');
     assert.equal(await frame.locator('#panel-advanced-content [data-testid=section]').count(), 3);
@@ -116,7 +138,8 @@ async function login(page, url = base) {
     await navigate('resources');
     assert.ok(await frame.locator('#workspace-nodes').isVisible());
     assert.equal(await frame.locator('#workspace-groups').isVisible(), false);
-    console.log('PASS: four native LuCI menus, overview above groups on dashboard, isolated resource and advanced pages');
+    await page.unroute('**/view/daed-router/panel.js*');
+    console.log('PASS: four native LuCI menus, overview beside groups on dashboard, isolated resource and advanced pages');
     const sections = frame.locator('#panel-common [data-testid=section]');
     await sections.nth(2).getByRole('heading', { name: '订阅', exact: true }).waitFor();
     const nodes = sections.nth(1);
@@ -386,6 +409,17 @@ async function login(page, url = base) {
         assert.equal(await search.inputValue(), 'Edited in drawer');
       }
       await page.screenshot({ path: path.join(output, 'native-' + width + '.png'), fullPage: true });
+      await navigate('dashboard');
+      const overview = await frame.locator('#panel-monitor').boundingBox();
+      const groupPanel = await frame.locator('#workspace-groups').boundingBox();
+      const panelWidth = await frame.locator('body').evaluate(()=>innerWidth);
+      if (panelWidth >= 900) assert.ok(Math.abs(overview.y-groupPanel.y)<3 && overview.x+overview.width <= groupPanel.x);
+      else assert.ok(overview.y+overview.height <= groupPanel.y);
+      assert.ok(await frame.locator('body').evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+      await page.screenshot({path:path.join(output,'dashboard-'+width+'.png'),fullPage:true});
+      await navigate('resources');
+      if (await tabs.isVisible()) await tabs.getByRole('tab', {name:/节点/}).click();
+
     }
     await gql('mutation ExtraManualNodes($args:[ImportArgument!]!){importNodes(rollbackError:true,args:$args){node{id}}}', { args: Array.from({ length: 13 }, (_, i) => ({ tag: 'Manual page ' + i, link: `vless://55555555-5555-4555-8555-${String(i).padStart(12, '0')}@192.0.2.90:443?encryption=none&security=tls&type=tcp#Manual-page-${i}` })) });
     await page.reload({ waitUntil: 'domcontentloaded' });

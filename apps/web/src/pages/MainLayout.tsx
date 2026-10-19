@@ -1,12 +1,14 @@
+import type { RouterMenuHost } from '~/utils/router-menu'
 import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
 
+import { Outlet, useNavigate } from 'react-router-dom'
 import { HeaderWithActions } from '~/components/Header'
 import { RouterHeader } from '~/components/RouterHeader'
 import { useInitialize } from '~/initialize'
 import { isMockMode } from '~/mocks'
 import { endpointURLAtom, tokenAtom } from '~/store'
+import { refreshStaleRouterMenu } from '~/utils/router-menu'
 import { routerMode } from '~/utils/router-mode'
 
 export function MainLayout() {
@@ -18,9 +20,17 @@ export function MainLayout() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    initialize()
-      .then(() => setReady(true))
-      .catch(() => setError('面板初始化失败，请刷新页面或查看运行日志。'))
+    async function prepare() {
+      if (
+        routerMode &&
+        window.parent !== window &&
+        (await refreshStaleRouterMenu(window.parent as unknown as RouterMenuHost))
+      )
+        return
+      await initialize()
+      setReady(true)
+    }
+    prepare().catch(() => setError('面板初始化失败，请刷新页面或查看运行日志。'))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

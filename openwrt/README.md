@@ -1,12 +1,12 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.0)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.1)。
 
-## 0.6.0 独立工作区与即时测速
+## 0.6.1 菜单升级修复与左右布局
 
-- LuCI 入口依次为 **管理面板、节点和订阅、高级设置、运行日志**。
-- 管理面板上方显示运行概况，下方管理群组；紧凑工具栏保留代理状态、启停和应用配置。
+- LuCI 入口依次为 **管理面板、节点和订阅、高级设置、运行日志**。升级后检测浏览器里旧的两项菜单缓存，只清理菜单数据并自动刷新一次，不退出登录或清除其他偏好。
+- 电脑端管理面板左侧显示运行概况、右侧管理群组，窄屏自动堆叠；紧凑工具栏保留代理状态、启停和应用配置。
 - 手动节点与订阅在独立双栏管理；手机切换查看两个列表，保留连续浏览、搜索、排序、单独测速及群组绑定。
 - 配置、DNS、路由移到独立高级设置页。现有数据、配色和排序偏好沿用。
 - 测速采用最多 8 路并发的滑动队列，每完成一个节点就更新结果；IPv4/IPv6 HTTP 探测同时进行，先成功的返回，不等待失效的另一条路径。单次 HTTP 探测共享 3 秒期限，不再使用后台健康检查重试。检查目标 DNS 成功解析复用 30 秒，配置更改立即失效。
@@ -29,10 +29,10 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 
 ## 安装和保留数据升级
 
-以 root 在路由器 SSH 中执行，已有本项目 0.1.x / 0.2.x / 0.3.x / 0.4.x / 0.5.x 安装时使用同一条命令升级：
+以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.0/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.1/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

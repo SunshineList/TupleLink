@@ -56,6 +56,8 @@ test('native resource and advanced tabs embed their fixed same-origin route', ()
 
 test('upgraded menu bypasses the cached pre-gateway dashboard and resolves every view', () => {
   assert.notEqual(menu['admin/services/daed/dashboard'].action.path, 'daed-router/dashboard');
+  assert.notEqual(menu['admin/services/daed/dashboard'].action.path, 'daed-router/panel');
+  assert.ok(fs.existsSync(path.join(htdocs,'panel.js')), 'Old cached menus still need a resolvable bootstrap view');
   for (const entry of Object.values(menu)) {
     if (entry.action.type !== 'view') continue;
     assert.equal(entry.action.path.split('/')[0], 'daed-router');
