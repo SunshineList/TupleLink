@@ -77,6 +77,7 @@ def prepare(root):
         generated[name] = digest(data)
     # Keep latency fixes in the release source, without changing submodule pins.
     patches = {
+        "dae/runtime.go": ("582676a55373d44220dced8552f094482d7d35a423d13de98ae0865cbe687062", lambda value: (HERE / "wing/runtime.go").read_text(encoding="utf-8")),
         "graphql/service/node/latency_mutation_utils.go": ("b7e722f4c24dd9606fceaf310daf285b30b8d878413ca20702970ef3b4ca805d", lambda value: (HERE / "wing/node_latency.go").read_text(encoding="utf-8")),
         "graphql/service/node/latency_cache.go": ("4d4fd03249c617bcc9fccb508dbc2d567fa74557dd5900ee046cbf307ff64831", lambda value: value.replace('if err := refreshLatencyCacheIfNeeded(ctx); err != nil {\n\t\treturn nil, err\n\t}', '// Reading results must never start network probes.').replace('if _, ok := merged[id]; !ok {', 'if cached, ok := merged[id]; !ok || resolver.TestedAtV.After(cached.TestedAtV) {')),
         "graphql/mutation.go": ("90a8f23ac625f2d3adf79f7f236d40b6529e2857028cc5ed02f02c0e111ee8ef", lambda value: value.replace('TestNodeLatencies(args *struct', 'TestNodeLatencies(ctx context.Context, args *struct').replace('node.TestLatencies(context.TODO(), args.IDs)', 'node.TestLatencies(ctx, args.IDs)')),
@@ -88,8 +89,9 @@ def prepare(root):
             data = transform(data.decode()).encode()
         elif previous.get(relative) != digest(data):
             raise ValueError("Unknown backend source; refusing to overwrite: " + relative)
-        elif relative.endswith("latency_mutation_utils.go"):
-            data = (HERE / "wing/node_latency.go").read_bytes()
+        elif relative in ("graphql/service/node/latency_mutation_utils.go", "dae/runtime.go"):
+            replacement = "node_latency.go" if relative.endswith("latency_mutation_utils.go") else "runtime.go"
+            data = (HERE / "wing" / replacement).read_bytes()
         destination.write_bytes(data)
         generated[relative] = digest(data)
     destination = root / "graphql/service/node/router_latency_test.go"
@@ -99,6 +101,18 @@ def prepare(root):
         raise ValueError("Unknown latency tests; refusing to overwrite")
     destination.write_bytes(data)
     generated[key] = digest(data)
+    # Tagged socket fixtures validate the real per-plane recorders and adapter.
+    # They are not compiled into release binaries and never initialize eBPF.
+    for relative, source in (
+        ("dae/router_runtime_test.go", "runtime_test.go"),
+        ("dae-core/control/router_runtime_fixture.go", "runtime_stats_fixture.go"),
+    ):
+        destination = root / relative
+        data = (HERE / "wing" / source).read_bytes()
+        if destination.exists() and destination.read_bytes() != data and previous.get(relative) != digest(destination.read_bytes()):
+            raise ValueError("Unknown runtime test fixture; refusing to overwrite: " + relative)
+        destination.write_bytes(data)
+        generated[relative] = digest(data)
     manifest.write_text(json.dumps(generated, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
@@ -107,4 +121,4 @@ if __name__ == "__main__":
     parser.add_argument("wing", type=Path)
     args = parser.parse_args()
     prepare(args.wing.resolve(strict=True))
-    print("Router subscription transport prepared; pinned submodule revision unchanged")
+    print("Router backend additions prepared; pinned submodule revisions unchanged")

@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.6.9'
+        default: '0.6.10'
         required: true
 
 permissions:
@@ -110,6 +110,11 @@ jobs:
       - name: BTF parser tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
+      - name: Live TCP and UDP runtime overview regression
+        if: matrix.cpu == 'x86_64'
+        run: |
+          (cd wing && go test -count=1 -v -tags daed_runtime_test ./dae ./graphql/service/general)
+          (cd wing/dae-core && go test -count=1 ./control -run 'Runtime|RelayTCP|Tracked|ActiveTCP')
       - name: Subscription SOCKS fallback, import, cron and failure preservation tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test -count=1 -v ./graphql/service/subscription

@@ -1,7 +1,14 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.9](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.9)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.10](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.10)。
+
+## 0.6.10 运行概况流量修复
+
+- 修复代理可正常联网、连接数有值，但速度、累计流量和趋势始终为零的问题：面板改为读取当前代理实例的统计，停止读取已废弃的全局计数器。
+- 未启动代理时返回空统计；切换图表时间范围不会重置累计流量。重启代理或应用配置建立新实例后，从新实例重新累计。
+- 增加真实 TCP 双向传输、UDP 回包、图表采样和实例切换回归。测试专用夹具不进入发行程序，也不会加载宿主 eBPF。
+- 无前端布局变更、新依赖或数据库迁移，保留节点、订阅、群组、配置和偏好。
 
 ## 0.6.9 批量测试恢复与多选
 
@@ -74,7 +81,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.9/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.10/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
@@ -244,3 +251,13 @@ feed 提交固定在 `sdk-matrix.json`，原生打包后逐一验证文件、架
 手动工作流生成 artifact，测试版仍需维护者核验并发布为 prerelease。
 
 自动测试、原生 uhttpd / rpcd 和浏览器验证的范围见 [VALIDATION.md](./VALIDATION.md)。
+
+运行概况维护回归（Linux，已初始化固定子模块并具备 Go/Clang 构建环境）：
+
+```sh
+python3 openwrt/prepare-wing.py wing
+(cd wing && go test -count=1 -v -tags daed_runtime_test ./dae ./graphql/service/general)
+(cd wing/dae-core && go test -count=1 ./control -run 'Runtime|RelayTCP|Tracked|ActiveTCP')
+```
+
+`daed_runtime_test` 仅用于测试，正式构建不启用该标签。
