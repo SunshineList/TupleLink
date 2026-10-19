@@ -28,7 +28,7 @@ service_triggers''')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), [
             'config daed',
-            'interface.* home /etc/init.d/daed reload',
+            'interface.up home /etc/init.d/daed reload',
             'interface.up wan /etc/init.d/daed reload',
             'interface.up wan6 /etc/init.d/daed reload',
         ])
@@ -38,6 +38,18 @@ service_triggers''')
             result = self.shell('restart() { echo restart >> /tmp/reloads; return ' + str(code) + '; }; reload_service')
             self.assertEqual(result.returncode, code, result.stderr)
         self.assertEqual((self.router.root / 'tmp/reloads').read_text().splitlines(), ['restart', 'restart'])
+
+    def test_routine_interface_updates_do_not_interrupt_connections(self):
+        for network in ('lan', 'wan', 'wan6'):
+            result = self.shell('''event=interface.update; network=''' + network + '''
+procd_add_reload_trigger() { :; }
+procd_add_interface_trigger() {
+ [ "$2" = "$network" ] || return 0
+ case "$event" in $1) touch /tmp/unexpected-restart ;; esac
+}
+service_triggers''')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((self.router.root / 'tmp/unexpected-restart').exists(), network)
 
     def test_custom_uplink_names_are_used_for_recovery(self):
         for option, value in (('wan_network', 'uplink'), ('wan6_network', 'uplink6')):

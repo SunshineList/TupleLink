@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/daeuniverse/dae-wing/common"
 	"github.com/daeuniverse/dae-wing/db"
+	"github.com/graph-gophers/graphql-go"
 	"gorm.io/gorm"
 )
 
@@ -28,6 +30,117 @@ func updateFixture(t *testing.T, link string) db.Subscription {
 		t.Fatal(err)
 	}
 	return sub
+}
+
+func TestRouterSubscriptionCronUsesCommittedSettings(t *testing.T) {
+	sub := updateFixture(t, "https://fixture.invalid/subscription")
+	d := db.DB(context.Background())
+	if err := d.Model(&sub).Updates(map[string]interface{}{"cron_enable": true, "cron_exp": "1 0 * * *"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	AddUpdateScheduler(context.Background(), sub.ID)
+	t.Cleanup(func() { RemoveUpdateScheduler(sub.ID) })
+	if _, err := UpdateCron(context.Background(), common.EncodeCursor(sub.ID), "2 0 * * *", true); err != nil {
+		t.Fatal(err)
+	}
+	schedulerMu.RLock()
+	scheduler := schedulerCache[sub.ID]
+	schedulerMu.RUnlock()
+	if scheduler == nil {
+		t.Fatal("enabled scheduler missing")
+	}
+	deadline := time.Now().Add(time.Second)
+	for scheduler.Jobs()[0].NextRun().IsZero() && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if next := scheduler.Jobs()[0].NextRun(); next.IsZero() || next.Minute() != 2 {
+		t.Fatal("scheduler used stale settings:", next)
+	}
+	if _, err := UpdateCron(context.Background(), common.EncodeCursor(sub.ID), "2 0 * * *", false); err != nil {
+		t.Fatal(err)
+	}
+	schedulerMu.RLock()
+	remaining := schedulerCache[sub.ID]
+	schedulerMu.RUnlock()
+	if remaining != nil {
+		t.Fatal("disabled scheduler remained active")
+	}
+}
+
+func TestRouterSubscriptionCronFailedSavePreservesScheduler(t *testing.T) {
+	sub := updateFixture(t, "https://fixture.invalid/subscription")
+	d := db.DB(context.Background())
+	if err := d.Model(&sub).Updates(map[string]interface{}{"cron_enable": true, "cron_exp": "1 0 * * *"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	AddUpdateScheduler(context.Background(), sub.ID)
+	t.Cleanup(func() { RemoveUpdateScheduler(sub.ID) })
+	schedulerMu.RLock()
+	previous := schedulerCache[sub.ID]
+	schedulerMu.RUnlock()
+	if previous == nil {
+		t.Fatal("fixture scheduler missing")
+	}
+	const callback = "router:cron_commit_failure"
+	if err := d.Callback().Update().After("gorm:update").Register(callback, func(query *gorm.DB) {
+		if query.Statement.Table == "subscriptions" {
+			query.Rollback()
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer d.Callback().Update().Remove(callback)
+	if _, err := UpdateCron(context.Background(), common.EncodeCursor(sub.ID), "2 0 * * *", true); err == nil {
+		t.Fatal("failed save reported success")
+	}
+	var saved db.Subscription
+	if err := d.First(&saved, sub.ID).Error; err != nil || saved.CronExp != "1 0 * * *" {
+		t.Fatal("failed save changed persisted schedule", err)
+	}
+	schedulerMu.RLock()
+	current := schedulerCache[sub.ID]
+	schedulerMu.RUnlock()
+	if current != previous {
+		t.Fatal("failed save replaced the healthy scheduler")
+	}
+}
+
+func TestRouterSubscriptionRemoveFailedSavePreservesScheduler(t *testing.T) {
+	sub := updateFixture(t, "https://fixture.invalid/subscription")
+	d := db.DB(context.Background())
+	if err := d.Model(&sub).Updates(map[string]interface{}{"cron_enable": true, "cron_exp": "1 0 * * *"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	AddUpdateScheduler(context.Background(), sub.ID)
+	t.Cleanup(func() { RemoveUpdateScheduler(sub.ID) })
+	schedulerMu.RLock()
+	previous := schedulerCache[sub.ID]
+	schedulerMu.RUnlock()
+	if previous == nil {
+		t.Fatal("fixture scheduler missing")
+	}
+	const callback = "router:remove_commit_failure"
+	if err := d.Callback().Delete().After("gorm:delete").Register(callback, func(query *gorm.DB) {
+		if query.Statement.Table == "subscriptions" {
+			query.Rollback()
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer d.Callback().Delete().Remove(callback)
+	if _, err := Remove(context.Background(), []graphql.ID{common.EncodeCursor(sub.ID)}); err == nil {
+		t.Fatal("failed removal reported success")
+	}
+	var saved db.Subscription
+	if err := d.First(&saved, sub.ID).Error; err != nil {
+		t.Fatal("failed removal deleted subscription", err)
+	}
+	schedulerMu.RLock()
+	current := schedulerCache[sub.ID]
+	schedulerMu.RUnlock()
+	if current != previous {
+		t.Fatal("failed removal stopped the healthy scheduler")
+	}
 }
 
 func TestRouterSubscriptionUpdateRejectsDeletedOrEditedDownload(t *testing.T) {

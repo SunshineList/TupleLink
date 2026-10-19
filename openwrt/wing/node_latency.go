@@ -30,6 +30,8 @@ const latencyRequestTimeout = 24 * time.Second
 
 var latencyRequestSlot = make(chan struct{}, latencyProbeConcurrency)
 var latencyProbeSlots = make(chan struct{}, latencyProbeConcurrency)
+var latencyOptionSlot = make(chan struct{}, 1)
+var parseLatencyTarget = dialer.ParseTcpCheckOption
 var latencyOptions struct {
 	sync.Mutex
 	global  string
@@ -114,6 +116,12 @@ func latencyProbeOption(ctx context.Context) (*dialer.GlobalOption, error) {
 	if err := db.DB(ctx).Where("selected = ?", true).First(&model).Error; err != nil {
 		return nil, err
 	}
+	select {
+	case latencyOptionSlot <- struct{}{}:
+		defer func() { <-latencyOptionSlot }()
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	// Share successful target resolution across concurrent one-node requests.
 	// A changed configuration bypasses the short cache immediately. Failed DNS
 	// is shared for just one second to avoid serial retries by concurrent callers.
@@ -132,7 +140,28 @@ func latencyProbeOption(ctx context.Context) (*dialer.GlobalOption, error) {
 	log := logrus.New()
 	log.SetOutput(io.Discard)
 	option := dialer.NewGlobalOption(&parsed.Global, log)
-	if _, err := option.TcpCheckOptionRaw.Option(); err != nil {
+	// Resolve with the caller's deadline, then pin the resolved families for
+	// this short-lived cache. Option() otherwise starts its own background DNS
+	// request and ignores cancellation while every other test waits for it.
+	target, err := parseLatencyTarget(ctx, option.TcpCheckOptionRaw.Raw, option.TcpCheckOptionRaw.Method, option.TcpCheckOptionRaw.ResolverNetwork)
+	if err == nil {
+		raw := []string{option.TcpCheckOptionRaw.Raw[0]}
+		for _, address := range []netip.Addr{target.Ip4, target.Ip6} {
+			if address.IsValid() {
+				raw = append(raw, address.String())
+			}
+		}
+		if len(raw) == 1 {
+			err = fmt.Errorf("no target addresses")
+		} else {
+			option.TcpCheckOptionRaw.Raw = raw
+			_, err = option.TcpCheckOptionRaw.Option()
+		}
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err != nil {
 		failure := fmt.Errorf("cannot resolve latency check target; check DNS or tcp_check_url")
 		latencyOptions.global, latencyOptions.option, latencyOptions.err, latencyOptions.expires = model.Global, nil, failure, time.Now().Add(time.Second)
 		return nil, failure

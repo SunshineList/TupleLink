@@ -1,9 +1,18 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.16](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.16)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.17](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.17)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.17 保存与连接稳定性
+
+- LAN 的普通地址、前缀等状态更新不再重启代理；保留接口重新上线后的恢复处理，减少已有连接被打断。
+- 节点测试的目标 DNS 解析与排队等待支持取消；取消的请求不缓存为公共失败，后续测试可正常继续。
+- 配置、DNS、路由、群组、节点等写入均检查事务提交结果；保存失败返回错误，异常中断回滚，避免显示保存成功却未生效。
+- 订阅定时设置提交成功后再切换任务；修改或删除失败时保留原有定时任务。
+- 源码补丁先在临时目录完成验证，再更新工作副本；遇到未知修改时拒绝覆盖，避免生成半更新的后端。
+- 保留用户数据，无新依赖或数据库迁移。
 
 ## 0.6.16 连接稳定性
 
@@ -148,7 +157,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/sloby
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.16/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.16
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.17/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.17
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有

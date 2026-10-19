@@ -48,7 +48,7 @@ service_triggers() {
 	config_get wan main wan_network wan
 	config_get wan6 main wan6_network wan6
 	procd_add_reload_trigger daed
-	procd_add_interface_trigger 'interface.*' "$lan" /etc/init.d/daed reload
+	procd_add_interface_trigger 'interface.up' "$lan" /etc/init.d/daed reload
 	# Re-evaluate auto WAN bindings after real uplink reconnection. Ordinary
 	# interface.update notifications must not restart working connections.
 	[ -z "$wan" ] || procd_add_interface_trigger 'interface.up' "$wan" /etc/init.d/daed reload

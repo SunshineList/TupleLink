@@ -7,17 +7,35 @@ and are included in the release source archive. Unknown local edits are refused.
 import argparse
 import hashlib
 import json
+import os
+import re
 from pathlib import Path
 import shutil
+import tempfile
 
 HERE = Path(__file__).resolve().parent
 ORIGINAL = "ae8c0126a163fce0d7c1abea226579c69c9784f65e1e7f95bd1a8e903d450779"
+TRANSACTION_DEFER = '''defer func() {
+		if err == nil {
+			tx.Commit()
+		} else {
+			tx.Rollback()
+		}
+	}()'''
+
+
+def router_transactions(text):
+    text = re.sub(r'(func Update\([^\n]+\)) \(\*Resolver, error\)', r'\1 (result *Resolver, err error)', text)
+    text = text.replace(') (int32, error) {', ') (n int32, err error) {')
+    return text.replace(TRANSACTION_DEFER, 'defer db.FinishTransaction(tx, &err)')
 
 
 def router_auth(text):
-    return (text.replace('ctx := context.Background()', 'ctx := r.Context()')
+    text = (text.replace('ctx := context.Background()', 'ctx := r.Context()')
             .replace('db.DB(context.TODO()).Model(&db.User{})', 'db.DB(r.Context()).Model(&db.User{})')
             .replace('err == nil && time.Now().Before(expireAt.Time)', 'err == nil && expireAt != nil && time.Now().Before(expireAt.Time)'))
+    text = text.replace('\t\ttx2.Commit()', '\t\tif err2 := tx2.Commit().Error; err2 != nil { return fmt.Errorf("%w; %v", err, err2) }')
+    return text.replace('\ttx.Commit()\n\treturn nil', '\treturn tx.Commit().Error')
 
 
 def router_lifecycle(text):
@@ -38,7 +56,7 @@ def router_lifecycle(text):
     return text.replace('\n\t\t\tWaitForNetwork(log)', '\n\t\t\trouterWaitForNetwork(log)')
 
 
-def prepare(root):
+def _prepare_in_place(root):
     target = root / "graphql/service/subscription"
     source = target / "mutation_utils.go"
     text = source.read_text(encoding="utf-8")
@@ -109,6 +127,22 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
     text = text.replace('http.NewRequest("GET", subscriptionLink, nil)', 'http.NewRequestWithContext(ctx, "GET", subscriptionLink, nil)')
     text = text.replace('// Retry with dae routing.', 'if ctx.Err() != nil { return nil, ctx.Err() }\n\t\t// Retry with dae routing.') if 'if ctx.Err() != nil' not in text else text
     text = text.replace('links, err := fetchLinks(argument.Link, &detectedName)', 'links, err := fetchLinksContext(c.Statement.Context, argument.Link, &detectedName)')
+    # A scheduler must read the committed new row; changing it before commit
+    # reads old cron settings and can replace a healthy job on a failed save.
+    begin, end = text.index('func Remove('), text.index('func Tag(')
+    removal = text[begin:end].replace(TRANSACTION_DEFER, 'defer tx.Rollback()')
+    if 'if err = tx.Commit().Error' not in removal:
+        removal = removal.replace('\tfor _, id := range ids {', '\tif err = tx.Commit().Error; err != nil { return 0, err }\n\n\tfor _, id := range ids {')
+    # A previously prepared copy may already use the shared transaction defer.
+    removal = removal.replace('defer db.FinishTransaction(tx, &err)', 'defer tx.Rollback()')
+    text = text[:begin] + removal + text[end:]
+    begin = text.index('func UpdateCron(')
+    cron = text[begin:]
+    cron = cron.replace(TRANSACTION_DEFER, 'defer tx.Rollback()')
+    if 'schedulerCtx, cancel := context.WithTimeout' not in cron:
+        cron = cron.replace('// Update scheduler\n', '// Update scheduler only after a successful commit.\n\tif err = tx.Commit().Error; err != nil { return nil, err }\n\tschedulerCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)\n\tdefer cancel()\n')
+        cron = cron.replace('AddUpdateScheduler(ctx, id)', 'AddUpdateScheduler(schedulerCtx, id)')
+    text = router_transactions(text[:begin]) + cron
     source.write_text(text, encoding="utf-8", newline="\n")
     generated = {"mutation_utils.go": digest(text.encode())}
     for name in ("subscription_transport.go", "subscription_transport_test.go", "subscription_name.go", "subscription_name_test.go", "subscription_update.go", "subscription_update_test.go"):
@@ -120,6 +154,11 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         generated[name] = digest(data)
     # Keep latency fixes in the release source, without changing submodule pins.
     patches = {
+        "graphql/service/config/mutation_utils.go": ("f57a5aa16fec110ff2906046aed26897d7ca22308200a45d85394602ab8113c3", router_transactions),
+        "graphql/service/dns/mutation_utils.go": ("229f064ba7f4004f1bbdf2c0494f0cffc7cfd57c4c692c0e0f00b704351a1e89", router_transactions),
+        "graphql/service/routing/mutation_utils.go": ("651bbbccbf1288da50dfffce15f70ae02434ac1b84be423574f54a382798c2a7", router_transactions),
+        "graphql/service/group/mutation_utils.go": ("e4cd1987cdeb9b0bfbb93c17c51c0d38fbbb5ba80fe8e18cc028edebdc0a9120", router_transactions),
+        "graphql/service/node/mutation_utils.go": ("0f0fcfb9b102f72b907be4981700db4379d6d4ed5f610d0864ab49e8ace2c5fd", router_transactions),
         "cmd/run.go": ("40511c13085d052870c5688199287ee5ae8285e8a61e6be628cb7fe6315d8566", router_auth),
         "dae/run.go": ("748a95abac2a3dda0741da10d8278cd1dd8e792061d3a0f02f0fab08dcb6e233", router_lifecycle),
         "dae/httpclient.go": ("ea4b8ec3cabf79d8d08c74931c7ed8877df7eae8da4855b73ccc2cf86f2a86fd", lambda value: (HERE / "wing/httpclient.go").read_text(encoding="utf-8")),
@@ -141,7 +180,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         elif relative in ("graphql/service/node/latency_mutation_utils.go", "dae/runtime.go", "dae/httpclient.go"):
             replacement = "node_latency.go" if relative.endswith("latency_mutation_utils.go") else relative.split("/")[-1]
             data = (HERE / "wing" / replacement).read_bytes()
-        elif relative in ("cmd/run.go", "dae/run.go"):
+        elif relative in ("cmd/run.go", "dae/run.go") or transform == router_transactions:
             data = transform(data.decode()).encode()
         destination.write_bytes(data)
         generated[relative] = digest(data)
@@ -154,6 +193,13 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
     subscription_mutations = subscription_mutations.replace('ctx, cancel := context.WithTimeout(', 'schedulerCtx, cancel := context.WithTimeout(').replace('subscription.UpdateAll(ctx)', 'subscription.UpdateAll(schedulerCtx)')
     subscription_mutations = subscription_mutations.replace('UpdateSubscription(args *struct', 'UpdateSubscription(ctx context.Context, args *struct').replace('subscription.Update(context.TODO(), args.ID)', 'subscription.Update(ctx, args.ID)')
     mutation_text = mutation_text[:begin] + subscription_mutations + mutation_text[end:]
+    mutation_text = mutation_text.replace(TRANSACTION_DEFER, 'defer db.FinishTransaction(tx, &err)')
+    mutation_text = mutation_text.replace('\ttx.Commit()\n\treturn result, nil', '\tif err := tx.Commit().Error; err != nil { return nil, err }\n\treturn result, nil')
+    begin, end = mutation_text.index('func (r *MutationResolver) Run('), mutation_text.index('func (r *MutationResolver) CreateDns(')
+    run = mutation_text[begin:end]
+    run = run.replace('tx := db.BeginTx(context.TODO())\n', 'tx := db.BeginTx(context.TODO())\n\tif tx.Error != nil { return 0, tx.Error }\n\tdefer tx.Rollback()\n') if 'defer tx.Rollback()' not in run else run
+    run = run.replace('\ttx.Commit()\n', '\tif err := tx.Commit().Error; err != nil { return 0, err }\n')
+    mutation_text = mutation_text[:begin] + run + mutation_text[end:]
     mutation_file.write_text(mutation_text, encoding="utf-8", newline="\n")
     generated["graphql/mutation.go"] = digest(mutation_text.encode())
     destination = root / "graphql/service/node/router_latency_test.go"
@@ -164,12 +210,15 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
     destination.write_bytes(data)
     generated[key] = digest(data)
     for relative, source in (
+        ("db/router_transaction.go", "transaction.go"),
+        ("graphql/router_transactions_test.go", "transaction_test.go"),
         ("cmd/router_http_context_test.go", "http_context_test.go"),
         ("dae/router_network_ready.go", "network_ready.go"),
         ("dae/router_network_ready_test.go", "network_ready_test.go"),
         ("dae/router_httpclient_test.go", "httpclient_test.go"),
         ("graphql/service/node/router_latency_cache.go", "node_latency_cache.go"),
         ("graphql/service/node/router_latency_cache_test.go", "node_latency_cache_test.go"),
+        ("graphql/service/node/router_latency_option_test.go", "node_latency_option_test.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat.go", "protocol_compat.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat_test.go", "protocol_compat_test.go"),
         ("dae-core/common/subscription/router_sip008.go", "sip008.go"),
@@ -201,6 +250,51 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         destination.write_bytes(data)
         generated[relative] = digest(data)
     manifest.write_text(json.dumps(generated, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+def prepare(root):
+    # Validate/transform the small reviewed input set in isolation first. An
+    # unknown edit in a late file must not leave earlier sources half updated.
+    inputs = (
+        "cmd/run.go", "dae/run.go", "dae/httpclient.go", "dae/runtime.go",
+        "graphql/mutation.go", "graphql/service/config/mutation_utils.go",
+        "graphql/service/dns/mutation_utils.go", "graphql/service/routing/mutation_utils.go",
+        "graphql/service/group/mutation_utils.go", "graphql/service/node/mutation_utils.go",
+        "graphql/service/node/latency_mutation_utils.go", "graphql/service/node/latency_cache.go",
+        "graphql/service/subscription/mutation_utils.go",
+        "dae-core/component/outbound/dialer/dialer.go", "dae-core/component/outbound/dialer/register.go",
+        "dae-core/common/subscription/subscription.go",
+    )
+    manifest = root / ".daed-openwrt-prepare.json"
+    previous = json.loads(manifest.read_text()) if manifest.exists() else {}
+    def relative(key):
+        return key if "/" in key else "graphql/service/subscription/" + key
+    with tempfile.TemporaryDirectory(prefix=".nailink-prepare-", dir=root.parent) as temporary:
+        stage = Path(temporary)
+        staged = set(inputs) | {relative(key) for key in previous}
+        for name in staged:
+            source = root / name
+            if source.is_file():
+                destination = stage / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+        for directory in ("db", "dae-core/control"):
+            (stage / directory).mkdir(parents=True, exist_ok=True)
+        if manifest.exists():
+            shutil.copy2(manifest, stage / manifest.name)
+        _prepare_in_place(stage)
+        generated = json.loads((stage / manifest.name).read_text())
+        for key in generated:
+            name = relative(key)
+            destination = root / name
+            if name not in staged and destination.exists() and destination.read_bytes() != (stage / name).read_bytes():
+                raise ValueError("Unknown existing backend addition; refusing to overwrite: " + name)
+        for key in generated:
+            name = relative(key)
+            destination = root / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(stage / name, destination)
+        os.replace(stage / manifest.name, manifest)
 
 
 if __name__ == "__main__":

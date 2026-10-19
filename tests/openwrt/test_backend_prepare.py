@@ -11,6 +11,11 @@ SPEC = importlib.util.spec_from_file_location("prepare_wing", ROOT / "openwrt/pr
 PREPARE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PREPARE)
 SOURCES = (
+    "graphql/service/config/mutation_utils.go",
+    "graphql/service/dns/mutation_utils.go",
+    "graphql/service/routing/mutation_utils.go",
+    "graphql/service/group/mutation_utils.go",
+    "graphql/service/node/mutation_utils.go",
     "cmd/run.go",
     "dae/run.go",
     "dae/httpclient.go",
@@ -36,6 +41,7 @@ class BackendPrepareTests(unittest.TestCase):
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text((ROOT / "wing" / relative).read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
         (self.root / "dae-core/control").mkdir(parents=True)
+        (self.root / "db").mkdir(parents=True)
 
     def test_runtime_patch_is_reproducible_and_idempotent(self):
         PREPARE.prepare(self.root)
@@ -64,6 +70,31 @@ class BackendPrepareTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown runtime test fixture"):
             PREPARE.prepare(self.root)
         self.assertEqual(path.read_bytes(), before)
+
+    def test_untracked_addition_is_preserved_before_first_prepare(self):
+        path = self.root / "db/router_transaction.go"
+        path.write_bytes(b"// independent local addition\n")
+        before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        with self.assertRaisesRegex(ValueError, "Unknown existing backend addition"):
+            PREPARE.prepare(self.root)
+        after = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+
+    def test_late_unknown_edit_does_not_partially_upgrade_sources(self):
+        PREPARE.prepare(self.root)
+        earlier = self.root / "dae/runtime.go"
+        earlier.write_bytes(earlier.read_bytes() + b"// previous reviewed runtime\n")
+        manifest = self.root / ".daed-openwrt-prepare.json"
+        state = json.loads(manifest.read_text())
+        state["dae/runtime.go"] = hashlib.sha256(earlier.read_bytes()).hexdigest()
+        manifest.write_text(json.dumps(state))
+        later = self.root / "dae-core/control/router_runtime_fixture.go"
+        later.write_bytes(later.read_bytes() + b"// unknown late change\n")
+        before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        with self.assertRaisesRegex(ValueError, "Unknown runtime test fixture"):
+            PREPARE.prepare(self.root)
+        after = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
 
     def test_unknown_lifecycle_edits_are_preserved(self):
         PREPARE.prepare(self.root)
