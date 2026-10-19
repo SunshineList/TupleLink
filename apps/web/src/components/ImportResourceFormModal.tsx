@@ -20,8 +20,8 @@ const schema = z.object({
   resources: z
     .array(
       z.object({
-        link: z.string().min(1, 'Link is required'),
-        tag: z.string().min(1, 'Tag is required'),
+        link: z.string().trim().min(1, 'Link is required'),
+        tag: z.string().trim(),
       }),
     )
     .min(1, 'At least one resource is required'),
@@ -115,9 +115,12 @@ export function ImportResourceFormModal({
             <fieldset disabled={isSubmitting}>
               <div className="flex flex-col gap-5">
                 {fields.map((field, i) => (
-                  <div key={field.id} className="flex gap-2.5">
+                  <div
+                    key={field.id}
+                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_36px] items-end gap-2.5 sm:grid-cols-[minmax(0,1fr)_176px_36px]"
+                  >
                     <Input
-                      wrapperClassName="flex-1"
+                      wrapperClassName="min-w-0 col-span-2 sm:col-span-1"
                       withAsterisk
                       label={t('link')}
                       value={resources[i]?.link || ''}
@@ -125,9 +128,9 @@ export function ImportResourceFormModal({
                       error={errors.resources?.[i]?.link?.message}
                     />
                     <Input
-                      wrapperClassName="w-24"
-                      withAsterisk
-                      label={t('tag')}
+                      wrapperClassName="min-w-0"
+                      label={t('importResource.optionalTag')}
+                      placeholder={t('importResource.autoName')}
                       value={resources[i]?.tag || ''}
                       onChange={(e) => setValue(`resources.${i}.tag`, e.target.value)}
                       error={errors.resources?.[i]?.tag?.message}

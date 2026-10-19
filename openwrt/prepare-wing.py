@@ -54,8 +54,21 @@ def prepare(root):
         text = text.replace('\n\t// Resolve node links.', '\n\tif len(b) > 4<<20 { return nil, fmt.Errorf("subscription response exceeds 4 MiB") }\n\n\t// Resolve node links.', 1)
         text = marker + text
         source.write_text(text, encoding="utf-8", newline="\n")
+    # Carry successful-response metadata only for a new import; updates keep names.
+    text = text.replace("func fetchLinksDirect(subscriptionLink string)", "func fetchLinksDirect(subscriptionLink string, names ...*string)")
+    text = text.replace("timeout/2)", "timeout/2, names...)")
+    text = text.replace("transport http.RoundTripper, timeout time.Duration)", "transport http.RoundTripper, timeout time.Duration, names ...*string)")
+    begin, end = text.index("func _fetchLinks("), text.index("func Import(")
+    fetch = text[begin:end]
+    if "detectedSubscriptionName(resp.Header" not in fetch:
+        fetch = fetch.replace("\treturn links, nil", "\tif len(names) > 0 && names[0] != nil { *names[0] = detectedSubscriptionName(resp.Header, subscriptionLink) }\n\treturn links, nil", 1)
+        text = text[:begin] + fetch + text[end:]
+    text = text.replace("links, err := fetchLinks(argument.Link)", "var detectedName string\n\tlinks, err := fetchLinks(argument.Link, &detectedName)")
+    if "argument.Tag = &detectedName" not in text:
+        text = text.replace("\t/// Create a subscription model.", '\tif argument.Tag == nil && detectedName != "" { argument.Tag = &detectedName }\n\t/// Create a subscription model.')
+    source.write_text(text, encoding="utf-8", newline="\n")
     generated = {"mutation_utils.go": digest(text.encode())}
-    for name in ("subscription_transport.go", "subscription_transport_test.go"):
+    for name in ("subscription_transport.go", "subscription_transport_test.go", "subscription_name.go", "subscription_name_test.go"):
         destination = target / name
         data = (HERE / "wing" / name).read_bytes()
         if destination.exists() and destination.read_bytes() != data and previous.get(name) != digest(destination.read_bytes()):

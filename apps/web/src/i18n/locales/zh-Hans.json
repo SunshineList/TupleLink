@@ -350,7 +350,21 @@
     "color": "配色主题",
     "system": "跟随系统",
     "light": "浅色",
-    "dark": "深色"
+    "dark": "深色",
+    "names": {
+      "amber": "暖金",
+      "ocean": "海洋蓝",
+      "rose": "玫瑰",
+      "emerald": "翡翠",
+      "violet": "紫罗兰",
+      "slate": "石墨",
+      "sunset": "日落",
+      "teal": "青绿",
+      "sky": "晴空",
+      "indigo": "靛蓝",
+      "coffee": "咖啡",
+      "olive": "橄榄"
+    }
   },
   "tlsImplementation": "TLS 实现",
   "tproxyPort": "透明代理端口",
@@ -515,5 +529,9 @@
     "timeRange": "统计时间范围",
     "totalTrafficShort": "本次流量",
     "statsUnavailable": "数据暂不可用"
+  },
+  "importResource": {
+    "optionalTag": "标签（可选）",
+    "autoName": "自动识别名称"
   }
 }

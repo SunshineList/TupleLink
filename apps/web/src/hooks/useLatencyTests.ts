@@ -13,6 +13,7 @@ export function useLatencyTests() {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState({ completed: 0, total: 0 })
   const [error, setError] = useState('')
+  const [scope, setScope] = useState('global')
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -21,11 +22,12 @@ export function useLatencyTests() {
     }
   }, [])
   const test = useCallback(
-    async (ids: string[]) => {
+    async (ids: string[], origin = 'global') => {
       if (busyRef.current || !ids.length) return
       busyRef.current = true
       stopped.current = false
       setError('')
+      setScope(origin)
       setBusy(true)
       setProgress({ completed: 0, total: new Set(ids).size })
       try {
@@ -64,6 +66,7 @@ export function useLatencyTests() {
     pending,
     busy,
     progress,
+    scope,
     error,
     stop,
   }

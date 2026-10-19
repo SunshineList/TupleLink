@@ -1,15 +1,18 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.3](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.3)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.4](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.4)。
 
-## 0.6.3 群组选择窗口内测速
+## 0.6.4 配色、布局和自动命名
 
-- 添加节点时，可单独测试每个候选节点，也可搜索后批量测试当前结果；选择和测速是独立操作，结果实时显示。
-- 添加订阅组时，可在选择前测试整组，查看已测/可用数量和最低延迟；选中订阅后，预览节点支持单测和按名称正则批量测试。
-- 测速结果沿用绿、黄、红标记，移除手动节点和订阅节点列表的颜色说明文字。
-- 两个窗口沿用现有并发队列，关闭时停止继续提交排队节点，已完成结果保留并同步到列表；测速不改变群组绑定。
-- 保留概况默认展示、群组卡片点击和快捷添加、四项菜单、所有现有配置及界面偏好。
+- 手动节点、订阅及订阅预览的测速进度只在发起区域显示，共享结果与现有并发队列；测速不再显示成“正在保存更改”。
+- 顶部“主题”提供 12 套配色预览，支持浅色、深色及跟随系统，选择在当前浏览器中保留；新增晴空、靛蓝、咖啡、橄榄配色。
+- 管理面板群组栏适度加宽，概况仍在左侧默认展示；群组和成员的长名称可换行，不再依赖悬停查看。
+- 导入节点和订阅时，标签选填。节点沿用分享链接中的名称；订阅优先读取 `Profile-Title`（支持 Base64）和 `Content-Disposition` 文件名，回退到链接备注或域名，不采用可能含密钥的 URL 路径及查询参数。
+- 自动命名仅用于新增时留空的标签，手动填写优先，订阅更新保留已有名称。没有增加额外网页请求或改变原有下载出口策略。
+- 保留原有节点、订阅、群组绑定、规则、排序及配色偏好，不重建数据库。
+
+订阅名称头的格式参考 [Hiddify 订阅协议文档](https://hiddify.com/app/URL-Scheme/)；本实现仍保持现有 Base64/SIP008 节点订阅格式。
 
 ## 使用
 
@@ -32,7 +35,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.3/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.4/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

@@ -812,6 +812,7 @@ export function useTestNodeLatenciesMutation() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    mutationKey: ['node-latency-test'],
     mutationFn: async (ids?: string[]) => {
       const data = await gqlClient.request<{ testNodeLatencies: NodeLatencyProbeResult[] }, { ids?: string[] }>(
         `

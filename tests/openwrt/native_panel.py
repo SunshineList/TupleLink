@@ -102,6 +102,11 @@ def main():
             body = base64.b64encode("\n".join(links).encode())
             self.send_response(200)
             self.send_header("Content-Type", "text/plain")
+            if self.path.startswith("/sub-named"):
+                self.send_header("Profile-Title", "base64:" + base64.b64encode("自动订阅名称".encode()).decode())
+                self.send_header("Content-Disposition", 'attachment; filename="fallback.yaml"')
+            elif self.path.startswith("/sub-filename"):
+                self.send_header("Content-Disposition", "inline; filename*=UTF-8''%E6%96%87%E4%BB%B6%E5%90%8D%E7%A7%B0.yaml")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

@@ -55,7 +55,7 @@ function usePickerTests(tests: LatencyTests) {
       if (owned.current || tests.busy || !ids.length) return
       owned.current = true
       try {
-        await tests.test(ids)
+        await tests.test(ids, 'group-picker')
       } finally {
         owned.current = false
       }
@@ -285,7 +285,7 @@ export function GroupAddNodesModal({
               {t('latency.testFiltered')}
             </Button>
           </div>
-          <LatencyStatus tests={tests} />
+          <LatencyStatus tests={tests} scope="group-picker" />
         </div>
         <ScrollableDialogBody>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-3">
@@ -482,7 +482,7 @@ export function GroupAddSubscriptionsModal({
             icon={<Search className="h-4 w-4" />}
           />
 
-          <LatencyStatus tests={tests} />
+          <LatencyStatus tests={tests} scope="group-picker" />
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-3">
             {filteredItems.map((item) => {
               const checked = selectedIds.includes(item.id)

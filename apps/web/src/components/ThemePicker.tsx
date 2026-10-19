@@ -21,12 +21,16 @@ interface ThemePreviewCardProps {
 }
 
 function ThemePreviewCard({ theme, isDark, isSelected, onClick }: ThemePreviewCardProps) {
+  const { t } = useTranslation()
+  const name = t(`theme.names.${theme.id}`, { defaultValue: theme.name })
   const colors = isDark ? theme.dark : theme.light
 
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={name}
+      aria-pressed={isSelected}
       className={cn(
         'relative flex flex-col gap-2 rounded-lg border-2 p-3 transition-all hover:scale-[1.02]',
         isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50',
@@ -46,7 +50,7 @@ function ThemePreviewCard({ theme, isDark, isSelected, onClick }: ThemePreviewCa
 
       {/* Theme name */}
       <span className="text-xs font-medium" style={{ color: colors.foreground }}>
-        {theme.name}
+        {name}
       </span>
 
       {/* Color preview */}
@@ -107,6 +111,8 @@ function ThemeModeToggle({ className }: ThemeModeToggleProps) {
         <button
           key={value}
           type="button"
+          aria-label={label}
+          aria-pressed={themeMode === value}
           onClick={() => setThemeMode(value)}
           className={cn(
             'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
@@ -124,7 +130,7 @@ function ThemeModeToggle({ className }: ThemeModeToggleProps) {
 }
 
 interface ThemePickerProps {
-  variant?: 'icon' | 'button'
+  variant?: 'icon' | 'button' | 'compact'
 }
 
 export function ThemePicker({ variant = 'icon' }: ThemePickerProps) {
@@ -169,6 +175,25 @@ export function ThemePicker({ variant = 'icon' }: ThemePickerProps) {
       </div>
     </div>
   )
+
+  if (variant === 'compact') {
+    return (
+      <Fragment>
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)} aria-label={t('theme.title')}>
+          <Palette className="h-4 w-4" style={{ color: currentColors.primary }} />
+          <span>{t('theme.title')}</span>
+        </Button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl" data-theme-picker>
+            <DialogHeader>
+              <DialogTitle>{t('theme.title')}</DialogTitle>
+            </DialogHeader>
+            {content}
+          </DialogContent>
+        </Dialog>
+      </Fragment>
+    )
+  }
 
   // Button variant for mobile menu - shows full width button with text
   if (variant === 'button') {

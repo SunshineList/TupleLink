@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useGeneralQuery, useRunMutation } from '~/apis'
+import { ThemePicker } from '~/components/ThemePicker'
 import { Button } from '~/components/ui/button'
 
 export function RouterHeader() {
@@ -18,7 +19,8 @@ export function RouterHeader() {
         : t('panel.dashboard')
   const query = useGeneralQuery()
   const run = useRunMutation()
-  const saving = useIsMutating() > 0
+  const saving =
+    useIsMutating({ predicate: (mutation) => mutation.options.mutationKey?.[0] !== 'node-latency-test' }) > 0
   const [operation, setOperation] = useState<'apply' | 'toggle'>('toggle')
   const [failed, setFailed] = useState(false)
   const running = query.data?.general.dae.running ?? false
@@ -42,6 +44,7 @@ export function RouterHeader() {
           <h1 className="text-base font-semibold tracking-tight">{title}</h1>
         </div>
         <div className="router-toolbar-actions flex flex-wrap items-center gap-2">
+          <ThemePicker variant="compact" />
           <span
             role="status"
             className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${running ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}

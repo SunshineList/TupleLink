@@ -350,7 +350,21 @@
     "color": "Color Theme",
     "system": "System",
     "light": "Light",
-    "dark": "Dark"
+    "dark": "Dark",
+    "names": {
+      "amber": "Amber",
+      "ocean": "Ocean",
+      "rose": "Rose",
+      "emerald": "Emerald",
+      "violet": "Violet",
+      "slate": "Slate",
+      "sunset": "Sunset",
+      "teal": "Teal",
+      "sky": "Sky",
+      "indigo": "Indigo",
+      "coffee": "Coffee",
+      "olive": "Olive"
+    }
   },
   "tlsImplementation": "TLS Implementation",
   "tproxyPort": "Transparent Proxy Port",
@@ -515,5 +529,9 @@
     "timeRange": "Time range",
     "totalTrafficShort": "Session traffic",
     "statsUnavailable": "Updates unavailable"
+  },
+  "importResource": {
+    "optionalTag": "Label (optional)",
+    "autoName": "Detect automatically"
   }
 }

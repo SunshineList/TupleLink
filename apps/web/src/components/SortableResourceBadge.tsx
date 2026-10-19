@@ -45,17 +45,20 @@ export function SortableResourceBadge({
         <GripVertical className="h-4 w-4 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground/70" />
       </div>
 
-      {/* Protocol badge */}
-      {protocol && (
-        <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide rounded bg-primary/10 text-primary">
-          {protocol}
-        </span>
-      )}
-
-      {/* Main content */}
       <div className="flex-1 min-w-0">
-        <span className="text-xs font-medium truncate block">{name}</span>
-        {address && <span className="text-[10px] text-muted-foreground truncate block mt-0.5">{address}</span>}
+        {protocol && (
+          <span className="mb-1 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
+            {protocol}
+          </span>
+        )}
+        <span data-group-member-name className="block text-xs font-medium leading-relaxed [overflow-wrap:anywhere]">
+          {name}
+        </span>
+        {address && (
+          <span className="mt-0.5 block truncate text-[10px] text-muted-foreground" title={address}>
+            {address}
+          </span>
+        )}
       </div>
 
       {meta && <span className="shrink-0 text-[10px] font-medium text-primary">{meta}</span>}

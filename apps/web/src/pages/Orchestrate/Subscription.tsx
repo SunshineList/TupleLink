@@ -102,6 +102,7 @@ export function SubscriptionResource({
                 onClick={() =>
                   latencyTests.test(
                     sortedSubscriptions.flatMap((subscription) => subscription.nodes.edges.map((node) => node.id)),
+                    'subscriptions',
                   )
                 }
                 aria-label={t('latency.testSubscriptions')}
@@ -129,7 +130,7 @@ export function SubscriptionResource({
         </Fragment>
       }
     >
-      <LatencyStatus tests={latencyTests} />
+      <LatencyStatus tests={latencyTests} scope="subscriptions" />
       {viewing && (
         <SubscriptionNodes
           key={viewing.id}
@@ -273,7 +274,9 @@ export function SubscriptionResource({
         opened={openedImportSubscriptionFormModal}
         onClose={closeImportSubscriptionFormModal}
         handleSubmit={async (values) => {
-          await importSubscriptionsMutation.mutateAsync(values.resources.map(({ link, tag }) => ({ link, tag })))
+          await importSubscriptionsMutation.mutateAsync(
+            values.resources.map(({ link, tag }) => ({ link, tag: tag.trim() || undefined })),
+          )
         }}
       />
 

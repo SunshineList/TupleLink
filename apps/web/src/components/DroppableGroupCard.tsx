@@ -140,10 +140,10 @@ export function DroppableGroupCard({
                 </SimpleTooltip>
               </div>
             ) : (
-              <h3 className="min-w-0 flex-1 text-sm font-semibold" title={name}>
+              <h3 className="min-w-0 basis-[140px] flex-1 text-sm font-semibold" title={name}>
                 <button
                   type="button"
-                  className="block w-full truncate py-1 text-left"
+                  className="block w-full py-1 text-left [overflow-wrap:anywhere]"
                   aria-expanded={!collapsed}
                   aria-controls={membersId}
                   aria-label={`${t(collapsed ? 'actions.expand' : 'collapse')} ${t('group')} ${name}`}
@@ -212,7 +212,7 @@ export function DroppableGroupCard({
             </div>
           </div>
           {summary && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground [&>span]:whitespace-nowrap">
+            <div data-group-summary className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               {summary}
             </div>
           )}

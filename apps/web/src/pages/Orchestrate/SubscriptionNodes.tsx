@@ -95,6 +95,8 @@ export function SubscriptionNodes({
   latencies: Record<string, NodeLatencyProbeResult>
 }) {
   const { t } = useTranslation()
+  const scope = `subscription:${subscription.id}`
+  const test = useCallback((ids: string[]) => tests.test(ids, scope), [tests.test, scope])
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<'custom' | 'latency'>('custom')
   const [adding, setAdding] = useState<{ id: string; name: string; type: 'node' } | null>(null)
@@ -105,6 +107,7 @@ export function SubscriptionNodes({
   const gridRef = useRef<HTMLDivElement>(null)
   const library = useMemo(() => buildNodeLibrary([], [subscription]), [subscription])
   const detail = library.find(({ node }) => node.id === detailId)?.node
+  const nestedOpen = !!detail || qrOpen || !!adding
   const filtered = useMemo(
     () => filterNodeLibrary(library, { ...defaultNodeFilters, search, sort }, latencies),
     [library, search, sort, latencies],
@@ -127,10 +130,20 @@ export function SubscriptionNodes({
       <Dialog
         open
         onOpenChange={(open) => {
-          if (!open) onClose()
+          if (open) return
+          if (qrOpen) setQrOpen(false)
+          else if (adding) setAdding(null)
+          else if (detail) setDetailId(null)
+          else onClose()
         }}
       >
-        <DialogContent className="subscription-browser" data-subscription-browser={subscription.id}>
+        <DialogContent
+          className="subscription-browser"
+          data-subscription-browser={subscription.id}
+          onInteractOutside={(event) => {
+            if (nestedOpen || (event.target as Element).closest('[data-slot="sheet-content"]')) event.preventDefault()
+          }}
+        >
           <DialogHeader className="shrink-0 pr-8 text-left">
             <DialogTitle className="break-words leading-snug">
               {subscription.tag || t('subscription')} · {t('panel.subscriptionNodes')}
@@ -155,7 +168,7 @@ export function SubscriptionNodes({
             <Button
               variant="outline"
               disabled={tests.busy || !filtered.length}
-              onClick={() => tests.test(filtered.map(({ node }) => node.id))}
+              onClick={() => test(filtered.map(({ node }) => node.id))}
             >
               <Gauge />
               {t('latency.testFiltered')}
@@ -180,7 +193,7 @@ export function SubscriptionNodes({
               {t('panel.filteredNodes', { count: filtered.length, total: library.length })}
             </span>
           </div>
-          <LatencyStatus tests={tests} />
+          <LatencyStatus tests={tests} scope={scope} />
           <div
             className="subscription-node-grid"
             ref={gridRef}
@@ -195,7 +208,7 @@ export function SubscriptionNodes({
                 latency={latencies[node.id]}
                 pending={tests.pending.has(node.id)}
                 busy={tests.busy}
-                onTest={tests.test}
+                onTest={test}
                 onDetails={showDetails}
                 onQR={showQR}
                 onJoin={joinNode}
@@ -243,7 +256,7 @@ export function SubscriptionNodes({
                   variant="outline"
                   disabled={tests.busy}
                   loading={tests.pending.has(detail.id)}
-                  onClick={() => tests.test([detail.id])}
+                  onClick={() => test([detail.id])}
                 >
                   {t('latency.testNode')}
                 </Button>

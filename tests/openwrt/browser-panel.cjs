@@ -45,7 +45,7 @@ async function login(page, url = base) {
       assert.ok(!body.errors, JSON.stringify(body.errors));
       return body.data;
     }
-    const imported = await gql('mutation SeedNodes($args:[ImportArgument!]!){importNodes(rollbackError:true,args:$args){error node{id}}}', { args: Array.from({ length: 7 }, (_, index) => ({ tag: 'Legacy manual ' + (index + 1), link: `vless://33333333-3333-4333-8333-${String(index + 1).padStart(12, '0')}@192.0.2.${index + 20}:443?encryption=none&security=tls&type=tcp#Legacy-${index + 1}` })) });
+    const imported = await gql('mutation SeedNodes($args:[ImportArgument!]!){importNodes(rollbackError:true,args:$args){error node{id}}}', { args: Array.from({ length: 7 }, (_, index) => ({ tag: index === 0 ? 'Legacy manual 1 · '+ '美国635中继AI-LongNodeName'.repeat(4) : 'Legacy manual ' + (index + 1), link: `vless://33333333-3333-4333-8333-${String(index + 1).padStart(12, '0')}@192.0.2.${index + 20}:443?encryption=none&security=tls&type=tcp#Legacy-${index + 1}` })) });
     assert.ok(imported.importNodes.every(item => !item.error && item.node));
     const nodeIds = imported.importNodes.map(item => item.node.id);
     const group = await gql('mutation {createGroup(name:"LegacyGroup",policy:fixed,policyParams:[]){id}}');
@@ -131,7 +131,7 @@ async function login(page, url = base) {
     assert.equal(await frame.locator('#workspace-nodes').isVisible(), false);
     const monitorBox = await frame.locator('#panel-monitor').boundingBox();
     const groupsBox = await frame.locator('#workspace-groups').boundingBox();
-    assert.ok(monitorBox.width > groupsBox.width * 1.5);
+    assert.ok(monitorBox.width > groupsBox.width && monitorBox.width < groupsBox.width * 1.5);
     assert.ok(await frame.locator('#panel-traffic-trends').isVisible());
     assert.ok(Math.abs(monitorBox.y-groupsBox.y) < 3 && monitorBox.x+monitorBox.width <= groupsBox.x, 'Desktop overview and groups must sit side by side');
     await page.setViewportSize({width:1600,height:800});
@@ -142,6 +142,31 @@ async function login(page, url = base) {
     await page.screenshot({path:path.join(output,'dashboard-first-screen.png'),fullPage:true});
     await page.setViewportSize({width:1600,height:1100});
     await page.screenshot({path:path.join(output,'dashboard-desktop.png'),fullPage:true});
+    await frame.getByRole('button',{name:'主题',exact:true}).click();
+    const themePicker=frame.locator('[data-theme-picker]');
+    const paletteNames=['暖金','海洋蓝','玫瑰','翡翠','紫罗兰','石墨','日落','青绿','晴空','靛蓝','咖啡','橄榄'];
+    const paletteColors=[];
+    for(const name of paletteNames) {
+      const button=themePicker.getByRole('button',{name,exact:true});
+      await button.click();
+      assert.equal(await button.getAttribute('aria-pressed'),'true');
+      paletteColors.push(await frame.locator('body').evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()));
+    }
+    assert.equal(new Set(paletteColors).size,12,'All palettes must change the rendered accent');
+    await themePicker.getByRole('button',{name:'深色',exact:true}).click();
+    assert.ok(await frame.locator('html').evaluate(element=>element.classList.contains('dark')));
+    await themePicker.getByRole('button',{name:'咖啡',exact:true}).click();
+    await page.keyboard.press('Escape');
+    await page.reload({waitUntil:'domcontentloaded'});
+    await frame.getByRole('heading',{name:'运行概况',exact:true}).waitFor();
+    assert.equal(await frame.locator('body').evaluate(()=>JSON.parse(localStorage.getItem('APP_STATEcolorTheme'))),'coffee');
+    assert.ok(await frame.locator('html').evaluate(element=>element.classList.contains('dark')));
+    await page.screenshot({path:path.join(output,'theme-coffee-dark.png'),fullPage:true});
+    await frame.getByRole('button',{name:'主题',exact:true}).click();
+    await themePicker.getByRole('button',{name:'跟随系统',exact:true}).click();
+    await themePicker.getByRole('button',{name:'暖金',exact:true}).click();
+    await page.keyboard.press('Escape');
+    console.log('PASS: twelve rendered palettes, accessible selection, dark mode and persistence after reload');
     await navigate('advanced');
     assert.equal(await frame.locator('#panel-advanced-content [data-testid=section]').count(), 3);
     assert.ok(await frame.locator('#panel-advanced-content').isVisible());
@@ -198,8 +223,13 @@ async function login(page, url = base) {
     const groupToggle = groupCard.getByRole('button', {name:'管理成员 LegacyGroup',exact:true,includeHidden:true});
     const groupSurface = groupCard.locator('[data-slot=card]').first();
     assert.equal(await groupToggle.getAttribute('aria-expanded'),'false');
+    assert.ok(await groupCard.locator('[data-group-summary]').evaluate(element=>element.scrollWidth<=element.clientWidth+1),'Collapsed summary names must not overflow');
     await groupSurface.click({position:{x:6,y:6}});
     assert.equal(await groupToggle.getAttribute('aria-expanded'),'true');
+    const fullMemberName=groupCard.locator(`[data-rfd-draggable-id="${groupId}-node-${nodeIds[0]}"] [data-group-member-name]`);
+    await fullMemberName.waitFor();
+    assert.ok((await fullMemberName.innerText()).includes('美国635中继AI-LongNodeName'));
+    assert.ok(await fullMemberName.evaluate(element=>element.scrollWidth<=element.clientWidth+1 && getComputedStyle(element).whiteSpace!=='nowrap'),'Long group member names must wrap without clipping');
     await groupSurface.click({position:{x:6,y:6}});
     assert.equal(await groupToggle.getAttribute('aria-expanded'),'false');
     await groupCard.getByRole('button', {name:/展开.*群组.*LegacyGroup/}).focus();
@@ -370,7 +400,7 @@ async function login(page, url = base) {
     await search.fill('Legacy manual 1');
     await nodes.getByRole('button', { name: /^更多操作 / }).click();
     await frame.getByRole('menuitem', { name: '编辑', exact: true }).click();
-    assert.equal(await dialog.getByRole('textbox', { name: /标签/ }).inputValue(), 'Legacy manual 1');
+    assert.equal(await dialog.getByRole('textbox', { name: /标签/ }).inputValue(), before.nodes.edges.find(node=>node.id===nodeIds[0]).tag);
     await dialog.getByRole('textbox', { name: /标签/ }).fill('Edited manual');
     await dialog.getByRole('button', { name: '提交', exact: true }).click();
     await dialog.waitFor({ state: 'hidden' });
@@ -389,6 +419,30 @@ async function login(page, url = base) {
     await page.keyboard.press('Escape');
     await sheet.waitFor({ state: 'hidden' });
     console.log('PASS: editing inside node details updates the open drawer from current data without losing search state');
+    await nodes.getByRole('button',{name:'导入节点',exact:true}).click();
+    await dialog.getByRole('textbox',{name:/链接/}).fill('vless://77777777-7777-4777-8777-777777777777@192.0.2.55:443?encryption=none&security=tls&type=tcp#%E8%87%AA%E5%8A%A8%E9%A6%99%E6%B8%AF%E8%8A%82%E7%82%B9');
+    await dialog.getByRole('button',{name:'提交',exact:true}).click();
+    await dialog.waitFor({state:'hidden'});
+    const automaticNode=(await gql('query {nodes{edges{id name tag}}}')).nodes.edges.find(node=>node.name==='自动香港节点');
+    assert.ok(automaticNode && !automaticNode.tag,'An empty label must retain the parsed node name');
+    const automaticSubs=[];
+    for(const [endpoint,label,expected] of [['sub-named','', '自动订阅名称'],['sub-filename','','文件名称'],['sub-fallback','','127.0.0.1'],['sub-named','我的名称','我的名称']]) {
+      await subscriptions.getByRole('button',{name:'添加订阅',exact:true}).click();
+      await dialog.getByRole('textbox',{name:/链接/}).fill('http://127.0.0.1:18081/'+endpoint+'?private=fixture-private-token&case='+automaticSubs.length);
+      if(label) await dialog.getByRole('textbox',{name:/标签/}).fill(label);
+      await dialog.getByRole('button',{name:'提交',exact:true}).click();
+      await dialog.waitFor({state:'hidden'});
+      const importedSubs=(await gql('query {subscriptions{id tag link}}')).subscriptions;
+      const added=importedSubs.find(item=>item.link.endsWith('case='+automaticSubs.length));
+      assert.equal(added?.tag,expected);
+      automaticSubs.push(added.id);
+    }
+    await gql('mutation {updateSubscription(id:"'+automaticSubs[3]+'"){id}}');
+    assert.equal((await gql('query {subscriptions{id tag}}')).subscriptions.find(item=>item.id===automaticSubs[3]).tag,'我的名称');
+    await gql('mutation RemoveAutoNode($ids:[ID!]!){removeNodes(ids:$ids)}',{ids:[automaticNode.id]});
+    await gql('mutation RemoveAutoSubs($ids:[ID!]!){removeSubscriptions(ids:$ids)}',{ids:automaticSubs});
+    console.log('PASS: optional node/subscription labels through native forms, parsed node name, profile-title, filename, safe hostname fallback and manual override preservation');
+
 
     await search.fill('');
     const large = await gql('mutation {importSubscription(rollbackError:true,arg:{tag:"Workspace 1000",link:"http://127.0.0.1:18081/sub-large"}){sub{id} nodeImportResult{node{id}}}}');
@@ -398,6 +452,27 @@ async function login(page, url = base) {
     await nodes.locator('[data-node-scroll]').waitFor();
     assert.equal(await nodes.locator('[data-node-id]').count(), 7, '1000 subscription nodes must not enter the manual list');
     const largeCard = subscriptions.locator('[data-rfd-draggable-id]').filter({ hasText: 'Workspace 1000' });
+    let releaseScopedProbes, scopedGate;
+    await page.route('**/cgi-bin/daed-router/graphql',async route=>{
+      const payload=route.request().postDataJSON();
+      if(!/mutation TestNodeLatencies/.test(payload.query)) return route.continue();
+      await scopedGate;
+      return route.fulfill({json:{data:{testNodeLatencies:payload.variables.ids.map(id=>({id,alive:true,latencyMs:90,testedAt:new Date().toISOString(),message:null}))}}});
+    });
+    for(const [scope,other,label] of [[subscriptions,nodes,'测试订阅节点'],[nodes,subscriptions,'测试手动节点']]) {
+      scopedGate=new Promise(resolve=>{releaseScopedProbes=resolve;});
+      await scope.getByRole('button',{name:label,exact:true}).click();
+      await scope.getByText(/测速进度/).waitFor();
+      assert.equal(await other.getByText(/测速进度/).count(),0,'Progress must stay in its originating panel');
+      assert.equal(await frame.locator('header').getByText(/正在保存更改/).count(),0,'Latency probes must not show configuration saving');
+      assert.equal(await nodes.locator('[data-node-id]').count(),7,'Subscription tests must not add nodes to the manual list');
+      await scope.getByRole('button',{name:'停止后续测速',exact:true}).click();
+      releaseScopedProbes();
+      await scope.locator('button:not(:disabled)').and(scope.getByRole('button',{name:label,exact:true})).waitFor();
+      assert.ok(await scope.getByRole('button',{name:label,exact:true}).isEnabled());
+    }
+    await page.unroute('**/cgi-bin/daed-router/graphql');
+    console.log('PASS: subscription/manual progress isolation, no unrelated saving state, manual library separation preserved');
     const beforeLargeHeight = (await frame.locator('#panel-common').boundingBox()).height;
     await largeCard.getByRole('button', { name: /查看节点/ }).click();
     const viewer = frame.locator('[data-subscription-browser]');
@@ -428,8 +503,9 @@ async function login(page, url = base) {
     await frame.getByRole('dialog').locator('canvas').waitFor({ state: 'hidden' });
     assert.equal(await subscriptionSearch.inputValue(), 'Workspace-0999');
     await grid.getByRole('button', { name: '加入群组', exact: true }).click();
-    const picker = frame.getByRole('dialog').filter({ has: frame.getByText('加入群组', { exact: true }) }).last();
+    const picker = frame.getByRole('dialog').filter({ has: frame.getByRole('heading', { name: '加入群组', exact: true }) }).last();
     await picker.getByText('LegacyGroup', { exact: true }).locator('..').getByRole('button', { name: '加入', exact: true }).click();
+    await picker.waitFor({state:'hidden'});
     assert.ok((await gql('query {groups{id nodes{name}}}')).groups.find(item => item.id === groupId).nodes.some(item => item.name.includes('Workspace-0999')));
     // Deterministic transport failures and batch UI are fault-injected; actual
     // HTTP-over-SOCKS probe/cancellation is tested in Go against a local server.
@@ -495,11 +571,15 @@ async function login(page, url = base) {
     const lastTile = grid.locator('[data-subscription-node]').last();
     await lastTile.scrollIntoViewIfNeeded();
     const savedScroll = await grid.evaluate(element => element.scrollTop);
-    await lastTile.getByRole('button', { name: /^节点详情 / }).click();
-    await detail.waitFor();
-    await page.keyboard.press('Escape');
-    await detail.waitFor({ state: 'hidden' });
-    assert.ok(Math.abs(await grid.evaluate(element => element.scrollTop) - savedScroll) < 3, 'Closing details should retain continuous-list position');
+    for(const method of ['button','escape']) {
+      await lastTile.getByRole('button', { name: /^节点详情 / }).click();
+      await detail.waitFor();
+      if(method==='button') await detail.getByRole('button', {name:'Close',exact:true}).click();
+      else await page.keyboard.press('Escape');
+      await detail.waitFor({ state: 'hidden' });
+      assert.ok(await viewer.isVisible(),'Closing a nested detail must preserve the subscription browser');
+      assert.ok(Math.abs(await grid.evaluate(element => element.scrollTop) - savedScroll) < 3, 'Closing details should retain continuous-list position');
+    }
     await viewer.evaluate(element => { element.ownerDocument.documentElement.style.fontSize = '20px'; });
     assert.ok(await lastTile.evaluate(element => element.scrollWidth <= element.clientWidth + 1), 'Large text must wrap within the card');
     assert.ok(await lastTile.evaluate(element => { const tile = element.getBoundingClientRect(); return [...element.querySelectorAll('button')].every(button => { const r = button.getBoundingClientRect(); return r.bottom <= tile.bottom + 1 && r.right <= tile.right + 1; }); }), 'Card actions must remain fully inside the card at larger text sizes');
@@ -546,7 +626,7 @@ async function login(page, url = base) {
       assert.ok(await frame.locator('body').evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
       assert.ok(await frame.locator('#panel-traffic-trends').isVisible());
       if(panelWidth>=900) {
-        assert.ok(overview.width > groupPanel.width*1.5);
+        assert.ok(overview.width > groupPanel.width && overview.width < groupPanel.width*1.5);
         await page.setViewportSize({width,height:800});
         await page.waitForTimeout(200);
         const viewport=await page.locator('iframe').boundingBox();
@@ -643,6 +723,14 @@ async function login(page, url = base) {
     const touchPage = await touchContext.newPage();
     const touchFrame = await login(touchPage);
     await touchFrame.getByRole('heading', {name:'运行概况',exact:true}).waitFor();
+    await touchFrame.getByRole('button',{name:'主题',exact:true}).tap();
+    const touchTheme=touchFrame.locator('[data-theme-picker]');
+    await touchTheme.getByRole('button',{name:'晴空',exact:true}).tap();
+    assert.ok(await touchTheme.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
+    await touchPage.screenshot({path:path.join(output,'theme-touch.png'),fullPage:true});
+    await touchTheme.getByRole('button',{name:'暖金',exact:true}).tap();
+    await touchTheme.getByRole('button',{name:'Close',exact:true}).tap();
+
     assert.ok(await touchFrame.locator('#panel-traffic-trends').isVisible());
     await touchPage.screenshot({path:path.join(output,'dashboard-touch-dark.png'),fullPage:true});
     const touchGroup=touchFrame.locator('[data-group-card-id]').filter({hasText:'LegacyGroup'});
@@ -672,6 +760,15 @@ async function login(page, url = base) {
     console.log('PASS: mobile dark dashboard directly shows trends, card surface expands by touch, and quick add works without expansion');
     await touchPage.goto(base + '/cgi-bin/luci/admin/services/daed/resources');
     await touchFrame.locator('[data-node-scroll]').waitFor();
+    await touchFrame.locator('#workspace-nodes').getByRole('button',{name:'导入节点',exact:true}).tap();
+    const touchImport=touchFrame.getByRole('dialog');
+    const touchLink=touchImport.getByRole('textbox',{name:/链接/});
+    const touchLabel=touchImport.getByRole('textbox',{name:/标签/});
+    const linkBox=await touchLink.boundingBox(),labelBox=await touchLabel.boundingBox();
+    assert.ok(linkBox.width>200 && labelBox.y>linkBox.y,'Mobile link input must occupy its own full row');
+    await touchPage.screenshot({path:path.join(output,'import-touch.png'),fullPage:true});
+    await touchImport.getByRole('button',{name:'Close',exact:true}).tap();
+
     const touchTabs = touchFrame.getByRole('tablist', { name: '常用功能' });
     await touchTabs.getByRole('tab', { name: /订阅/ }).tap();
     const touchSubscription = touchFrame.locator('#workspace-subscriptions [data-rfd-draggable-id]').filter({ hasText: 'Workspace 1000' });

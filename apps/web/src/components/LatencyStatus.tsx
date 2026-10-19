@@ -4,8 +4,9 @@ import { Button } from './ui/button'
 
 export type LatencyTests = ReturnType<typeof useLatencyTests>
 
-export function LatencyStatus({ tests }: { tests: LatencyTests }) {
+export function LatencyStatus({ tests, scope }: { tests: LatencyTests; scope: string }) {
   const { t } = useTranslation()
+  if (tests.scope !== scope) return null
   return (
     <>
       {tests.busy && (

@@ -110,7 +110,7 @@ function NodeRow({
         disabled={tests.busy}
         aria-label={`${t('latency.testNode')} ${name}`}
         title={t('latency.testNode')}
-        onClick={() => tests.test([node.id])}
+        onClick={() => tests.test([node.id], 'manual')}
       >
         <LatencyBadge result={latency} fallback={t('latency.test')} />
       </Button>
@@ -269,7 +269,12 @@ export function NodeResource({
               size="icon"
               aria-label={t('latency.testManual')}
               disabled={latencyTests.busy || !library.length}
-              onClick={() => latencyTests.test(library.map(({ node }) => node.id))}
+              onClick={() =>
+                latencyTests.test(
+                  library.map(({ node }) => node.id),
+                  'manual',
+                )
+              }
             >
               <Gauge />
             </Button>
@@ -287,7 +292,7 @@ export function NodeResource({
         }
       >
         <p className="shrink-0 text-xs text-muted-foreground">{t('panel.manualNodesHint')}</p>
-        <LatencyStatus tests={latencyTests} />
+        <LatencyStatus tests={latencyTests} scope="manual" />
         {totalCount > 0 && (
           <div className="shrink-0 space-y-2" data-node-toolbar>
             <label className="flex items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
@@ -543,7 +548,9 @@ export function NodeResource({
         opened={openedImportNodeFormModal}
         onClose={() => setOpenedImportNodeFormModal(false)}
         handleSubmit={async (values) => {
-          await importNodesMutation.mutateAsync(values.resources.map(({ link, tag }) => ({ link, tag })))
+          await importNodesMutation.mutateAsync(
+            values.resources.map(({ link, tag }) => ({ link, tag: tag.trim() || undefined })),
+          )
         }}
       />
       <ConfigureNodeFormModal

@@ -87,7 +87,7 @@ func (t subscriptionHeaders) RoundTrip(request *http.Request) (*http.Response, e
 	return t.RoundTripper.RoundTrip(request)
 }
 
-func fetchLinksThroughProxy(link string, settings subscriptionProxy) ([]string, error) {
+func fetchLinksThroughProxy(link string, settings subscriptionProxy, names ...*string) ([]string, error) {
 	if settings.address == "" {
 		return nil, errors.New("PassWall local SOCKS proxy is unavailable; start PassWall or select another subscription download mode")
 	}
@@ -106,26 +106,26 @@ func fetchLinksThroughProxy(link string, settings subscriptionProxy) ([]string, 
 		DisableKeepAlives:   true,
 	}
 	defer transport.CloseIdleConnections()
-	return _fetchLinks(link, subscriptionHeaders{transport, settings.agent}, 12*time.Second)
+	return _fetchLinks(link, subscriptionHeaders{transport, settings.agent}, 12*time.Second, names...)
 }
 
-func fetchLinks(link string) ([]string, error) {
+func fetchLinks(link string, names ...*string) ([]string, error) {
 	settings, discoveryError := readSubscriptionProxy()
 	if discoveryError != nil {
 		return nil, discoveryError
 	}
 	if settings.mode == "passwall" {
 		// An explicit proxy choice must not silently fall back to another exit.
-		return fetchLinksThroughProxy(link, settings)
+		return fetchLinksThroughProxy(link, settings, names...)
 	}
-	links, directError := fetchLinksDirect(link)
+	links, directError := fetchLinksDirect(link, names...)
 	if directError == nil {
 		return links, nil
 	}
 	if settings.mode == "off" {
 		return nil, directError
 	}
-	links, proxyError := fetchLinksThroughProxy(link, settings)
+	links, proxyError := fetchLinksThroughProxy(link, settings, names...)
 	if proxyError != nil {
 		return nil, fmt.Errorf("%v; %w (PassWall SOCKS)", directError, proxyError)
 	}
