@@ -254,7 +254,7 @@
     "testManual": "测试手动节点",
     "testFiltered": "测试当前结果",
     "progress": "测速进度 {{completed}} / {{total}}",
-    "stop": "本批完成后停止",
+    "stop": "停止后续测速",
     "requestFailed": "测速中断，已保留已有结果。请确认 Daed 服务及测速地址可用后重试。",
     "testSubscriptions": "测试订阅节点",
     "colors": "延迟颜色说明",
@@ -502,6 +502,8 @@
     "nodeLatency": "延迟",
     "manualNodesHint": "这里只显示手动添加的节点；订阅节点请从对应订阅查看。",
     "subscriptionNodes": "订阅节点",
-    "subscriptionNodesHint": "搜索或连续滚动查看全部节点，支持单独测速和加入群组。"
+    "subscriptionNodesHint": "搜索或连续滚动查看全部节点，支持单独测速和加入群组。",
+    "dashboard": "管理面板",
+    "resources": "节点和订阅"
   }
 }

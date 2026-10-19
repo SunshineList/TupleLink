@@ -763,3 +763,55 @@ form {
     gap: 4px;
   }
 }
+
+/* LuCI owns page navigation; each embedded page has a single task. */
+.panel-workspace [hidden] {
+  display: none !important;
+}
+.panel-workspace[data-workspace='dashboard'] .panel-common-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.panel-workspace[data-workspace='dashboard'] .panel-side-section {
+  height: auto;
+  min-height: 220px;
+}
+.panel-workspace[data-workspace='dashboard'] .panel-side-scroll {
+  max-height: none;
+  overflow: visible;
+}
+.panel-workspace[data-workspace='resources'] .panel-common-grid {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+}
+.panel-workspace[data-workspace='resources'] .panel-mobile-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.panel-workspace[data-workspace='advanced'] #panel-advanced {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.panel-workspace[data-workspace='advanced'] .panel-advanced-grid {
+  padding: 0;
+}
+@media (max-width: 899px) {
+  .panel-workspace[data-workspace='resources'] .panel-common-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (min-width: 640px) {
+  .panel-workspace[data-workspace='dashboard'] [data-group-card-id] > [data-slot='card'] {
+    padding: 16px;
+  }
+}
+@media (max-width: 479px) {
+  .router-toolbar {
+    gap: 8px;
+  }
+  .router-toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .router-toolbar-actions > [role='status']:first-child {
+    margin-right: auto;
+  }
+}

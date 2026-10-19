@@ -8,14 +8,14 @@ const htdocs = path.join(__dirname, '../../openwrt/htdocs');
 const menu = JSON.parse(fs.readFileSync(path.join(__dirname, '../../openwrt/files/menu.json')));
 const panelModule = menu['admin/services/daed/dashboard'].action.path.split('/').pop();
 
-function load(name, protocol = 'http:') {
+function load(name, protocol = 'http:', page = 'dashboard') {
   const polls = [];
   const calls = [];
   const fetchCalls = [];
   let authorized = true;
   let result = { running: true, listen: '127.0.0.1:2023', checks: [] };
   const context = vm.createContext({
-    window: { location: { protocol } },
+    window: { location: { protocol, pathname: '/cgi-bin/luci/admin/services/daed/' + page } },
     L: { env: { sessionid: '1234567890abcdef1234567890abcdef' } },
     fetch: async (url, options) => { fetchCalls.push([url, options]); return {ok: authorized}; },
     view: { extend: value => value },
@@ -39,9 +39,19 @@ test('all LuCI modules parse in the actual function-wrapper convention', () => {
   for (const file of fs.readdirSync(htdocs)) new Function(fs.readFileSync(path.join(htdocs, file), 'utf8'));
 });
 
-test('Daed menu only has dashboard and logs, defaulting to dashboard', () => {
-  assert.deepEqual(Object.keys(menu).sort(), ['admin/services/daed', 'admin/services/daed/dashboard', 'admin/services/daed/logs']);
-  assert.ok(menu['admin/services/daed/dashboard'].order < menu['admin/services/daed/logs'].order);
+test('Daed menu exposes four ordered pages, defaulting to dashboard', () => {
+  const entries = Object.entries(menu).filter(([key]) => key !== 'admin/services/daed').sort((a,b) => a[1].order - b[1].order);
+  assert.deepEqual(entries.map(([key]) => key.split('/').pop()), ['dashboard', 'resources', 'advanced', 'logs']);
+  assert.deepEqual(entries.map(([,entry]) => entry.title), ['管理面板','节点和订阅','高级设置','运行日志']);
+});
+
+test('native resource and advanced tabs embed their fixed same-origin route', () => {
+  for (const page of ['resources', 'advanced']) {
+    const { view } = load(panelModule, 'https:', page);
+    assert.equal(elements(view.render({running:true,authorized:true}), 'iframe')[0].attrs.src, '/cgi-bin/daed-router/#/' + page);
+  }
+  const {view} = load(panelModule, 'https:', 'untrusted');
+  assert.equal(elements(view.render({running:true,authorized:true}), 'iframe')[0].attrs.src, '/cgi-bin/daed-router/');
 });
 
 test('upgraded menu bypasses the cached pre-gateway dashboard and resolves every view', () => {

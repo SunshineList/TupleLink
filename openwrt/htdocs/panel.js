@@ -27,6 +27,9 @@ return view.extend({
     })
   },
   render: function (data) {
+    var page = (window.location.pathname || '').split('/').pop()
+    var routes = { resources: ['resources', '节点和订阅'], advanced: ['advanced', '高级设置'] }
+    var route = routes[page] || ['', '管理面板']
     if (!data.running)
       return E('div', {}, [
         E('p', {}, 'Daed 服务未运行。'),
@@ -46,8 +49,8 @@ return view.extend({
       ])
     if (!data.authorized) return E('p', {}, '路由器登录已失效或当前账户无管理权限，请刷新后台重新登录。')
     return E('iframe', {
-      src: panel,
-      title: 'Daed 管理面板',
+      src: panel + (route[0] ? '#/' + route[0] : ''),
+      title: 'Daed ' + route[1],
       style: 'display:block;width:100%;height:calc(100vh - 160px);min-height:560px;border:0',
     })
   },

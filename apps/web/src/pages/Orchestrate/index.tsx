@@ -44,7 +44,7 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
   return newArray
 }
 
-export function OrchestratePage() {
+export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' | 'resources' | 'advanced' }) {
   const { t } = useTranslation()
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [activeArea, setActiveArea] = useState('panel-common')
@@ -70,7 +70,7 @@ export function OrchestratePage() {
       observer.disconnect()
       window.removeEventListener('resize', resize)
     }
-  }, [])
+  }, [area])
   const scrollToArea = (id: string) => {
     if (id === 'panel-advanced') setAdvancedOpen(true)
     setActiveArea(id)
@@ -665,73 +665,93 @@ export function OrchestratePage() {
   }
 
   return (
-    <div className="panel-workspace flex flex-col gap-7">
-      <nav className="flex gap-5 overflow-x-auto border-b text-sm" aria-label={t('panel.title')}>
-        {[
-          ['panel-common', t('panel.common')],
-          ['panel-advanced', t('panel.advanced')],
-          ['panel-monitor', t('panel.monitor')],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            aria-controls={id}
-            aria-current={activeArea === id ? 'location' : undefined}
-            className={`shrink-0 border-b-2 px-1 pb-3 pt-1 ${activeArea === id ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground'}`}
-            onClick={() => scrollToArea(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      <section id="panel-common" tabIndex={-1} className="scroll-mt-36 outline-none" aria-label={t('panel.common')}>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold">{t('panel.common')}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{t('panel.commonDescription')}</p>
-        </div>
-        <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
-          <div className="panel-mobile-tabs" role="tablist" aria-label={t('panel.common')}>
-            {[
-              ['groups', t('group'), groups.length],
-              ['nodes', t('node'), nodeLibrary.length],
-              ['subscriptions', t('subscription'), subscriptions.length],
-            ].map(([id, label, count], index) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                id={`workspace-tab-${id}`}
-                aria-controls={`workspace-${id}`}
-                aria-selected={mobilePanel === id}
-                tabIndex={mobilePanel === id ? 0 : -1}
-                onClick={() => setMobilePanel(String(id))}
-                onKeyDown={(event) => {
-                  const keys = ['groups', 'nodes', 'subscriptions']
-                  const next =
-                    event.key === 'ArrowRight'
-                      ? (index + 1) % 3
-                      : event.key === 'ArrowLeft'
-                        ? (index + 2) % 3
-                        : event.key === 'Home'
-                          ? 0
-                          : event.key === 'End'
-                            ? 2
-                            : -1
-                  if (next < 0) return
-                  event.preventDefault()
-                  setMobilePanel(keys[next])
-                  document.getElementById(`workspace-tab-${keys[next]}`)?.focus()
-                }}
-              >
-                {label} <span className="tabular-nums">{count}</span>
-              </button>
-            ))}
+    <div className="panel-workspace flex flex-col gap-5" data-workspace={area}>
+      {area === 'dashboard' && (
+        <section id="panel-monitor">
+          <TrafficOverview />
+        </section>
+      )}
+      {area === 'all' && (
+        <nav className="flex gap-5 overflow-x-auto border-b text-sm" aria-label={t('panel.title')}>
+          {[
+            ['panel-common', t('panel.common')],
+            ['panel-advanced', t('panel.advanced')],
+            ['panel-monitor', t('panel.monitor')],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              aria-controls={id}
+              aria-current={activeArea === id ? 'location' : undefined}
+              className={`shrink-0 border-b-2 px-1 pb-3 pt-1 ${activeArea === id ? 'border-primary font-medium text-foreground' : 'border-transparent text-muted-foreground'}`}
+              onClick={() => scrollToArea(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
+      <section
+        id="panel-common"
+        hidden={area === 'advanced'}
+        tabIndex={-1}
+        className="scroll-mt-36 outline-none"
+        aria-label={t(area === 'dashboard' ? 'group' : 'panel.resources')}
+      >
+        {area === 'all' && (
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold">{t('panel.common')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('panel.commonDescription')}</p>
           </div>
+        )}
+        <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
+          {area !== 'dashboard' && (
+            <div className="panel-mobile-tabs" role="tablist" aria-label={t('panel.common')}>
+              {[
+                ['groups', t('group'), groups.length],
+                ['nodes', t('node'), nodeLibrary.length],
+                ['subscriptions', t('subscription'), subscriptions.length],
+              ]
+                .filter(([id]) => area === 'all' || id !== 'groups')
+                .map(([id, label, count], index, tabs) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    id={`workspace-tab-${id}`}
+                    aria-controls={`workspace-${id}`}
+                    aria-selected={mobilePanel === id}
+                    tabIndex={mobilePanel === id ? 0 : -1}
+                    onClick={() => setMobilePanel(String(id))}
+                    onKeyDown={(event) => {
+                      const keys = tabs.map(([id]) => String(id))
+                      const next =
+                        event.key === 'ArrowRight'
+                          ? (index + 1) % keys.length
+                          : event.key === 'ArrowLeft'
+                            ? (index + keys.length - 1) % keys.length
+                            : event.key === 'Home'
+                              ? 0
+                              : event.key === 'End'
+                                ? keys.length - 1
+                                : -1
+                      if (next < 0) return
+                      event.preventDefault()
+                      setMobilePanel(keys[next])
+                      document.getElementById(`workspace-tab-${keys[next]}`)?.focus()
+                    }}
+                  >
+                    {label} <span className="tabular-nums">{count}</span>
+                  </button>
+                ))}
+            </div>
+          )}
           <div className="panel-common-grid" ref={workspaceRef}>
             <div
               id="workspace-groups"
+              hidden={area === 'resources'}
               className="panel-resource-pane"
-              data-active={mobilePanel === 'groups'}
+              data-active={area === 'dashboard' || mobilePanel === 'groups'}
               role="region"
               aria-label={t('group')}
             >
@@ -745,6 +765,7 @@ export function OrchestratePage() {
             </div>
             <div
               id="workspace-nodes"
+              hidden={area === 'dashboard'}
               className="panel-resource-pane"
               data-active={mobilePanel === 'nodes'}
               role="region"
@@ -770,6 +791,7 @@ export function OrchestratePage() {
             </div>
             <div
               id="workspace-subscriptions"
+              hidden={area === 'dashboard'}
               className="panel-resource-pane"
               data-active={mobilePanel === 'subscriptions'}
               role="region"
@@ -787,39 +809,44 @@ export function OrchestratePage() {
 
       <section
         id="panel-advanced"
+        hidden={area !== 'advanced' && area !== 'all'}
         tabIndex={-1}
         className="scroll-mt-36 rounded-2xl border bg-card shadow-sm outline-none"
       >
-        <button
-          type="button"
-          aria-expanded={advancedOpen}
-          aria-controls="panel-advanced-content"
-          className="flex w-full items-center gap-3 p-5 text-left"
-          onClick={() => setAdvancedOpen((value) => !value)}
-        >
-          <SlidersHorizontal aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1">
-            <span className="block text-base font-semibold">{t('panel.advanced')}</span>
-            <span className="mt-1 block text-sm text-muted-foreground">{t('panel.advancedDescription')}</span>
-          </span>
-          <ChevronDown
-            aria-hidden="true"
-            className={`h-4 w-4 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`}
-          />
-        </button>
+        {area === 'all' && (
+          <button
+            type="button"
+            aria-expanded={advancedOpen}
+            aria-controls="panel-advanced-content"
+            className="flex w-full items-center gap-3 p-5 text-left"
+            onClick={() => setAdvancedOpen((value) => !value)}
+          >
+            <SlidersHorizontal aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-base font-semibold">{t('panel.advanced')}</span>
+              <span className="mt-1 block text-sm text-muted-foreground">{t('panel.advancedDescription')}</span>
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className={`h-4 w-4 transition-transform motion-reduce:transition-none ${advancedOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+        )}
         <div
           id="panel-advanced-content"
-          hidden={!advancedOpen}
-          className="grid grid-cols-1 gap-4 border-t p-4 lg:grid-cols-3"
+          hidden={area !== 'advanced' && !advancedOpen}
+          className="panel-advanced-grid grid grid-cols-1 gap-4 p-4 lg:grid-cols-3"
         >
           <Config />
           <DNS />
           <Routing />
         </div>
       </section>
-      <section id="panel-monitor" tabIndex={-1} className="scroll-mt-36 outline-none">
-        <TrafficOverview />
-      </section>
+      {area === 'all' && (
+        <section id="panel-monitor" tabIndex={-1} className="scroll-mt-36 outline-none">
+          <TrafficOverview />
+        </section>
+      )}
     </div>
   )
 }

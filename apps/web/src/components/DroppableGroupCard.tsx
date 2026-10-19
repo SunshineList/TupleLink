@@ -117,14 +117,14 @@ export function DroppableGroupCard({
                 </SimpleTooltip>
               </div>
             ) : (
-              <div className="min-w-0 w-full">
+              <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm font-semibold" title={name}>
                   {name}
                 </h3>
               </div>
             )}
 
-            <div className="flex w-full flex-wrap items-center justify-end gap-1">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
               {!isEditing && dragHandleProps && (
                 <SimpleTooltip label={t('a11y.dragToReorder')}>
                   <div

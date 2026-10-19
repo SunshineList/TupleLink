@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -55,12 +56,21 @@ func TestRouterLatencyThroughRealSocksAndCancellation(t *testing.T) {
 				}
 				_, _ = io.CopyN(io.Discard, c, int64(length+2))
 				_, _ = c.Write([]byte{5, 0, 0, 1, 127, 0, 0, 1, 0, 80})
+				// An unusable IPv6 path must not delay a working IPv4 result.
+				if header[3] == 4 {
+					_, _ = io.Copy(io.Discard, c)
+					return
+				}
 				request, err := http.ReadRequest(bufio.NewReader(c))
 				if err != nil {
 					return
 				}
 				if request.URL.Path == "/slow" {
 					time.Sleep(500 * time.Millisecond)
+				}
+				if request.URL.Path == "/stall" {
+					_, _ = io.Copy(io.Discard, c)
+					return
 				}
 				time.Sleep(20 * time.Millisecond)
 				_, _ = io.WriteString(c, "HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n")
@@ -76,6 +86,16 @@ func TestRouterLatencyThroughRealSocksAndCancellation(t *testing.T) {
 	if !result.AliveVal || result.LatencyMsV == nil || *result.LatencyMsV < 10 || result.NodeID != 7 {
 		t.Fatalf("real HTTP-over-proxy latency failed: %#v", result)
 	}
+	option.TcpCheckOptionRaw.Reset()
+	option.TcpCheckOptionRaw.Raw = []string{"http://localhost/generate_204", "127.0.0.1", "::1"}
+	startDual := time.Now()
+	result = testSingleNodeLatency(context.Background(), option, &n)
+	if !result.AliveVal || time.Since(startDual) > 400*time.Millisecond {
+		t.Fatalf("working IPv4 waited for stalled IPv6: %v %#v", time.Since(startDual), result)
+	}
+	t.Logf("IPv4 HTTP response returned in %v despite stalled IPv6", time.Since(startDual))
+	option.TcpCheckOptionRaw.Reset()
+	option.TcpCheckOptionRaw.Raw = []string{"http://127.0.0.1/generate_204", "127.0.0.1"}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	start := time.Now()
@@ -91,6 +111,40 @@ func TestRouterLatencyThroughRealSocksAndCancellation(t *testing.T) {
 	result = testSingleNodeLatency(ctx, option, &n)
 	if result.AliveVal || time.Since(start) > 300*time.Millisecond {
 		t.Fatal("active slow proxy probe did not respect cancellation")
+	}
+	option.TcpCheckOptionRaw.Reset()
+	option.TcpCheckOptionRaw.Raw = []string{"http://127.0.0.1/stall", "127.0.0.1"}
+	start = time.Now()
+	result = testSingleNodeLatency(context.Background(), option, &n)
+	if result.AliveVal || time.Since(start) > 3500*time.Millisecond {
+		t.Fatal("stalled HTTP probe exceeded interactive deadline")
+	}
+	t.Logf("Stalled HTTP request stopped after %v", time.Since(start))
+}
+
+func TestRouterLatencyGlobalConcurrencyAcrossRequests(t *testing.T) {
+	var active, peak atomic.Int32
+	var wg sync.WaitGroup
+	for request := 0; request < 8; request++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := runLatencyProbes(context.Background(), make([]db.Node, 8), func(_ context.Context, _ *db.Node) *LatencyResolver {
+				n := active.Add(1)
+				for p := peak.Load(); n > p && !peak.CompareAndSwap(p, n); p = peak.Load() {
+				}
+				time.Sleep(5 * time.Millisecond)
+				active.Add(-1)
+				return &LatencyResolver{}
+			})
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if peak.Load() > 8 || active.Load() != 0 {
+		t.Fatalf("global limit violated: peak %d active %d", peak.Load(), active.Load())
 	}
 }
 

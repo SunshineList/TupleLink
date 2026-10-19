@@ -31,9 +31,13 @@ export function useLatencyTests() {
       try {
         await testLatencyBatches(
           ids,
-          (batch) => {
-            if (mounted.current) setPending(new Set(batch))
-            return mutateAsync(batch)
+          async (batch) => {
+            if (mounted.current) setPending((previous) => new Set([...previous, ...batch]))
+            try {
+              return await mutateAsync(batch)
+            } finally {
+              if (mounted.current) setPending((previous) => new Set([...previous].filter((id) => !batch.includes(id))))
+            }
           },
           (_results, completed, total) => {
             if (mounted.current) setProgress({ completed, total })

@@ -66,7 +66,7 @@ async function login(page, url = base) {
     const upgraded = await control('upgrade');
     assert.ok(upgraded.unchanged, 'Upgrade changed user-data tables: ' + upgraded.changed_tables.join(', '));
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await frame.getByRole('heading', { name: '代理管理', exact: true }).waitFor({ timeout: 45000 });
+    await frame.getByRole('heading', { name: '管理面板', exact: true }).waitFor({ timeout: 45000 });
     const after = await gql('query {nodes{edges{id name tag link}} subscriptions{id tag link nodes{edges{id name}}} groups{id name policy nodes{id} subscriptions{subscription{id} nameFilterRegex}} configs{id name selected global{logLevel tproxyPort lanInterface wanInterface}} dnss{id name selected dns{string}} routings{id name selected routing{string}}}');
     assert.deepEqual(after, before);
     const preferences = await frame.locator('body').evaluate(() => ({ order: localStorage.getItem('APP_STATEnodeSortableKeys'), cols: localStorage.getItem('APP_STATEcolsPerRow') }));
@@ -78,6 +78,10 @@ async function login(page, url = base) {
     const probeSeeds = (await gql('mutation ProbeSeeds($args:[ImportArgument!]!){importNodes(rollbackError:true,args:$args){node{id}}}', { args: Array.from({ length: 8 }, (_, i) => ({ tag: 'Probe fixture ' + i, link: 'socks5://' + proxyFixture.address + '#Probe-' + i })) })).importNodes.map(item => item.node.id);
     const probeStart = Date.now();
     const actualProbes = (await gql('mutation TestNodeLatencies($ids:[ID!]){testNodeLatencies(ids:$ids){id latencyMs alive testedAt}}', { ids: probeSeeds })).testNodeLatencies;
+    const individualStart = Date.now();
+    const individualProbes = await Promise.all(probeSeeds.map(id => gql('mutation TestNodeLatencies($ids:[ID!]){testNodeLatencies(ids:$ids){id alive latencyMs}}', {ids:[id]})));
+    assert.ok(individualProbes.every(data => data.testNodeLatencies.length === 1 && data.testNodeLatencies[0].alive));
+    console.log('Actual eight-request sliding window:', Date.now()-individualStart, 'ms');
     assert.equal(actualProbes.length, 8);
     assert.ok(actualProbes.every(result => result.alive && Number.isFinite(result.latencyMs)));
     assert.ok(Date.now() - probeStart < 25000, 'Real gateway probes must finish before its 30-second deadline');
@@ -91,15 +95,33 @@ async function login(page, url = base) {
     console.log('PASS: actual LuCI CGI -> GraphQL -> eight concurrent SOCKS/HTTP latency probes; cache polling issues no network probes');
 
 
+    async function navigate(tab) {
+      await page.goto(base + '/cgi-bin/luci/admin/services/daed/' + tab, {waitUntil:'domcontentloaded'});
+      await frame.locator('[data-workspace]').waitFor();
+    }
+    const menuLabels = await page.locator('a').allTextContents();
+    for (const label of ['管理面板','节点和订阅','高级设置','运行日志']) assert.ok(menuLabels.some(text => text.trim() === label), 'Missing native menu ' + label);
+    await frame.getByRole('heading', {name:'运行概况',exact:true}).waitFor();
+    assert.ok(await frame.locator('#workspace-groups').isVisible());
+    assert.equal(await frame.locator('#workspace-nodes').isVisible(), false);
+    const monitorBox = await frame.locator('#panel-monitor').boundingBox();
+    const groupsBox = await frame.locator('#workspace-groups').boundingBox();
+    assert.ok(monitorBox.y < groupsBox.y);
+    await page.screenshot({path:path.join(output,'dashboard-desktop.png'),fullPage:true});
+    await navigate('advanced');
+    assert.equal(await frame.locator('#panel-advanced-content [data-testid=section]').count(), 3);
+    assert.ok(await frame.locator('#panel-advanced-content').isVisible());
+    assert.equal(await frame.locator('#panel-common').isVisible(), false);
+    await page.screenshot({path:path.join(output,'advanced-desktop.png'),fullPage:true});
+    await navigate('resources');
+    assert.ok(await frame.locator('#workspace-nodes').isVisible());
+    assert.equal(await frame.locator('#workspace-groups').isVisible(), false);
+    console.log('PASS: four native LuCI menus, overview above groups on dashboard, isolated resource and advanced pages');
     const sections = frame.locator('#panel-common [data-testid=section]');
     await sections.nth(2).getByRole('heading', { name: '订阅', exact: true }).waitFor();
     const nodes = sections.nth(1);
     const subscriptions = sections.nth(2);
-    assert.equal(await frame.locator('#panel-advanced-content').isVisible(), false);
-    await frame.getByRole('button', { name: '高级设置', exact: true }).click();
-    await frame.locator('#panel-advanced-content').waitFor({ state: 'visible' });
-    assert.equal(await frame.locator('#panel-advanced-content [data-testid=section]').count(), 3);
-    await frame.locator('button[aria-controls="panel-advanced-content"]').click();
+    assert.equal(await frame.locator('#panel-advanced').isVisible(), false);
     assert.equal(await nodes.locator('[data-rfd-draggable-id]').count(), 7, 'Manual panel excludes subscription nodes');
     assert.equal(await nodes.getByRole('combobox', { name: '节点来源' }).count(), 0);
     const search = nodes.getByRole('searchbox', { name: '搜索节点' });
@@ -135,25 +157,16 @@ async function login(page, url = base) {
     assert.equal(order[1], nodeIds[1]);
     console.log('PASS: native keyboard drag after filtering preserves hidden node order');
 
-    await search.fill('Legacy manual 3');
-    const mouseHandle = nodes.locator(`[data-rfd-drag-handle-draggable-id="node-${nodeIds[2]}"]`);
-    const groupCard = sections.nth(0).locator('[data-group-card-id]').filter({ hasText: 'LegacyGroup' });
-    await groupCard.scrollIntoViewIfNeeded();
-    const from = await mouseHandle.boundingBox(), to = await groupCard.boundingBox();
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(from.x + from.width / 2 + 10, from.y + from.height / 2, { steps: 5 });
-    await page.mouse.move(to.x + to.width / 2, to.y + Math.min(60, to.height / 2), { steps: 20 });
-    await page.waitForTimeout(250);
-    const expandedBox = await groupCard.boundingBox();
-    const groupViewport = await sections.nth(0).locator('.panel-side-scroll').boundingBox();
-    await page.mouse.move(expandedBox.x + expandedBox.width / 2,
-      (Math.max(expandedBox.y, groupViewport.y) + Math.min(expandedBox.y + expandedBox.height, groupViewport.y + groupViewport.height)) / 2,
-      { steps: 5 });
-    await page.mouse.up();
-    await page.waitForTimeout(300);
-    assert.ok((await gql('query {groups{id nodes{id}}}')).groups.find(item => item.id === groupId).nodes.some(item => item.id === nodeIds[2]));
-    console.log('PASS: pointer drag from virtual list into a collapsed group expands and binds the node through the real API');
+    await navigate('dashboard');
+    const groupCard = sections.nth(0).locator('[data-group-card-id]').filter({hasText:'LegacyGroup'});
+    await groupCard.getByRole('button', {name:'管理成员 LegacyGroup',exact:true}).click();
+    await groupCard.getByRole('button', {name:'添加节点',exact:true}).click();
+    await dialog.getByRole('checkbox').first().click();
+    await dialog.getByRole('button', {name:'添加所选节点',exact:true}).click();
+    await dialog.waitFor({state:'hidden'});
+    assert.ok((await gql('query {groups{id nodes{id}}}')).groups.find(item=>item.id===groupId).nodes.length > 2);
+    console.log('PASS: dashboard manages group members through the real API without requiring a resource column');
+    await navigate('resources');
 
     await control('subscription_fail', { enabled: true });
     const originalSubNodes = (await gql('query {subscriptions{id nodes{edges{id name}}}}')).subscriptions;
@@ -197,6 +210,7 @@ async function login(page, url = base) {
     await dialog.waitFor({ state: 'hidden' });
     console.log('PASS: failed import keeps the form open and retains entered values');
 
+    await navigate('dashboard');
     await sections.nth(0).getByRole('button', { name: '新建群组', exact: true }).click();
     await dialog.getByRole('textbox', { name: /名字/ }).fill('invalid group name');
     await dialog.getByRole('button', { name: '提交', exact: true }).click();
@@ -206,6 +220,7 @@ async function login(page, url = base) {
     await dialog.getByRole('button', { name: '提交', exact: true }).click();
     await dialog.waitFor({ state: 'hidden' });
     assert.ok((await gql('query {groups{name}}')).groups.some(group => group.name === 'NewGroup'));
+    await navigate('resources');
     await search.fill('Legacy manual 1');
     await nodes.getByRole('button', { name: /^更多操作 / }).click();
     await frame.getByRole('menuitem', { name: '编辑', exact: true }).click();
@@ -301,14 +316,14 @@ async function login(page, url = base) {
     await subscriptionSearch.fill('Workspace-00');
     await viewer.getByRole('button', { name: '测试当前结果', exact: true }).click();
     await viewer.getByText(/测速进度/).waitFor();
-    await viewer.getByRole('button', { name: '本批完成后停止', exact: true }).click();
+    await viewer.getByRole('button', { name: '停止后续测速', exact: true }).click();
     await viewer.locator('button:not(:disabled)').filter({ hasText: '测试当前结果' }).waitFor();
-    assert.ok(probeRequests.length <= 3, 'Stop must cancel future batches');
+    assert.ok(probeRequests.length <= 17, 'Stop must cancel queued node requests');
     probeRequests = [];
     await viewer.getByRole('button', { name: '测试当前结果', exact: true }).click();
     await viewer.locator('button:not(:disabled)').filter({ hasText: '测试当前结果' }).waitFor();
     assert.equal(probeRequests.flat().length, 100);
-    assert.ok(probeRequests.every(ids => ids.length <= 8));
+    assert.ok(probeRequests.every(ids => ids.length === 1));
     failProbe = true;
     await subscriptionSearch.fill('Workspace-0999');
     await grid.getByRole('button', { name: /^测试节点延迟 / }).click();
@@ -340,20 +355,19 @@ async function login(page, url = base) {
     await viewer.evaluate(element => { element.ownerDocument.documentElement.style.fontSize = ''; });
     await page.keyboard.press('Escape');
     await viewer.waitFor({ state: 'hidden' });
+    await navigate('dashboard');
     await frame.getByRole('button', { name: '查看流量趋势', exact: true }).click();
     await frame.locator('#panel-traffic-trends svg.recharts-surface').first().waitFor();
     for (const name of ['10 分钟', '30 分钟', '1 小时']) await frame.getByRole('button', { name, exact: true }).click();
     await frame.getByRole('button', { name: '收起流量趋势', exact: true }).click();
-    await frame.getByRole('button', { name: '常用功能', exact: true }).click();
+    await navigate('resources');
     for (const width of [320, 390, 768, 1024, 1600]) {
       await page.setViewportSize({ width, height: 1100 });
       await page.waitForTimeout(150);
       assert.ok(await frame.locator('body').evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Horizontal overflow at ' + width);
-      assert.deepEqual(await sections.locator(':scope > div:first-child h2').allTextContents(), ['群组', '节点', '订阅']);
+      assert.deepEqual(await frame.locator('#workspace-nodes [data-testid=section] > div:first-child h2, #workspace-subscriptions [data-testid=section] > div:first-child h2').allTextContents(), ['节点', '订阅']);
       const tabs = frame.getByRole('tablist', { name: '常用功能' });
       if (await tabs.isVisible()) {
-        await tabs.getByRole('tab', { name: /群组/ }).click();
-        assert.equal(await nodes.isVisible(), false);
         await tabs.getByRole('tab', { name: /节点/ }).click();
         await search.fill('Edited in drawer');
         await tabs.getByRole('tab', { name: /订阅/ }).click();
@@ -448,7 +462,7 @@ async function login(page, url = base) {
     const secureContext = await browser.newContext({ ignoreHTTPSErrors: true, locale: 'zh-CN' });
     const securePage = await secureContext.newPage();
     const secureFrame = await login(securePage, base.replace(':18080', ':18443').replace('http:', 'https:'));
-    await secureFrame.getByRole('heading', { name: '代理管理', exact: true }).waitFor({ timeout: 45000 });
+    await secureFrame.getByRole('heading', { name: '管理面板', exact: true }).waitFor({ timeout: 45000 });
     const cookie = (await secureContext.cookies()).find(item => item.name === 'daed_luci_session');
     assert.ok(cookie && cookie.secure && cookie.httpOnly);
     await secureContext.close();
@@ -456,6 +470,7 @@ async function login(page, url = base) {
     const touchContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'zh-CN' });
     const touchPage = await touchContext.newPage();
     const touchFrame = await login(touchPage);
+    await touchPage.goto(base + '/cgi-bin/luci/admin/services/daed/resources');
     await touchFrame.locator('[data-node-scroll]').waitFor();
     const touchTabs = touchFrame.getByRole('tablist', { name: '常用功能' });
     await touchTabs.getByRole('tab', { name: /订阅/ }).tap();

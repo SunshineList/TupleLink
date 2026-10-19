@@ -10,9 +10,19 @@
     "order": 10,
     "action": { "type": "view", "path": "daed-router/panel" }
   },
+  "admin/services/daed/resources": {
+    "title": "节点和订阅",
+    "order": 20,
+    "action": { "type": "view", "path": "daed-router/panel" }
+  },
+  "admin/services/daed/advanced": {
+    "title": "高级设置",
+    "order": 30,
+    "action": { "type": "view", "path": "daed-router/panel" }
+  },
   "admin/services/daed/logs": {
     "title": "运行日志",
-    "order": 20,
+    "order": 40,
     "action": { "type": "view", "path": "daed-router/logs" }
   }
 }

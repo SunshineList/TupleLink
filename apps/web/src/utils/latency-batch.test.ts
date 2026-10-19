@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { testLatencyBatches } from './latency-batch'
 
 describe('bounded latency testing', () => {
-  it('deduplicates IDs, uses eight-node batches and reports incremental progress', async () => {
+  it('deduplicates IDs, uses concurrent single-node requests and reports each result', async () => {
     const batches: string[][] = []
     const progress: number[] = []
     await testLatencyBatches(
@@ -17,10 +17,10 @@ describe('bounded latency testing', () => {
       },
       () => false,
     )
-    expect(batches).toHaveLength(10)
-    expect(batches.every((batch) => batch.length <= 8)).toBe(true)
+    expect(batches).toHaveLength(79)
+    expect(batches.every((batch) => batch.length === 1)).toBe(true)
     expect(batches.flat()).toHaveLength(79)
-    expect(progress).toEqual([8, 16, 24, 32, 40, 48, 56, 64, 72, 79])
+    expect(progress).toEqual(Array.from({ length: 79 }, (_, i) => i + 1))
   })
   it('stops between batches and never submits an empty request', async () => {
     let calls = 0
@@ -58,6 +58,38 @@ describe('bounded latency testing', () => {
         () => false,
       ),
     ).rejects.toThrow('HTTP 502')
-    expect(progress).toEqual([8])
+    expect(progress.length).toBeGreaterThan(0)
+    expect(progress.length).toBeLessThan(20)
+  })
+  it('keeps eight workers moving while a slow node is pending, then drains in-flight work', async () => {
+    let finish!: () => void
+    const slow = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const completed: string[] = []
+    let active = 0
+    let peak = 0
+    const task = testLatencyBatches(
+      Array.from({ length: 12 }, (_, i) => String(i)),
+      async ([id]) => {
+        peak = Math.max(peak, ++active)
+        if (id === '0') await slow
+        await Promise.resolve()
+        active--
+        return [{ id, alive: true, latencyMs: 8, testedAt: '' }]
+      },
+      (results) => {
+        completed.push(results[0].id)
+      },
+      () => false,
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(peak).toBe(8)
+    expect(completed).toHaveLength(11)
+    expect(completed).not.toContain('0')
+    finish()
+    await task
+    expect(completed.at(-1)).toBe('0')
+    expect(active).toBe(0)
   })
 })

@@ -1,6 +1,6 @@
 import type { NodeLatencyProbeResult } from '~/apis'
 
-// Each request stays below the CGI deadline; return results incrementally.
+// A sliding window avoids a slow node holding up the next seven results.
 export async function testLatencyBatches(
   ids: string[],
   probe: (ids: string[]) => Promise<NodeLatencyProbeResult[]>,
@@ -9,10 +9,21 @@ export async function testLatencyBatches(
 ) {
   const unique = [...new Set(ids)]
   let completed = 0
-  for (let start = 0; start < unique.length && !stopped(); start += 8) {
-    const batch = unique.slice(start, start + 8)
-    const results = await probe(batch)
-    completed += batch.length
-    update(results, completed, unique.length)
-  }
+  let next = 0
+  let failure: unknown
+  await Promise.all(
+    Array.from({ length: Math.min(8, unique.length) }, async () => {
+      while (next < unique.length && !stopped() && !failure) {
+        const id = unique[next++]
+        try {
+          const results = await probe([id])
+          update(results, ++completed, unique.length)
+        } catch (error) {
+          failure = error
+        }
+      }
+    }),
+  )
+  // Wait for all in-flight requests before enabling another test.
+  if (failure) throw failure
 }

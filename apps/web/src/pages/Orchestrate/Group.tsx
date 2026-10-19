@@ -284,6 +284,15 @@ export function GroupResource({
             </span>
             <span>{t('groupPicker.nodesCount', { count: groupNodes.length })}</span>
             <span>{t('groupPicker.subscriptionGroupsCount', { count: groupSubscriptions.length })}</span>
+            {!!groupNodes.length && (
+              <span className="max-w-full truncate" title={groupNodes.map((node) => node.tag || node.name).join(' · ')}>
+                {groupNodes
+                  .slice(0, 2)
+                  .map((node) => node.tag || node.name)
+                  .join(' · ')}
+                {groupNodes.length > 2 ? '…' : ''}
+              </span>
+            )}
           </>
         }
         collapsed={!expandedGroupIds.has(groupId)}

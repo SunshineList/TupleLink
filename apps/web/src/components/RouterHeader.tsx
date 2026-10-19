@@ -1,12 +1,21 @@
 import { useIsMutating } from '@tanstack/react-query'
+import { Activity, Power } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useGeneralQuery, useRunMutation } from '~/apis'
 import { Button } from '~/components/ui/button'
 
 export function RouterHeader() {
   const { t } = useTranslation()
+  const { pathname } = useLocation()
+  const title =
+    pathname === '/resources'
+      ? t('panel.resources')
+      : pathname === '/advanced'
+        ? t('panel.advanced')
+        : t('panel.dashboard')
   const query = useGeneralQuery()
   const run = useRunMutation()
   const saving = useIsMutating() > 0
@@ -27,12 +36,12 @@ export function RouterHeader() {
   }
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-4 lg:px-8">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">{t('panel.title')}</h1>
-          <p className="mt-1 text-xs text-muted-foreground">{t('panel.description')}</p>
+      <div className="router-toolbar mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-4 py-3 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Activity className="h-5 w-5 text-primary" aria-hidden="true" />
+          <h1 className="text-base font-semibold tracking-tight">{title}</h1>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="router-toolbar-actions flex flex-wrap items-center gap-2">
           <span
             role="status"
             className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${running ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}
@@ -62,6 +71,7 @@ export function RouterHeader() {
             aria-busy={run.isPending && operation === 'toggle'}
             onClick={() => invoke('toggle')}
           >
+            <Power className="h-3.5 w-3.5" aria-hidden="true" />
             {run.isPending && operation === 'toggle'
               ? running
                 ? t('panel.stopping')

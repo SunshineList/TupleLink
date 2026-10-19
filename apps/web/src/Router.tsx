@@ -16,7 +16,9 @@ export function Router() {
     <RouterType>
       <Routes>
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<OrchestratePage />} />
+          <Route index element={<OrchestratePage area={routerMode ? 'dashboard' : 'all'} />} />
+          {routerMode && <Route path="resources" element={<OrchestratePage area="resources" />} />}
+          {routerMode && <Route path="advanced" element={<OrchestratePage area="advanced" />} />}
         </Route>
 
         <Route path="/setup" element={routerMode ? <Navigate to="/" replace /> : <SetupPage />} />
