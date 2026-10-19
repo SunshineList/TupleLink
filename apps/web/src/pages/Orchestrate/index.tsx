@@ -756,6 +756,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
               aria-label={t('group')}
             >
               <GroupResource
+                latencyTests={latencyTests}
                 quickAdd={area === 'dashboard'}
                 highlight={!!draggingResource}
                 draggingResource={draggingResource}

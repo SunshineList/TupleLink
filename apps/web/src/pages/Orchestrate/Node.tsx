@@ -22,7 +22,7 @@ import { useImportNodesMutation, useRemoveNodesMutation } from '~/apis'
 import { ConfigureNodeFormModal } from '~/components/ConfigureNodeFormModal'
 import { EditNodeFormModal } from '~/components/EditNodeFormModal'
 import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
-import { LatencyBadge, LatencyLegend } from '~/components/LatencyBadge'
+import { LatencyBadge } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceEmpty } from '~/components/ResourceEmpty'
@@ -288,7 +288,6 @@ export function NodeResource({
       >
         <p className="shrink-0 text-xs text-muted-foreground">{t('panel.manualNodesHint')}</p>
         <LatencyStatus tests={latencyTests} />
-        <LatencyLegend />
         {totalCount > 0 && (
           <div className="shrink-0 space-y-2" data-node-toolbar>
             <label className="flex items-center gap-2 rounded-lg border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">

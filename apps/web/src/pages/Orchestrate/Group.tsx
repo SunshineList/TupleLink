@@ -2,6 +2,7 @@ import type { DraggableProvidedDragHandleProps, DraggableStateSnapshot } from '@
 import type { NodeLatencyProbeResult } from '~/apis'
 import type { GroupFormModalRef } from '~/components/GroupFormModal'
 import type { GroupPickerItem } from '~/components/GroupResourcePickerModal'
+import type { LatencyTests } from '~/components/LatencyStatus'
 import type { DraggingResource } from '~/constants'
 import type { GroupsQuery, NodesQuery, SubscriptionsQuery } from '~/schemas/gql/graphql'
 import { Draggable, Droppable } from '@hello-pangea/dnd'
@@ -34,7 +35,6 @@ import { useDisclosure } from '~/hooks'
 import { cn } from '~/lib/utils'
 import { appStateAtom, defaultResourcesAtom } from '~/store'
 import { getInstantDropStyle } from '~/utils'
-import { formatLatencyLabel, hasMeasuredLatency } from '~/utils/latency'
 
 const GROUP_DROPPABLE_ID = 'group-list'
 
@@ -44,6 +44,7 @@ export function GroupResource({
   dragDestinationDroppableId,
   hoveredGroupId,
   nodeLatencies,
+  latencyTests,
   quickAdd = false,
 }: {
   highlight?: boolean
@@ -51,6 +52,7 @@ export function GroupResource({
   dragDestinationDroppableId?: string | null
   hoveredGroupId?: string | null
   nodeLatencies?: Record<string, NodeLatencyProbeResult>
+  latencyTests: LatencyTests
   quickAdd?: boolean
 }) {
   const { t } = useTranslation()
@@ -151,18 +153,12 @@ export function GroupResource({
         const description = [node.name && node.name !== title ? node.name : '', node.address]
           .filter(Boolean)
           .join(' · ')
-        const metaTone: GroupPickerItem['metaTone'] = hasMeasuredLatency(nodeLatencies?.[node.id])
-          ? 'primary'
-          : 'default'
 
         return {
           id: node.id,
           title,
           description: description || undefined,
-          meta: [t('groupPicker.manualNode'), formatLatencyLabel(nodeLatencies?.[node.id], t)]
-            .filter(Boolean)
-            .join(' · '),
-          metaTone,
+          meta: t('groupPicker.manualNode'),
           badge: node.protocol || undefined,
           keywords: [node.name, node.tag, node.address, node.protocol].filter(Boolean) as string[],
         }
@@ -175,21 +171,12 @@ export function GroupResource({
         .filter((node) => !existingNodeIds.has(node.id))
         .map((node) => {
           const title = node.name || node.id
-          const metaTone: GroupPickerItem['metaTone'] = hasMeasuredLatency(nodeLatencies?.[node.id])
-            ? 'primary'
-            : 'default'
 
           return {
             id: node.id,
             title,
             description: undefined,
-            meta: [
-              t('groupPicker.fromSubscription', { name: subscriptionName }),
-              formatLatencyLabel(nodeLatencies?.[node.id], t),
-            ]
-              .filter(Boolean)
-              .join(' · '),
-            metaTone,
+            meta: t('groupPicker.fromSubscription', { name: subscriptionName }),
             badge: node.protocol || undefined,
             keywords: [node.name, node.link, node.protocol, subscriptionName].filter(Boolean) as string[],
           }
@@ -197,7 +184,7 @@ export function GroupResource({
     })
 
     return [...manualNodeItems, ...subscriptionNodeItems]
-  }, [addingNodesGroup, nodeLatencies, nodes, subscriptions, t])
+  }, [addingNodesGroup, nodes, subscriptions, t])
 
   const addableSubscriptionItems = useMemo<GroupPickerItem[]>(() => {
     if (!addingSubscriptionsGroup) return []
@@ -440,6 +427,8 @@ export function GroupResource({
       />
 
       <GroupAddNodesModal
+        tests={latencyTests}
+        latencies={nodeLatencies}
         opened={!!addingNodesGroupId}
         onClose={() => setAddingNodesGroupId(null)}
         groupName={addingNodesGroup?.name || t('group')}
@@ -458,6 +447,8 @@ export function GroupResource({
       />
 
       <GroupAddSubscriptionsModal
+        tests={latencyTests}
+        latencies={nodeLatencies}
         opened={!!addingSubscriptionsGroupId}
         onClose={() => setAddingSubscriptionsGroupId(null)}
         groupName={addingSubscriptionsGroup?.name || t('group')}

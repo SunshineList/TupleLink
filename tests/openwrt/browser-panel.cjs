@@ -159,6 +159,7 @@ async function login(page, url = base) {
     assert.equal(await frame.locator('#panel-advanced').isVisible(), false);
     assert.equal(await nodes.locator('[data-rfd-draggable-id]').count(), 7, 'Manual panel excludes subscription nodes');
     assert.equal(await nodes.getByRole('combobox', { name: '节点来源' }).count(), 0);
+    assert.equal(await frame.getByLabel('延迟颜色说明').count(),0);
     const search = nodes.getByRole('searchbox', { name: '搜索节点' });
     await search.fill('missing-node');
     await nodes.getByRole('heading', { name: '没有匹配的节点' }).waitFor();
@@ -224,6 +225,93 @@ async function login(page, url = base) {
     assert.equal(await groupToggle.getAttribute('aria-expanded'),'true', 'Successful add must reveal members');
     console.log('PASS: card padding click, keyboard expansion, isolated settings, quick add while collapsed, and successful add reveals members');
     console.log('PASS: dashboard manages group members through the real API without requiring a resource column');
+    // Real picker probes use the local SOCKS/HTTP fixture, never the proxy Run path.
+    await gql('mutation PickerCheckTarget($id:ID!,$global:globalInput!){updateConfig(id:$id,global:$global){id}}', {id:checkConfig.id,global:{tcpCheckUrl:['http://127.0.0.1:18081/probe','127.0.0.1'],tcpCheckHttpMethod:'GET'}});
+    const pickerSeeds=(await gql('mutation PickerSeeds($args:[ImportArgument!]!){importNodes(rollbackError:true,args:$args){node{id}}}',{args:Array.from({length:12},(_,i)=>({tag:'Picker manual '+i,link:'socks5://'+proxyFixture.address+'#Picker-manual-'+i}))})).importNodes.map(item=>item.node.id);
+    const pickerSub=(await gql('mutation {importSubscription(rollbackError:true,arg:{tag:"Picker subscription",link:"http://127.0.0.1:18081/sub-probes"}){sub{id}}}')).importSubscription.sub.id;
+    await navigate('dashboard');
+    const pickerBindings=await gql('query {groups{id nodes{id} subscriptions{subscription{id} nameFilterRegex}}}');
+    await groupCard.getByRole('button',{name:'添加节点',exact:true}).click();
+    const nodePicker=frame.locator('[data-node-picker]');
+    const pickerSearch=nodePicker.getByRole('searchbox');
+    await pickerSearch.fill('Picker manual');
+    const firstPick=nodePicker.locator(`[data-picker-node="${pickerSeeds[0]}"]`);
+    const secondPick=nodePicker.locator(`[data-picker-node="${pickerSeeds[1]}"]`);
+    await firstPick.getByRole('checkbox').check();
+    await secondPick.getByRole('button',{name:/^测试节点延迟/}).focus();
+    await page.keyboard.press('Enter');
+    await secondPick.locator('[data-latency-tone="good"]').waitFor();
+    assert.ok(await firstPick.getByRole('checkbox').isChecked());
+    assert.equal(await secondPick.getByRole('checkbox').isChecked(),false,'Keyboard testing must not select a node');
+    await nodePicker.getByRole('button',{name:'测试当前结果',exact:true}).click();
+    await nodePicker.getByRole('button',{name:'测试当前结果',exact:true}).waitFor({state:'visible'});
+    await nodePicker.locator('[data-picker-node] [data-latency-tone="good"]').nth(11).waitFor();
+    assert.equal(await pickerSearch.inputValue(),'Picker manual');
+    assert.ok(await firstPick.getByRole('checkbox').isChecked());
+    assert.ok((await gql('query {nodeLatencies{id alive}}')).nodeLatencies.filter(item=>pickerSeeds.includes(item.id)).every(item=>item.alive));
+    await page.route('**/cgi-bin/daed-router/graphql',async route=>{
+      if(/mutation TestNodeLatencies/.test(route.request().postDataJSON().query)) return route.fulfill({status:502,body:'Injected picker transport failure'});
+      return route.continue();
+    });
+    await secondPick.getByRole('button',{name:/^测试节点延迟/}).click();
+    await nodePicker.getByRole('alert').waitFor();
+    assert.ok(await firstPick.getByRole('checkbox').isChecked());
+    assert.equal(await pickerSearch.inputValue(),'Picker manual');
+    assert.equal(await secondPick.locator('[data-latency-tone]').getAttribute('data-latency-tone'),'good');
+    await page.unroute('**/cgi-bin/daed-router/graphql');
+    await page.screenshot({path:path.join(output,'picker-nodes-desktop.png'),fullPage:true});
+    await page.keyboard.press('Escape');
+    await nodePicker.waitFor({state:'hidden'});
+    await groupCard.getByRole('button',{name:'添加订阅组',exact:true}).click();
+    const subPicker=frame.locator('[data-subscription-picker]');
+    const subPickCard=subPicker.locator(`[data-picker-subscription="${pickerSub}"]`);
+    await subPickCard.getByRole('button',{name:'测试订阅组节点 Picker subscription',exact:true}).click();
+    await subPickCard.getByText('已测 2/2 · 可用 2',{exact:true}).waitFor();
+    assert.equal(await subPickCard.getByRole('checkbox').isChecked(),false,'Testing a subscription must not select it');
+    assert.ok(await subPickCard.locator('[data-latency-tone="good"]').isVisible());
+    await subPickCard.getByRole('checkbox').check();
+    assert.equal(await subPicker.locator('[data-picker-preview-node]').count(),2);
+    assert.equal(await subPicker.locator('[data-picker-preview-node] [data-latency-tone="good"]').count(),2);
+    await subPicker.getByRole('textbox',{name:'节点名称正则',exact:true}).fill('HK');
+    assert.equal(await subPicker.locator('[data-picker-preview-node]').count(),1);
+    await subPicker.getByRole('button',{name:'测试匹配节点',exact:true}).click();
+    await subPicker.locator('[data-picker-preview-node] button:not(:disabled)').waitFor();
+    await subPicker.locator('[data-picker-preview-node]').getByRole('button',{name:/^测试节点延迟/}).click();
+    await subPicker.locator('[data-picker-preview-node] button:not(:disabled)').waitFor();
+    await page.screenshot({path:path.join(output,'picker-subscriptions-desktop.png'),fullPage:true});
+    await page.keyboard.press('Escape');
+    await subPicker.waitFor({state:'hidden'});
+    assert.deepEqual(await gql('query {groups{id nodes{id} subscriptions{subscription{id} nameFilterRegex}}}'),pickerBindings,'Probing must not alter group bindings');
+    // Closing a picker stops queued nodes while in-flight results still enter shared cache.
+    let pickerRequests=0, releasePickerProbes;
+    const closingProbeGate=new Promise(resolve=>{releasePickerProbes=resolve;});
+    await page.route('**/cgi-bin/daed-router/graphql',async route=>{
+      const payload=route.request().postDataJSON();
+      if(!/mutation TestNodeLatencies/.test(payload.query)) return route.continue();
+      pickerRequests++;
+      await closingProbeGate;
+      return route.fulfill({json:{data:{testNodeLatencies:payload.variables.ids.map(id=>({id,alive:true,latencyMs:210,testedAt:new Date().toISOString(),message:null}))}}});
+    });
+    await groupCard.getByRole('button',{name:'添加节点',exact:true}).click();
+    await pickerSearch.fill('Picker manual');
+    await nodePicker.getByRole('button',{name:'测试当前结果',exact:true}).click();
+    await nodePicker.getByRole('status').waitFor();
+    await page.keyboard.press('Escape');
+    await nodePicker.waitFor({state:'hidden'});
+    releasePickerProbes();
+    await groupCard.getByRole('button',{name:'添加节点',exact:true}).click();
+    await pickerSearch.fill('Picker manual');
+    await nodePicker.locator('button:not(:disabled)').filter({hasText:'测试当前结果'}).waitFor();
+    assert.ok(pickerRequests>0 && pickerRequests<=8,'Closing must stop remaining picker requests');
+    assert.ok(await nodePicker.locator('[data-latency-tone="warning"]').count()>0,'Completed results must survive closing');
+    await page.keyboard.press('Escape');
+    await nodePicker.waitFor({state:'hidden'});
+    await page.unroute('**/cgi-bin/daed-router/graphql');
+    await gql('mutation RemovePickerNodes($ids:[ID!]!){removeNodes(ids:$ids)}',{ids:pickerSeeds});
+    await gql('mutation RemovePickerSubscription($ids:[ID!]!){removeSubscriptions(ids:$ids)}',{ids:[pickerSub]});
+    await gql('mutation RestorePickerCheckTarget($id:ID!,$global:globalInput!){updateConfig(id:$id,global:$global){id}}',{id:checkConfig.id,global:checkConfig.global});
+    console.log('PASS: actual node/subscription picker probes, keyboard isolation, live colored results, batch search, regex-limited preview probes, 502 preservation, shared cache and close stops queue');
+
     await navigate('resources');
 
     await control('subscription_fail', { enabled: true });
@@ -313,6 +401,7 @@ async function login(page, url = base) {
     const beforeLargeHeight = (await frame.locator('#panel-common').boundingBox()).height;
     await largeCard.getByRole('button', { name: /查看节点/ }).click();
     const viewer = frame.locator('[data-subscription-browser]');
+    assert.equal(await viewer.getByLabel('延迟颜色说明').count(),0);
     const grid = viewer.getByRole('list', { name: '订阅节点', exact: true });
     assert.equal(await grid.locator('[data-subscription-node]').count(), 1000);
     assert.equal(await viewer.getByRole('navigation', { name: '节点分页' }).count(), 0);
@@ -344,12 +433,12 @@ async function login(page, url = base) {
     assert.ok((await gql('query {groups{id nodes{name}}}')).groups.find(item => item.id === groupId).nodes.some(item => item.name.includes('Workspace-0999')));
     // Deterministic transport failures and batch UI are fault-injected; actual
     // HTTP-over-SOCKS probe/cancellation is tested in Go against a local server.
-    let probeRequests = [], failProbe = false, probeLatency = 18;
+    let probeRequests = [], failProbe = false, probeLatency = 18, probeGate = null;
     await page.route('**/cgi-bin/daed-router/graphql', async route => {
       const payload = route.request().postDataJSON();
       if (!/mutation TestNodeLatencies/.test(payload.query)) return route.continue();
       const ids = payload.variables.ids; probeRequests.push(ids);
-      await new Promise(resolve => setTimeout(resolve, 80));
+      if (probeGate) await probeGate; else await new Promise(resolve => setTimeout(resolve, 80));
       if (failProbe) return route.fulfill({ status: 502, contentType: 'text/plain', body: 'Injected gateway failure' });
       return route.fulfill({ json: { data: { testNodeLatencies: ids.map(id => ({ id, alive: probeLatency !== null, latencyMs: probeLatency, testedAt: new Date().toISOString(), message: null })) } } });
     });
@@ -372,11 +461,15 @@ async function login(page, url = base) {
     probeRequests = [probeRequests.at(-1)];
 
     await subscriptionSearch.fill('Workspace-00');
+    let releaseStopProbes;
+    probeGate = new Promise(resolve => {releaseStopProbes=resolve;});
     await viewer.getByRole('button', { name: '测试当前结果', exact: true }).click();
     await viewer.getByText(/测速进度/).waitFor();
     await viewer.getByRole('button', { name: '停止后续测速', exact: true }).click();
+    releaseStopProbes();
+    probeGate = null;
     await viewer.locator('button:not(:disabled)').filter({ hasText: '测试当前结果' }).waitFor();
-    assert.ok(probeRequests.length <= 17, 'Stop must cancel queued node requests');
+    assert.ok(probeRequests.length <= 9, 'Stop must cancel queued node requests');
     probeRequests = [];
     await viewer.getByRole('button', { name: '测试当前结果', exact: true }).click();
     await viewer.locator('button:not(:disabled)').filter({ hasText: '测试当前结果' }).waitFor();
@@ -561,7 +654,20 @@ async function login(page, url = base) {
     await touchSurface.tap({position:{x:6,y:6}});
     assert.equal(await touchToggle.getAttribute('aria-expanded'),'false');
     await touchGroup.getByRole('button',{name:'添加节点',exact:true}).tap();
-    await touchFrame.getByRole('dialog').getByRole('button',{name:'取消',exact:true}).tap();
+    const touchNodePicker=touchFrame.locator('[data-node-picker]');
+    await touchNodePicker.getByRole('searchbox').fill('Legacy manual 7');
+    await touchPage.route('**/cgi-bin/daed-router/graphql',async route=>{
+      const payload=route.request().postDataJSON();
+      if(!/mutation TestNodeLatencies/.test(payload.query)) return route.continue();
+      return route.fulfill({json:{data:{testNodeLatencies:payload.variables.ids.map(id=>({id,alive:true,latencyMs:85,testedAt:new Date().toISOString(),message:null}))}}});
+    });
+    await touchNodePicker.getByRole('button',{name:/^测试节点延迟/}).tap();
+    await touchNodePicker.locator('[data-latency-tone="good"]').waitFor();
+    assert.equal(await touchNodePicker.getByRole('checkbox').isChecked(),false);
+    assert.ok(await touchNodePicker.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
+    await touchPage.screenshot({path:path.join(output,'picker-touch-dark.png'),fullPage:true});
+    await touchNodePicker.getByRole('button',{name:'取消',exact:true}).tap();
+    await touchPage.unroute('**/cgi-bin/daed-router/graphql');
     assert.equal(await touchToggle.getAttribute('aria-expanded'),'false');
     console.log('PASS: mobile dark dashboard directly shows trends, card surface expands by touch, and quick add works without expansion');
     await touchPage.goto(base + '/cgi-bin/luci/admin/services/daed/resources');

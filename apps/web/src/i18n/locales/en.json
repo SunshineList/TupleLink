@@ -69,7 +69,8 @@
     "updateAll": "Update All",
     "viewDetails": "View Details",
     "viewQRCode": "View QR Code",
-    "viewSource": "View Source"
+    "viewSource": "View Source",
+    "select": "Select"
   },
   "address": "address",
   "allowInsecure": "Allow Insecure",
@@ -234,7 +235,11 @@
     "subscriptionPreviewEmpty": "No nodes match the current rule.",
     "subscriptionPreviewMatchedCount": "{{count}} nodes matched",
     "subscriptionPreviewNoMatchForItem": "No nodes from this subscription group match the current rule.",
-    "subscriptionRegexTooltip": "Filter rule: {{regex}}"
+    "subscriptionRegexTooltip": "Filter rule: {{regex}}",
+    "testSubscription": "Test subscription nodes",
+    "testMatched": "Test matching nodes",
+    "fastest": "Lowest latency",
+    "testSummary": "Tested {{count}}/{{total}} · Reachable {{alive}}"
   },
   "info": "info",
   "interface and kernel options": "Interface and Kernel Options",

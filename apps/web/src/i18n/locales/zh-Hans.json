@@ -69,7 +69,8 @@
     "updateAll": "更新全部",
     "viewDetails": "查看详情",
     "viewQRCode": "查看二维码",
-    "viewSource": "查看源代码"
+    "viewSource": "查看源代码",
+    "select": "选择"
   },
   "address": "地址",
   "allowInsecure": "允许不安全",
@@ -234,7 +235,11 @@
     "subscriptionPreviewEmpty": "当前规则没有匹配到任何节点。",
     "subscriptionPreviewMatchedCount": "匹配 {{count}} 个节点",
     "subscriptionPreviewNoMatchForItem": "这个订阅组在当前规则下没有匹配节点。",
-    "subscriptionRegexTooltip": "过滤规则：{{regex}}"
+    "subscriptionRegexTooltip": "过滤规则：{{regex}}",
+    "testSubscription": "测试订阅组节点",
+    "testMatched": "测试匹配节点",
+    "fastest": "最低延迟",
+    "testSummary": "已测 {{count}}/{{total}} · 可用 {{alive}}"
   },
   "info": "信息",
   "interface and kernel options": "接口及内核选项",

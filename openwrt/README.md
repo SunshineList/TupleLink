@@ -1,15 +1,15 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.2)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.3](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.3)。
 
-## 0.6.2 管理面板交互优化
+## 0.6.3 群组选择窗口内测速
 
-- 电脑端左侧运行概况约占三分之二宽度，右侧群组更紧凑；手机按概况、群组顺序显示。
-- 上传、下载、连接、本次流量及双向趋势默认直接显示；累计上传、累计下载和 UDP 会话一起展示，保留四档时间范围。
-- 点击群组名称、摘要或卡片空白即可展开/收起，也支持键盘操作；设置、重命名、删除及拖拽独立响应。
-- 群组收起时仍可直接添加节点或订阅组，支持现有搜索和多选；添加成功自动展开，立即看到新成员。
-- 保留管理面板、节点和订阅、高级设置、运行日志四项菜单，以及原有节点管理、测速、排序和界面偏好；不更改数据库或网络配置逻辑。
+- 添加节点时，可单独测试每个候选节点，也可搜索后批量测试当前结果；选择和测速是独立操作，结果实时显示。
+- 添加订阅组时，可在选择前测试整组，查看已测/可用数量和最低延迟；选中订阅后，预览节点支持单测和按名称正则批量测试。
+- 测速结果沿用绿、黄、红标记，移除手动节点和订阅节点列表的颜色说明文字。
+- 两个窗口沿用现有并发队列，关闭时停止继续提交排队节点，已完成结果保留并同步到列表；测速不改变群组绑定。
+- 保留概况默认展示、群组卡片点击和快捷添加、四项菜单、所有现有配置及界面偏好。
 
 ## 使用
 
@@ -32,7 +32,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.2/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.3/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

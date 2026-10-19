@@ -6,7 +6,7 @@ import type { LibraryNode } from '~/utils/node-library'
 import { Eye, Gauge, Search } from 'lucide-react'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { LatencyBadge, LatencyLegend } from '~/components/LatencyBadge'
+import { LatencyBadge } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
@@ -180,7 +180,6 @@ export function SubscriptionNodes({
               {t('panel.filteredNodes', { count: filtered.length, total: library.length })}
             </span>
           </div>
-          <LatencyLegend />
           <LatencyStatus tests={tests} />
           <div
             className="subscription-node-grid"

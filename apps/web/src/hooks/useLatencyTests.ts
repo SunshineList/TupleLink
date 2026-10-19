@@ -56,14 +56,15 @@ export function useLatencyTests() {
     },
     [mutateAsync, t],
   )
+  const stop = useCallback(() => {
+    stopped.current = true
+  }, [])
   return {
     test,
     pending,
     busy,
     progress,
     error,
-    stop: () => {
-      stopped.current = true
-    },
+    stop,
   }
 }

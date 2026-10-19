@@ -27,14 +27,3 @@ export function LatencyBadge({ result, fallback }: { result?: NodeLatencyProbeRe
     </span>
   )
 }
-
-export function LatencyLegend() {
-  const { t } = useTranslation()
-  return (
-    <p className="flex shrink-0 flex-wrap gap-x-4 gap-y-1 text-xs" aria-label={t('latency.colors')}>
-      <span className="font-medium text-emerald-700 dark:text-emerald-300">{t('latency.good')}</span>
-      <span className="font-medium text-amber-800 dark:text-amber-300">{t('latency.warning')}</span>
-      <span className="font-medium text-red-700 dark:text-red-300">{t('latency.bad')}</span>
-    </p>
-  )
-}
