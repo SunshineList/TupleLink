@@ -4,10 +4,16 @@ package node
 
 import (
 	"context"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/netip"
+	"net/url"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/daeuniverse/dae-wing/common"
@@ -158,14 +164,14 @@ func testSingleNodeLatency(ctx context.Context, option *dialer.GlobalOption, nod
 	r := &LatencyResolver{NodeID: node.ID, TestedAtV: time.Now()}
 	d, err := dialer.NewFromLinkContext(ctx, option, dialer.InstanceOption{DisableCheck: true}, node.Link, "")
 	if err != nil {
-		message := "unsupported or invalid node"
+		message := "invalid_node"
 		r.MessageV = &message
 		return r
 	}
 	defer d.Close()
 	result, err := probeInteractiveLatency(ctx, d)
 	if err != nil {
-		message := "node probe failed"
+		message := latencyFailureCode(err)
 		r.MessageV = &message
 		return r
 	}
@@ -174,7 +180,7 @@ func testSingleNodeLatency(ctx context.Context, option *dialer.GlobalOption, nod
 		ms := int32(result.Latency.Milliseconds())
 		r.LatencyMsV = &ms
 	} else {
-		message := "node unreachable or timed out"
+		message := "unreachable"
 		r.MessageV = &message
 	}
 	return r
@@ -198,6 +204,7 @@ func probeInteractiveLatency(parent context.Context, d *dialer.Dialer) (*dialer.
 	type attempt struct {
 		ok      bool
 		latency time.Duration
+		err     error
 	}
 	results := make(chan attempt, 2)
 	var wg sync.WaitGroup
@@ -213,17 +220,71 @@ func probeInteractiveLatency(parent context.Context, d *dialer.Dialer) (*dialer.
 			defer wg.Done()
 			start := time.Now()
 			ok, err := d.HttpCheck(ctx, index, opt.Url, ip, opt.Method, network.Mark, network.Mptcp)
-			results <- attempt{ok: ok && err == nil, latency: time.Since(start)}
+			results <- attempt{ok: ok && err == nil, latency: time.Since(start), err: err}
 		}(family.ip, family.index)
 	}
 	go func() { wg.Wait(); close(results) }()
 	result := &dialer.LatencyProbeResult{}
+	var failure error
 	for attempt := range results {
 		if attempt.ok && !result.Alive {
 			result.Alive, result.Latency = true, attempt.latency
 			cancel()
 		}
+		// Prefer an actionable error over a second family's generic timeout.
+		if attempt.err != nil && (failure == nil || latencyFailureCode(failure) == "timeout") {
+			failure = attempt.err
+		}
 	}
 	result.CheckedAt = time.Now()
+	if !result.Alive && failure != nil {
+		return result, failure
+	}
 	return result, nil
+}
+
+// Return fixed categories only: nested network errors can contain credentials,
+// the full node URL, private certificate paths or server-controlled messages.
+func latencyFailureCode(err error) string {
+	for {
+		var request *url.Error
+		if !errors.As(err, &request) || request.Err == nil {
+			break
+		}
+		err = request.Err
+	}
+	var dns *net.DNSError
+	if errors.As(err, &dns) {
+		return "dns_failed"
+	}
+	var authority x509.UnknownAuthorityError
+	var hostname x509.HostnameError
+	var certificate x509.CertificateInvalidError
+	if errors.As(err, &authority) || errors.As(err, &hostname) || errors.As(err, &certificate) {
+		return "tls_failed"
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return "connection_refused"
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed) {
+		return "connection_closed"
+	}
+	message := strings.ToLower(err.Error())
+	var network net.Error
+	if errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &network) && network.Timeout()) || strings.Contains(message, "timeout") {
+		return "timeout"
+	}
+	if errors.Is(err, context.Canceled) {
+		return "cancelled"
+	}
+	if strings.Contains(message, "certificate") || strings.Contains(message, "tls: ") {
+		return "tls_failed"
+	}
+	if strings.Contains(message, "auth") || strings.Contains(message, "password") {
+		return "authentication_failed"
+	}
+	if strings.Contains(message, "status code") {
+		return "check_target_failed"
+	}
+	return "unreachable"
 }

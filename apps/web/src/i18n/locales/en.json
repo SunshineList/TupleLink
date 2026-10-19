@@ -261,6 +261,17 @@
     "testAllNodesWithStatus": "Test all node latencies · Last tested at {{ time }} · {{ count }} nodes measured",
     "nodesMeasured": "{{ count }} nodes measured",
     "failed": "Failed",
+    "nodeFailure": {
+      "invalidNode": "Invalid options",
+      "dns": "DNS failed",
+      "tls": "Certificate error",
+      "refused": "Connection refused",
+      "closed": "Connection closed",
+      "timeout": "Timed out",
+      "cancelled": "Cancelled",
+      "authentication": "Authentication failed",
+      "target": "Check URL failed"
+    },
     "unavailable": "Unavailable",
     "test": "Test",
     "testNode": "Test node latency",

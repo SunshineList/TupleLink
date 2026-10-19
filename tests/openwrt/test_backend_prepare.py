@@ -16,6 +16,8 @@ SOURCES = (
     "graphql/service/node/latency_cache.go",
     "graphql/mutation.go",
     "dae/runtime.go",
+    "dae-core/component/outbound/dialer/register.go",
+    "dae-core/common/subscription/subscription.go",
 )
 
 
@@ -55,6 +57,15 @@ class BackendPrepareTests(unittest.TestCase):
         path.write_bytes(path.read_bytes() + b"// local edit\n")
         before = path.read_bytes()
         with self.assertRaisesRegex(ValueError, "Unknown runtime test fixture"):
+            PREPARE.prepare(self.root)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_unknown_protocol_wrapper_edit_is_preserved(self):
+        PREPARE.prepare(self.root)
+        path = self.root / "dae-core/component/outbound/dialer/router_protocol_compat.go"
+        path.write_bytes(path.read_bytes() + b"// local transport change\n")
+        before = path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "Unknown protocol compatibility source"):
             PREPARE.prepare(self.root)
         self.assertEqual(path.read_bytes(), before)
 

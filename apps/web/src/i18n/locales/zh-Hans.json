@@ -261,6 +261,17 @@
     "testAllNodesWithStatus": "测试所有节点延迟 · 最近测试时间 {{ time }} · 已测试 {{ count }} 个节点",
     "nodesMeasured": "已测试 {{ count }} 个节点",
     "failed": "失败",
+    "nodeFailure": {
+      "invalidNode": "参数错误",
+      "dns": "解析失败",
+      "tls": "证书错误",
+      "refused": "连接被拒绝",
+      "closed": "连接被关闭",
+      "timeout": "超时",
+      "cancelled": "已取消",
+      "authentication": "认证失败",
+      "target": "测试地址异常"
+    },
     "unavailable": "不可用",
     "test": "测试",
     "testNode": "测试节点延迟",

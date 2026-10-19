@@ -19,6 +19,22 @@ export function formatLatencyLabel(result: NodeLatencyProbeResult | undefined, t
     return undefined
   }
   if (result.alive === false) {
+    const reasons = {
+      invalid_node: 'invalidNode',
+      dns_failed: 'dns',
+      tls_failed: 'tls',
+      connection_refused: 'refused',
+      connection_closed: 'closed',
+      timeout: 'timeout',
+      cancelled: 'cancelled',
+      authentication_failed: 'authentication',
+      check_target_failed: 'target',
+    } as const
+    const reason =
+      result.message && Object.hasOwn(reasons, result.message)
+        ? reasons[result.message as keyof typeof reasons]
+        : undefined
+    if (reason) return t(`latency.nodeFailure.${reason}`)
     return t('latency.failed')
   }
   if (hasMeasuredLatency(result)) {

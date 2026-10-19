@@ -1,7 +1,17 @@
 # Daed 软路由插件
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.10](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.10)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.11](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.11)。
+
+## 0.6.11 协议参数兼容修复
+
+- Hysteria2 的 Salamander 混淆、`obfs-password` / `obfsPassword`、`ports` / `mport`
+  端口范围在实际连接和手动测试中统一生效；编辑保留完整的 `user:password` 认证。
+- AnyTLS 正确识别显式的 `insecure=true`、`allowInsecure` 参数，未启用时仍校验证书。
+- SS 的 SIP008 订阅保留插件名称及参数；编辑器兼容 SIP002 明文凭据和插件 TLS 标志。
+- 节点测试显示超时、证书、DNS、连接关闭等固定失败分类，不输出节点凭据或服务器原文。
+- 独立 sing-box 服务端的 15 项本地用例覆盖 SS/SS2022、HY2、AnyTLS 的真实 HTTP、UDP
+  传输及严格证书拒绝。此结果不代表订阅供应商的每个公网节点均可用。
 
 ## 0.6.10 运行概况流量修复
 
@@ -81,7 +91,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，已有本项目安装时使用同一条命令升级，无需卸载：
 
 ```sh
-uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.10/install.sh && sh /tmp/daed-install.sh
+uclient-fetch -O /tmp/daed-install.sh https://github.com/slobys/daed/releases/download/openwrt-v0.6.11/install.sh && sh /tmp/daed-install.sh
 ```
 
 升级先停止 Daed 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到

@@ -4,6 +4,8 @@ package node
 import (
 	"bufio"
 	"context"
+	"crypto/x509"
+	"fmt"
 	"github.com/daeuniverse/dae-wing/db"
 	dialer "github.com/daeuniverse/dae/component/outbound/dialer"
 	"github.com/graph-gophers/graphql-go"
@@ -11,12 +13,35 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
+
+func TestRouterLatencyFailureCategoriesDoNotLeakCredentials(t *testing.T) {
+	for _, c := range []struct {
+		err  error
+		code string
+	}{
+		{x509.UnknownAuthorityError{}, "tls_failed"},
+		{&net.DNSError{Err: "private host", Name: "fixture.invalid"}, "dns_failed"},
+		{syscall.ECONNREFUSED, "connection_refused"},
+		{io.EOF, "connection_closed"},
+		{context.DeadlineExceeded, "timeout"},
+		{context.Canceled, "cancelled"},
+		{fmt.Errorf("authentication failed for private-password"), "authentication_failed"},
+		{fmt.Errorf("unexpected status code: 403 private-provider-body"), "check_target_failed"},
+	} {
+		wrapped := &url.Error{Op: "Get", URL: "anytls://private-password@fixture.invalid", Err: c.err}
+		if got := latencyFailureCode(wrapped); got != c.code {
+			t.Fatalf("expected %s, got %s", c.code, got)
+		}
+	}
+}
 
 func TestRouterLatencyThroughRealSocksAndCancellation(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

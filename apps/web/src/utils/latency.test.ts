@@ -1,6 +1,7 @@
+import type { TFunction } from 'i18next'
 import type { NodeLatencyProbeResult } from '~/apis'
 import { describe, expect, it } from 'vitest'
-import { hasMeasuredLatency, latencyTone } from './latency'
+import { formatLatencyLabel, hasMeasuredLatency, latencyTone } from './latency'
 
 const measured = (latencyMs: number): NodeLatencyProbeResult => ({
   id: 'fixture',
@@ -9,6 +10,15 @@ const measured = (latencyMs: number): NodeLatencyProbeResult => ({
   testedAt: '',
 })
 describe('latency colors', () => {
+  it('only renders known failure categories and never echoes arbitrary backend text', () => {
+    const translate = ((key: string) => key) as TFunction
+    expect(formatLatencyLabel({ ...measured(0), alive: false, message: 'tls_failed' }, translate)).toBe(
+      'latency.nodeFailure.tls',
+    )
+    expect(formatLatencyLabel({ ...measured(0), alive: false, message: 'private://password@host' }, translate)).toBe(
+      'latency.failed',
+    )
+  })
   it.each([
     [0, 'good'],
     [199, 'good'],

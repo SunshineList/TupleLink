@@ -1,3 +1,39 @@
+# 0.6.11 协议兼容验证
+
+日期：2026-10-19；分支：`codex/openwrt-plugin`。
+测试发行：[openwrt-v0.6.11](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.11)。
+
+- 在独立 sing-box 1.14.3 回环服务端复现 Hysteria2 Salamander 被忽略、AnyTLS
+  `insecure=true` 未生效的问题；修复前分别超时、证书验证失败，修复后实际传输通过。
+- 15 项跨实现用例覆盖 SS AEAD 三种算法、SS2022 三种算法、普通 HY2、用户名密码
+  认证、Salamander、混淆参数别名与端口范围、AnyTLS 及显式布尔别名。
+  14 项成功用例均验证 64 KiB HTTP 回包、UDP echo 和实际交互式测试；另 1 项
+  验证未启用 insecure 时严格拒绝不可信证书，面板返回 `tls_failed`。
+- 修复 SS SIP008 插件名丢失，SS 编辑器明文凭据、插件 TLS 标志和等号参数丢失，
+  HY2 编辑器认证、混淆及端口参数丢失；已有协议/用户配置不做批量重写。
+- 测试返回固定错误类别，前端仅渲染已知文案；错误回归含凭据 URL 和服务器原文，
+  验证不向面板泄露。运行时、DNS、群组绑定和数据库结构保持原有设计。
+- 测试服务端仅作为本地验证工具，未加入运行依赖。源码通过受校验补丁复现，
+  不修改固定子模块版本，也不修改全局 Go module 缓存。
+- 34 项协议解析、64 项前端单元测试及 TypeScript/ESLint 通过；新增后端分类、SIP008
+  和参数回归通过。隔离 OpenWrt 共 72 项测试，其中 66 项通过、6 项环境依赖用例跳过。
+  9 项 LuCI 测试通过，最终 x86_64 / ARM64 构建和 22 个 IPK/APK 包内容校验通过。
+- 从最终 IPK 提取程序执行 0.6.10 → 0.6.11 的原生 LuCI 升级，10 张用户表保留；
+  千节点连续浏览、多选、单项/批量测试、错误保留、HTTPS、电脑/触摸手机回归通过。
+
+用户提供的公网 AnyTLS 节点在本机的 Daed、Windows/Linux sing-box 均失败；用户随后
+确认同一节点在 v2rayN 也不可用。此结果不能证明具体供应商故障原因，也不等于
+所有 SS/HY2 节点均已修复；没有可复现的公网 SS/HY2 连接错误日志。
+本轮不在用户路由器安装或修改配置，不以本地回环测试替代 R4S 的 eBPF/LAN 验收。
+
+复现协议互操作测试（先执行 `openwrt/prepare-wing.py /path/to/wing`）：
+
+```sh
+python3 tests/openwrt/protocol_interop.py --wing /path/to/wing --sing-box /path/to/sing-box
+```
+
+---
+
 # 0.6.10 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。

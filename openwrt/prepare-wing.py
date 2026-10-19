@@ -77,6 +77,8 @@ def prepare(root):
         generated[name] = digest(data)
     # Keep latency fixes in the release source, without changing submodule pins.
     patches = {
+        "dae-core/component/outbound/dialer/register.go": ("59aa07ff1a3bf7c7dd38353091c3e9cdb2510f256e02e327c1fc768ef4e3ca99", lambda value: value.replace('normalizedLink := normalizeShadowTLSPluginOptions(link)\n\tbaseDialer := newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp)', 'normalizedLink, baseDialer, err := routerProtocolOptions(normalizeShadowTLSPluginOptions(link), newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp), gOption.UDPHopInterval)\n\tif err != nil { return nil, err }', 1)),
+        "dae-core/common/subscription/subscription.go": ("c48c3a14937aac13fde5d10af24e6d5774c6b5d2f09f8f23872201c06dcdd05f", lambda value: value.replace('url.Values{"plugin": []string{server.PluginOpts}}.Encode()', 'routerSIP008Plugin(server.Plugin, server.PluginOpts)', 1)),
         "dae/runtime.go": ("582676a55373d44220dced8552f094482d7d35a423d13de98ae0865cbe687062", lambda value: (HERE / "wing/runtime.go").read_text(encoding="utf-8")),
         "graphql/service/node/latency_mutation_utils.go": ("b7e722f4c24dd9606fceaf310daf285b30b8d878413ca20702970ef3b4ca805d", lambda value: (HERE / "wing/node_latency.go").read_text(encoding="utf-8")),
         "graphql/service/node/latency_cache.go": ("4d4fd03249c617bcc9fccb508dbc2d567fa74557dd5900ee046cbf307ff64831", lambda value: value.replace('if err := refreshLatencyCacheIfNeeded(ctx); err != nil {\n\t\treturn nil, err\n\t}', '// Reading results must never start network probes.').replace('if _, ok := merged[id]; !ok {', 'if cached, ok := merged[id]; !ok || resolver.TestedAtV.After(cached.TestedAtV) {')),
@@ -101,6 +103,19 @@ def prepare(root):
         raise ValueError("Unknown latency tests; refusing to overwrite")
     destination.write_bytes(data)
     generated[key] = digest(data)
+    for relative, source in (
+        ("dae-core/component/outbound/dialer/router_protocol_compat.go", "protocol_compat.go"),
+        ("dae-core/component/outbound/dialer/router_protocol_compat_test.go", "protocol_compat_test.go"),
+        ("dae-core/common/subscription/router_sip008.go", "sip008.go"),
+        ("dae-core/common/subscription/router_sip008_test.go", "sip008_test.go"),
+        ("graphql/service/node/router_protocol_interop_test.go", "protocol_interop_test.go"),
+    ):
+        destination = root / relative
+        data = (HERE / "wing" / source).read_bytes()
+        if destination.exists() and destination.read_bytes() != data and previous.get(relative) != digest(destination.read_bytes()):
+            raise ValueError("Unknown protocol compatibility source: " + relative)
+        destination.write_bytes(data)
+        generated[relative] = digest(data)
     # Tagged socket fixtures validate the real per-plane recorders and adapter.
     # They are not compiled into release binaries and never initialize eBPF.
     for relative, source in (

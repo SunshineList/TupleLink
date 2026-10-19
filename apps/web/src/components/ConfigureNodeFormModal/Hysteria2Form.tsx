@@ -16,7 +16,7 @@ function generateHysteria2Link(data: Hysteria2FormValues): string {
   /* hysteria2://[auth@]hostname[:port]/?[key=value]&[key=value]... */
   const query = {
     obfs: data.obfs,
-    obfsPassword: data.obfsPassword,
+    'obfs-password': data.obfsPassword,
     sni: data.sni,
     ports: data.ports || '',
     insecure: data.allowInsecure ? 1 : 0,
@@ -71,6 +71,18 @@ export function Hysteria2Form({ onLinkGeneration, initialValues, actionsPortal }
         onChange={(e) => setValue('ports', e.target.value)}
       />
       <Input label="Auth" withAsterisk value={formValues.auth} onChange={(e) => setValue('auth', e.target.value)} />
+      <Input
+        label={t('configureNode.obfs')}
+        placeholder="salamander"
+        value={formValues.obfs}
+        onChange={(e) => setValue('obfs', e.target.value)}
+      />
+      <Input
+        label={t('configureNode.obfsPassword')}
+        type="password"
+        value={formValues.obfsPassword}
+        onChange={(e) => setValue('obfsPassword', e.target.value)}
+      />
       <Input label="SNI" value={formValues.sni} onChange={(e) => setValue('sni', e.target.value)} />
       <Input label="Pin SHA256" value={formValues.pinSHA256} onChange={(e) => setValue('pinSHA256', e.target.value)} />
       <Checkbox

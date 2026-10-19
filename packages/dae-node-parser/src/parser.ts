@@ -13,6 +13,14 @@ import type {
 
 import { Base64 } from 'js-base64'
 
+function explicitTLSPreference(params: URLSearchParams): boolean {
+  for (const key of ['insecure', 'allowInsecure', 'allow_insecure']) {
+    const value = params.get(key)
+    if (value) return ['1', 'true', 't'].includes(value.toLowerCase())
+  }
+  return false
+}
+
 /**
  * Parse HTTP/HTTPS protocol URL
  * Format: http://[username:password@]host:port#name
@@ -107,7 +115,9 @@ export function parseSSUrl(url: string): Partial<SSConfig> | null {
           plugin = pluginParts[0] || ''
           pluginOpts = pluginParts.slice(1).reduce(
             (acc, part) => {
-              const [key, value] = part.split('=')
+              const equals = part.indexOf('=')
+              const key = equals < 0 ? part : part.slice(0, equals)
+              const value = equals < 0 ? '' : part.slice(equals + 1)
 
               if (key) {
                 acc[key] = value || ''
@@ -132,7 +142,8 @@ export function parseSSUrl(url: string): Partial<SSConfig> | null {
       port = Number.parseInt(cleanHostPort.slice(colonIndex + 1), 10)
 
       // Decode userinfo
-      const userInfo = Base64.decode(userInfoBase64)
+      const encodedUserInfo = decodeURIComponent(userInfoBase64)
+      const userInfo = encodedUserInfo.includes(':') ? encodedUserInfo : Base64.decode(encodedUserInfo)
       const colonUserIndex = userInfo.indexOf(':')
 
       if (colonUserIndex === -1) {
@@ -183,7 +194,7 @@ export function parseSSUrl(url: string): Partial<SSConfig> | null {
 
     // Parse plugin options
     if (plugin === 'v2ray-plugin') {
-      result.tls = pluginOpts.tls ? 'tls' : ''
+      result.tls = pluginOpts.tls !== undefined && !['false', '0'].includes(pluginOpts.tls) ? 'tls' : ''
       result.mode = pluginOpts.mode || 'websocket'
       result.host = pluginOpts.host || ''
       result.path = pluginOpts.path || ''
@@ -383,7 +394,7 @@ export function parseHysteria2Url(url: string): Partial<Hysteria2Config> | null 
     const params = parsed.searchParams
 
     return {
-      auth: decodeURIComponent(parsed.username),
+      auth: decodeURIComponent(parsed.username) + (parsed.password ? `:${decodeURIComponent(parsed.password)}` : ''),
       server: parsed.hostname,
       port: parsed.port ? Number.parseInt(parsed.port, 10) : 443,
       name: decodeURIComponent(parsed.hash.slice(1) || ''),
@@ -391,7 +402,7 @@ export function parseHysteria2Url(url: string): Partial<Hysteria2Config> | null 
       obfsPassword: params.get('obfs-password') || params.get('obfsPassword') || '',
       sni: params.get('sni') || '',
       ports: params.get('ports') || params.get('mport') || '',
-      allowInsecure: params.get('insecure') === '1' || params.get('insecure') === 'true',
+      allowInsecure: explicitTLSPreference(params),
       pinSHA256: params.get('pinSHA256') || '',
     }
   } catch {
@@ -418,7 +429,7 @@ export function parseAnytlsUrl(url: string): Partial<AnytlsConfig> | null {
       port: parsed.port ? Number.parseInt(parsed.port, 10) : 443,
       name: decodeURIComponent(parsed.hash.slice(1) || ''),
       sni: params.get('sni') || params.get('peer') || '',
-      allowInsecure: params.get('insecure') === '1' || params.get('insecure') === 'true',
+      allowInsecure: explicitTLSPreference(params),
     }
   } catch {
     return null
@@ -446,7 +457,7 @@ export function parseVMessUrl(url: string): (Partial<V2rayConfig> & { protocol: 
     const mainContent = hashIndex !== -1 ? content.slice(0, hashIndex) : content
 
     // If content contains @ and doesn't look like base64, try URL format first
-    if (mainContent.includes('@') && !mainContent.match(/^[A-Z0-9+/=]+$/i)) {
+    if (mainContent.includes('@') && !/^[A-Z0-9+/=]+$/i.test(mainContent)) {
       const result = parseVMessStandardUrl(url)
 
       if (result) {
