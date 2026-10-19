@@ -849,3 +849,21 @@ form {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Dense node selection keeps the result beside the name and a full touch target. */
+.picker-node-row [data-latency-tone] {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+@media (max-width: 640px), (pointer: coarse) {
+  .picker-node-select,
+  .picker-latency-button,
+  .node-picker-toolbar button,
+  .node-picker-footer button {
+    min-height: 44px;
+  }
+  .node-picker-toolbar input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}

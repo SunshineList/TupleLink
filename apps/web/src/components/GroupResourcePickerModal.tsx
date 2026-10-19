@@ -92,14 +92,21 @@ const PickerLatencyButton = memo(
         type="button"
         size="sm"
         variant="ghost"
-        className="px-1"
+        className="picker-latency-button min-h-9 min-w-16 gap-1 px-1.5 text-xs"
         loading={pending}
         disabled={busy}
+        aria-busy={pending}
         aria-label={`${t('latency.testNode')} ${name}`}
         onClick={() => onTest([id])}
       >
-        {!result && !pending && <Gauge aria-hidden="true" />}
-        <LatencyBadge result={result} fallback={t('latency.test')} />
+        {result ? (
+          <LatencyBadge result={result} />
+        ) : (
+          <>
+            {!pending && <Gauge aria-hidden="true" />}
+            <span>{t('latency.test')}</span>
+          </>
+        )}
       </Button>
     )
   },
@@ -128,53 +135,44 @@ const PickerNodeCard = memo(
       <article
         data-picker-node={item.id}
         className={cn(
-          'min-w-0 rounded-lg border p-3 transition-colors hover:border-primary/30',
+          'picker-node-row grid min-w-0 grid-cols-[20px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2.5 py-1.5 transition-colors hover:border-primary/30',
           checked && 'border-primary bg-primary/5',
         )}
         onClick={(event) => {
           if (!(event.target as Element).closest('button,[role="checkbox"]')) onToggle(item.id)
         }}
       >
-        <div className="flex min-w-0 items-start gap-3">
-          <Checkbox
-            checked={checked}
-            className="mt-1 shrink-0"
-            aria-label={`${t('actions.select')} ${item.title}`}
-            onCheckedChange={() => onToggle(item.id)}
-          />
-          <button
-            type="button"
-            className="min-w-0 flex-1 text-left"
-            aria-pressed={checked}
-            aria-label={`${t('actions.select')} ${item.title}`}
-            onClick={() => onToggle(item.id)}
-          >
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="break-words text-sm font-medium">{item.title}</span>
-              {item.badge && (
-                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                  {item.badge}
-                </span>
-              )}
-            </span>
-            {item.description && (
-              <span className="mt-1 block truncate text-xs text-muted-foreground" title={item.description}>
-                {item.description}
-              </span>
+        <Checkbox
+          checked={checked}
+          className="shrink-0"
+          aria-label={`${t('actions.select')} ${item.title}`}
+          onCheckedChange={() => onToggle(item.id)}
+        />
+        <button
+          type="button"
+          className="picker-node-select min-h-10 min-w-0 text-left"
+          aria-pressed={checked}
+          aria-label={`${t('actions.select')} ${item.title}`}
+          onClick={() => onToggle(item.id)}
+        >
+          <span className="block text-sm font-medium leading-5 [overflow-wrap:anywhere]">{item.title}</span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-muted-foreground">
+            {item.badge && (
+              <span className="shrink-0 text-[10px] font-medium uppercase text-primary">{item.badge}</span>
             )}
-            {item.meta && <span className="mt-1 block truncate text-xs text-muted-foreground">{item.meta}</span>}
-          </button>
-        </div>
-        <div className="mt-2 flex justify-end">
-          <PickerLatencyButton
-            id={item.id}
-            name={item.title}
-            result={result}
-            pending={pending}
-            busy={busy}
-            onTest={onTest}
-          />
-        </div>
+            <span className="min-w-0 truncate" title={[item.meta, item.description].filter(Boolean).join(' · ')}>
+              {[item.meta, item.description].filter(Boolean).join(' · ')}
+            </span>
+          </span>
+        </button>
+        <PickerLatencyButton
+          id={item.id}
+          name={item.title}
+          result={result}
+          pending={pending}
+          busy={busy}
+          onTest={onTest}
+        />
       </article>
     )
   },
@@ -255,17 +253,17 @@ export function GroupAddNodesModal({
           if (loading) event.preventDefault()
         }}
       >
-        <ScrollableDialogHeader>
-          <div className="pr-8">
-            <DialogTitle>{t('groupPicker.addNodesTitle', { name: groupName })}</DialogTitle>
-            <p className="mt-2 text-sm text-muted-foreground">
+        <ScrollableDialogHeader className="px-4 py-3 text-left">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pr-8">
+            <DialogTitle className="text-base">{t('groupPicker.addNodesTitle', { name: groupName })}</DialogTitle>
+            <p className="text-xs text-muted-foreground">
               {t('groupPicker.selectedCount', { count: selectedIds.length })}
             </p>
           </div>
         </ScrollableDialogHeader>
-        <div className="shrink-0 space-y-3 border-b px-6 py-3">
-          <div className="flex flex-wrap gap-2">
-            <div className="min-w-0 flex-1 basis-[220px]">
+        <div className="node-picker-toolbar shrink-0 space-y-2 border-b px-4 py-2.5">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+            <div className="min-w-0">
               <Input
                 type="search"
                 value={query}
@@ -278,6 +276,7 @@ export function GroupAddNodesModal({
             <Button
               type="button"
               variant="outline"
+              size="sm"
               disabled={tests.busy || !filteredItems.length}
               onClick={() => pickerTests.test(filteredItems.map((item) => item.id))}
             >
@@ -287,8 +286,8 @@ export function GroupAddNodesModal({
           </div>
           <LatencyStatus tests={tests} scope="group-picker" />
         </div>
-        <ScrollableDialogBody>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-3">
+        <ScrollableDialogBody className="px-4 py-3">
+          <div data-picker-list className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2">
             {filteredItems.map((item) => (
               <PickerNodeCard
                 key={item.id}
@@ -302,15 +301,15 @@ export function GroupAddNodesModal({
               />
             ))}
             {!filteredItems.length && (
-              <p className="py-10 text-center text-sm text-muted-foreground">
+              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
                 {t(query.trim() ? 'groupPicker.noSearchResults' : 'groupPicker.noAvailableNodes')}
               </p>
             )}
           </div>
         </ScrollableDialogBody>
-        <ScrollableDialogFooter>
+        <ScrollableDialogFooter className="node-picker-footer flex-row flex-wrap items-center justify-end px-4 py-3">
           {submitError && (
-            <p role="alert" className="mr-auto text-xs text-destructive">
+            <p role="alert" className="w-full text-xs text-destructive">
               {submitError}
             </p>
           )}

@@ -267,6 +267,12 @@ async function login(page, url = base) {
     await pickerSearch.fill('Picker manual');
     const firstPick=nodePicker.locator(`[data-picker-node="${pickerSeeds[0]}"]`);
     const secondPick=nodePicker.locator(`[data-picker-node="${pickerSeeds[1]}"]`);
+    await firstPick.waitFor();
+    await page.waitForTimeout(250);
+    assert.ok((await firstPick.boundingBox()).height<=76,'Normal picker rows should stay compact');
+    assert.ok(Math.abs((await firstPick.boundingBox()).y-(await secondPick.boundingBox()).y)<2,'Desktop picker uses two columns');
+    assert.ok(await firstPick.evaluate(element=>element.scrollWidth<=element.clientWidth+1),'Picker content must not overflow');
+
     await firstPick.getByRole('checkbox').check();
     await secondPick.getByRole('button',{name:/^测试节点延迟/}).focus();
     await page.keyboard.press('Enter');
@@ -752,6 +758,12 @@ async function login(page, url = base) {
     await touchNodePicker.getByRole('button',{name:/^测试节点延迟/}).tap();
     await touchNodePicker.locator('[data-latency-tone="good"]').waitFor();
     assert.equal(await touchNodePicker.getByRole('checkbox').isChecked(),false);
+    await touchPage.waitForTimeout(250);
+    const touchRow=touchNodePicker.locator('[data-picker-node]');
+    assert.ok((await touchRow.boundingBox()).height<=88,'Mobile picker should use compact rows');
+    assert.ok((await touchRow.getByRole('button',{name:/^测试节点延迟/}).boundingBox()).height>=44,'Touch testing keeps a 44px target');
+    assert.equal(await touchNodePicker.locator('[data-picker-list]').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),1);
+
     assert.ok(await touchNodePicker.evaluate(element=>element.scrollWidth<=element.clientWidth+1));
     await touchPage.screenshot({path:path.join(output,'picker-touch-dark.png'),fullPage:true});
     await touchNodePicker.getByRole('button',{name:'取消',exact:true}).tap();
