@@ -3,13 +3,53 @@ package main
 import (
 	"debug/elf"
 	"encoding/binary"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
 )
+
+func TestKernelProbesLoadRealCallbackAndPacketAccess(t *testing.T) {
+	var names []string
+	if err := validateKernel(func(spec *ebpf.ProgramSpec) error {
+		if spec.Type != ebpf.SchedCLS || spec.License != "GPL" || len(spec.Instructions) < 8 {
+			t.Fatal("incomplete kernel probe")
+		}
+		names = append(names, spec.Name)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 2 || names[0] != "nl_loop" || names[1] != "nl_packet" {
+		t.Fatal(names)
+	}
+	var callback, loop bool
+	functions := 0
+	for _, instruction := range kernelProbeSpecs()[0].Instructions {
+		if btf.FuncMetadata(&instruction) != nil {
+			functions++
+		}
+		callback = callback || (instruction.IsLoadOfFunctionPointer() && instruction.Reference() == "callback")
+		loop = loop || (instruction.OpCode == asm.FnLoop.Call().OpCode && instruction.Constant == int64(asm.FnLoop))
+	}
+	if !callback || !loop || functions != 2 {
+		t.Fatal("helper-ID-only test cannot validate callback/JIT support")
+	}
+}
+
+func TestKernelProbeFailureIsReturnedWithoutTryingLaterPrograms(t *testing.T) {
+	want := errors.New("callback rejected")
+	calls := 0
+	err := validateKernel(func(*ebpf.ProgramSpec) error { calls++; return want })
+	if !errors.Is(err, want) || calls != 1 {
+		t.Fatal(err, calls)
+	}
+}
 
 func TestELFArchitectureProfiles(t *testing.T) {
 	for _, item := range []struct {

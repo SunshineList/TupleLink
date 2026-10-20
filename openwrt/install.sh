@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/NaiLink
-release=openwrt-v0.6.19
+release=openwrt-v0.6.20
 asset_dir=''
 mode=install
 action=install
@@ -378,7 +378,7 @@ fi
 if [ "$action" != reinstall ] && { installed daed || installed luci-app-daed; }; then fail 'Another NaiLink package is installed; use --reinstall for a backed-up fresh installation.'; fi
 printf 'NaiLink: %s / %s / %s, release %s\n' "$machine" "$format" "$selected_arch" "$version"
 case "$probe_cpu" in armv7|mips|mipsle)
-	printf 'NaiLink: 32 位架构为试验支持；需要兼容的 eBPF/BTF 内核，尚未完成全部设备的透明代理与长期运行验证。\n' ;;
+	printf 'NaiLink: 32 位版本仅为实验构建；已测常见内核无法加载必需的 BPF 回调。最小内核探针通过后，仍需完整透明代理和长期运行验证。\n' ;;
 esac
 
 # Native package managers resolve kmods against the router's own feeds/kernel ABI.

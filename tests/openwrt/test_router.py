@@ -80,7 +80,11 @@ enable) touch /tmp/autostart ;;
 disable) rm -f /tmp/autostart ;;
 esac''')
         self.write("/fixtures/check", (OPENWRT / "files/daed-check").read_bytes(), True)
-        self.script("/fixtures/btf-probe", '[ ! -e /tmp/btf-bad ] || { echo "invalid BTF fixture" >&2; exit 1; }')
+        self.script("/fixtures/btf-probe", '''[ ! -e /tmp/btf-bad ] || { echo "invalid BTF fixture" >&2; exit 1; }
+case " $* " in *' --kernel '*)
+ echo "$*" >> /tmp/kernel-probes
+ [ ! -e /tmp/kernel-bad ] || { echo 'kernel callback unsupported' >&2; exit 1; } ;;
+esac''')
         self.write("/installer/install.sh", (OPENWRT / "install.sh").read_bytes(), True)
         self.write("/fixtures/nailink", (OPENWRT / "files/nailink").read_bytes(), True)
         self.script("/fixtures/install", '''[ ! -e /tmp/pm-fail ] || exit 17

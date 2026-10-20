@@ -26,6 +26,7 @@ SOURCES = (
     "dae/runtime.go",
     "dae-core/component/outbound/dialer/dialer.go",
     "dae-core/component/outbound/dialer/register.go",
+    "dae-core/component/interface_manager.go",
     "dae-core/common/subscription/subscription.go",
 )
 

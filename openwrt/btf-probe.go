@@ -10,7 +10,10 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/rlimit"
 )
 
 func elfArchitecture(arch string) (elf.Class, elf.Data, elf.Machine) {
@@ -68,16 +71,81 @@ func validateBTF(path string) error {
 	return nil
 }
 
+// A helper-ID/version check is insufficient: 32-bit kernels can recognize
+// bpf_loop while their JIT cannot load callbacks. Load real, unattached probe
+// programs and close every FD; do not change sysctls, interfaces or routing.
+func kernelProbeSpecs() []*ebpf.ProgramSpec {
+	callback := asm.LoadImm(asm.R2, -1, asm.DWord).WithReference("callback")
+	callback.Src = asm.PseudoFunc
+	integer := &btf.Int{Name: "int", Size: 4, Encoding: btf.Signed}
+	voidPointer := &btf.Pointer{Target: &btf.Void{}}
+	entry := btf.WithFuncMetadata(asm.Mov.Imm(asm.R1, 1), &btf.Func{Name: "nl_loop", Type: &btf.FuncProto{
+		Return: integer, Params: []btf.FuncParam{{Name: "ctx", Type: voidPointer}},
+	}})
+	callbackEntry := btf.WithFuncMetadata(asm.Mov.Imm(asm.R0, 1).WithSymbol("callback"), &btf.Func{Name: "callback", Type: &btf.FuncProto{
+		Return: integer, Params: []btf.FuncParam{{Name: "index", Type: &btf.Int{Name: "u32", Size: 4}}, {Name: "ctx", Type: voidPointer}},
+	}})
+	return []*ebpf.ProgramSpec{
+		{Name: "nl_loop", Type: ebpf.SchedCLS, License: "GPL", Instructions: asm.Instructions{
+			entry, callback,
+			asm.Mov.Imm(asm.R3, 0), asm.Mov.Imm(asm.R4, 0), asm.FnLoop.Call(),
+			asm.Mov.Imm(asm.R0, 0), asm.Return(),
+			callbackEntry, asm.Return(),
+		}},
+		// The L3 path reads IPv4 fields directly from skb->data. Kernels with
+		// strict packet alignment must reject this before package replacement.
+		{Name: "nl_packet", Type: ebpf.SchedCLS, License: "GPL", Instructions: asm.Instructions{
+			asm.LoadMem(asm.R2, asm.R1, 76, asm.Word),
+			asm.LoadMem(asm.R3, asm.R1, 80, asm.Word),
+			asm.Mov.Reg(asm.R4, asm.R2), asm.Add.Imm(asm.R4, 20),
+			asm.JGT.Reg(asm.R4, asm.R3, "done"),
+			asm.LoadMem(asm.R0, asm.R2, 12, asm.Word),
+			asm.Mov.Imm(asm.R0, 0).WithSymbol("done"), asm.Return(),
+		}},
+	}
+}
+
+func validateKernel(load func(*ebpf.ProgramSpec) error) error {
+	for _, spec := range kernelProbeSpecs() {
+		if err := load(spec); err != nil {
+			return fmt.Errorf("kernel cannot load transparent-proxy requirement %s: %w; CPU, kernel version and BTF alone do not prove compatibility; a compatible kernel/JIT is required", spec.Name, err)
+		}
+	}
+	return nil
+}
+
+func loadKernelProbe(spec *ebpf.ProgramSpec) error {
+	program, err := ebpf.NewProgram(spec)
+	if err != nil {
+		return err
+	}
+	return program.Close()
+}
+
 func main() {
 	path := flag.String("file", "", "BTF/vmlinux file selected from the runtime's kernel search paths")
+	kernel := flag.Bool("kernel", false, "load and close unattached TC callback and packet-access probes")
 	flag.Parse()
-	if *path == "" || flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: btf-probe --file /path/to/vmlinux")
+	if (*path == "" && !*kernel) || flag.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "usage: btf-probe --file /path/to/vmlinux [--kernel], or btf-probe --kernel")
 		os.Exit(2)
 	}
-	if err := validateBTF(*path); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	if *path != "" {
+		if err := validateBTF(*path); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println("BTF parsed; required network types found.")
 	}
-	fmt.Println("BTF parsed; required network types found. This does not load eBPF.")
+	if *kernel {
+		if err := rlimit.RemoveMemlock(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := validateKernel(loadKernelProbe); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println("Kernel TC callback and packet-access probes loaded and closed; complete datapath validation is still required.")
+	}
 }

@@ -1,6 +1,7 @@
 """Architecture selection and ABI guards, with real ash/UCI and synthetic ELF."""
 import importlib.util
 import hashlib
+import json
 from pathlib import Path
 import struct
 import tempfile
@@ -101,3 +102,30 @@ class RouterArchitectureTests(unittest.TestCase):
                     self.assertIn("Unsupported CPU", result.stderr)
                     self.assertEqual((case.root / "tmp/pm-calls").read_text(), "")
                 finally: case.tearDown()
+
+    def test_kernel_probe_rejection_preserves_existing_service_and_database(self):
+        for fmt in ('ipk', 'apk'):
+            case = test_router.RouterTests(); case.setUp()
+            try:
+                if fmt == 'apk': case.use_apk(machine='mips', architecture='mipsel_24kc')
+                else:
+                    case.write('/tmp/machine', 'armv7l\n')
+                    case.write('/tmp/arch', 'arm_cortex-a7_neon-vfpv4\n')
+                    case.assets(fmt, 'arm_cortex-a7_neon-vfpv4')
+                case.managed()
+                case.write('/etc/daed/wing.db', 'preserved-database')
+                case.write('/tmp/kernel-bad', '')
+                case.write('/tmp/pm-calls', '')
+                result = case.install('--dry-run')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('kernel callback unsupported', result.stdout + result.stderr)
+                self.assertIn('--kernel', (case.root / 'tmp/kernel-probes').read_text())
+                self.assertEqual((case.root / 'etc/daed/wing.db').read_text(), 'preserved-database')
+                self.assertTrue((case.root / 'tmp/daemon-running').exists())
+                self.assertNotIn('update', (case.root / 'tmp/pm-calls').read_text())
+                check = case.run_router('/bin/sh', '/fixtures/check')
+                report = json.loads(check.stdout)
+                statuses = {item['name']: item['status'] for item in report['checks']}
+                self.assertEqual(statuses['btf'], 'ok')
+                self.assertEqual(statuses['kernel_datapath'], 'error')
+            finally: case.tearDown()

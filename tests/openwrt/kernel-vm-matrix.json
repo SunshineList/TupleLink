@@ -1,0 +1,18 @@
+{
+  "x86_64": {
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-generic-kernel.bin",
+    "sha256": "06199141695a347a586964d89bffea5b2da3e75728e91fe826ed55e4b6aecc3c"
+  },
+  "armv7": {
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/armsr/armv7/openwrt-24.10.4-armsr-armv7-generic-kernel.bin",
+    "sha256": "403029f894a2887c9588d7b45ccd6df8f96c5c83ae60d9169e4815440292a7aa"
+  },
+  "mips": {
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/malta/be/openwrt-24.10.4-malta-be-vmlinux.elf",
+    "sha256": "f36db0669d3dd43881be5de2e687d0331a0222a7732499ee9ed0926928feb63a"
+  },
+  "mipsle": {
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/malta/le/openwrt-24.10.4-malta-le-vmlinux.elf",
+    "sha256": "c73022e3bfc9a3af51df9974469f0c3954c9e71335e469aa23d86b9b6c49b52e"
+  }
+}

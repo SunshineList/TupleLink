@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.6.19'
+        default: '0.6.20'
         required: true
 
 permissions:
@@ -104,6 +104,7 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends qemu-user-static
           python3 tests/openwrt/architecture_smoke.py --cpu '${{ matrix.cpu }}' --binary .build/runtime/daed
+          python3 tests/openwrt/architecture_regression.py --cpu '${{ matrix.cpu }}' --wing wing
       - name: Live TCP and UDP runtime overview regression
         if: matrix.cpu == 'x86_64'
         run: |
@@ -114,7 +115,10 @@ jobs:
         run: cd wing && go test -count=1 -v ./graphql ./graphql/service/node ./graphql/service/subscription
       - name: Backend concurrency regression
         if: matrix.cpu == 'x86_64'
-        run: cd wing && CGO_ENABLED=1 go test -race -count=1 ./graphql ./graphql/service/node ./graphql/service/subscription ./cmd ./dae
+        run: |
+          cd wing
+          CGO_ENABLED=1 go test -race -count=1 ./graphql ./graphql/service/node ./graphql/service/subscription ./cmd ./dae
+          CGO_ENABLED=1 go test -race -count=1 github.com/daeuniverse/dae/component -run '^TestRouterInterface'
       - name: LuCI gateway authentication and upgrade tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/luci-proxy.go ../openwrt/luci-proxy_test.go
@@ -198,8 +202,64 @@ jobs:
           name: openwrt-packages-${{ matrix.target }}
           path: .build/packages/
 
+  kernel-preflight:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - cpu: x86_64
+            goarch: amd64
+            qemu_package: qemu-system-x86
+            qemu: qemu-system-x86_64
+            expect: success
+          - cpu: armv7
+            goarch: arm
+            qemu_package: qemu-system-arm
+            qemu: qemu-system-arm
+            expect: failure
+          - cpu: mips
+            goarch: mips
+            qemu_package: qemu-system-mips
+            qemu: qemu-system-mips
+            expect: failure
+          - cpu: mipsle
+            goarch: mipsle
+            qemu_package: qemu-system-mips
+            qemu: qemu-system-mipsel
+            expect: failure
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.0'
+          cache-dependency-path: wing/go.sum
+      - name: Build standalone probes and fetch checksum-pinned test kernel
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: 7,softfloat
+          GOMIPS: softfloat
+        run: |
+          mkdir -p .build/kernel-vm
+          (cd wing && go build -o ../.build/kernel-vm/init ../tests/openwrt/kernel_probe_init.go)
+          (cd wing && go build -o ../.build/kernel-vm/probe ../openwrt/btf-probe.go)
+          python3 -c 'import hashlib,json,urllib.request; r=json.load(open("tests/openwrt/kernel-vm-matrix.json"))["${{ matrix.cpu }}"]; p=".build/kernel-vm/kernel"; urllib.request.urlretrieve(r["url"],p); assert hashlib.sha256(open(p,"rb").read()).hexdigest()==r["sha256"]'
+      - name: Verify real kernel acceptance or expected incompatibility
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends '${{ matrix.qemu_package }}' e2fsprogs
+          sudo python3 tests/openwrt/kernel_probe_vm.py --cpu '${{ matrix.cpu }}' --kernel .build/kernel-vm/kernel --init .build/kernel-vm/init --probe .build/kernel-vm/probe --qemu '/usr/bin/${{ matrix.qemu }}' --work .build/kernel-vm --expect '${{ matrix.expect }}'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: kernel-preflight-${{ matrix.cpu }}
+          path: .build/kernel-vm/*.log
+
   assemble:
-    needs: packages
+    needs: [packages, kernel-preflight]
     runs-on: ubuntu-24.04
     env:
       VERSION: ${{ inputs.version }}

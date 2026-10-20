@@ -162,6 +162,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         "cmd/run.go": ("40511c13085d052870c5688199287ee5ae8285e8a61e6be628cb7fe6315d8566", router_auth),
         "dae/run.go": ("748a95abac2a3dda0741da10d8278cd1dd8e792061d3a0f02f0fab08dcb6e233", router_lifecycle),
         "dae/httpclient.go": ("ea4b8ec3cabf79d8d08c74931c7ed8877df7eae8da4855b73ccc2cf86f2a86fd", lambda value: (HERE / "wing/httpclient.go").read_text(encoding="utf-8")),
+        "dae-core/component/interface_manager.go": ("c8a97c9851c2c21d7af3b48d1c2fc514a80e6c838dce25b9ef15888e02752d2c", lambda value: (HERE / "wing/interface_manager.go").read_text(encoding="utf-8")),
         "dae-core/component/outbound/dialer/dialer.go": ("c6615ddf375371b1974c6d35ef8660aea8ee907fe88ebe09207560b5da5d39ad", lambda value: value.replace('return &netproxy.FakeNetConn{\n\t\t\t\t\tConn:  conn,\n\t\t\t\t\tLAddr: nil,\n\t\t\t\t\tRAddr: nil,\n\t\t\t\t}, nil', 'return routerCheckConn(conn), nil', 1)),
         "dae-core/component/outbound/dialer/register.go": ("59aa07ff1a3bf7c7dd38353091c3e9cdb2510f256e02e327c1fc768ef4e3ca99", lambda value: value.replace('normalizedLink := normalizeShadowTLSPluginOptions(link)\n\tbaseDialer := newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp)', 'normalizedLink, baseDialer, err := routerProtocolOptions(normalizeShadowTLSPluginOptions(link), newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp), gOption.UDPHopInterval)\n\tif err != nil { return nil, err }', 1)),
         "dae-core/common/subscription/subscription.go": ("c48c3a14937aac13fde5d10af24e6d5774c6b5d2f09f8f23872201c06dcdd05f", lambda value: value.replace('url.Values{"plugin": []string{server.PluginOpts}}.Encode()', 'routerSIP008Plugin(server.Plugin, server.PluginOpts)', 1)),
@@ -177,7 +178,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
             data = transform(data.decode()).encode()
         elif previous.get(relative) != digest(data):
             raise ValueError("Unknown backend source; refusing to overwrite: " + relative)
-        elif relative in ("graphql/service/node/latency_mutation_utils.go", "dae/runtime.go", "dae/httpclient.go"):
+        elif relative in ("graphql/service/node/latency_mutation_utils.go", "dae/runtime.go", "dae/httpclient.go", "dae-core/component/interface_manager.go"):
             replacement = "node_latency.go" if relative.endswith("latency_mutation_utils.go") else relative.split("/")[-1]
             data = (HERE / "wing" / replacement).read_bytes()
         elif relative in ("cmd/run.go", "dae/run.go") or transform == router_transactions:
@@ -221,6 +222,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         ("graphql/service/node/router_latency_option_test.go", "node_latency_option_test.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat.go", "protocol_compat.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat_test.go", "protocol_compat_test.go"),
+        ("dae-core/component/router_interface_manager_test.go", "interface_manager_test.go"),
         ("dae-core/common/subscription/router_sip008.go", "sip008.go"),
         ("dae-core/common/subscription/router_sip008_test.go", "sip008_test.go"),
         ("graphql/service/node/router_protocol_interop_test.go", "protocol_interop_test.go"),
@@ -263,6 +265,7 @@ def prepare(root):
         "graphql/service/node/latency_mutation_utils.go", "graphql/service/node/latency_cache.go",
         "graphql/service/subscription/mutation_utils.go",
         "dae-core/component/outbound/dialer/dialer.go", "dae-core/component/outbound/dialer/register.go",
+        "dae-core/component/interface_manager.go",
         "dae-core/common/subscription/subscription.go",
     )
     manifest = root / ".daed-openwrt-prepare.json"

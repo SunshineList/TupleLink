@@ -62,7 +62,7 @@ else
 fi
 case "$arch" in
 	x86_64|aarch64) add_check architecture ok "$arch" ;;
-	armv7|armv7l|mips|mipsel|mipsle) add_check architecture warning "$arch: experimental 32-bit build; compatible eBPF/BTF kernel required, device validation incomplete." ;;
+	armv7|armv7l|mips|mipsel|mipsle) add_check architecture warning "$arch: experimental userspace build; tested common 32-bit kernels cannot load required BPF callbacks. Kernel probes must pass; complete datapath validation is still required." ;;
 	*) add_check architecture error 'Supported: x86_64/ARM64; experimental: ARMv7/MIPS32/MIPSel32. ARMv5/v6, MIPS64 and other CPUs have no release package.' ;;
 esac
 major=${kernel%%.*}
@@ -91,7 +91,12 @@ if [ -z "$btf_path" ]; then
 	add_check btf error 'No native BTF or current-kernel vmlinux file was found. Existing external BTF packages are supported; no firmware or BTF is downloaded automatically.'
 elif [ -x "$probe" ]; then
 	if probe_result=$("$probe" --file "$btf_path" 2>&1); then
-		add_check btf ok "BTF parsed: $btf_path. Required network types exist; actual eBPF loading still needs validation."
+		add_check btf ok "BTF parsed: $btf_path. Required network types exist."
+		if kernel_result=$("$probe" --kernel 2>&1); then
+			add_check kernel_datapath ok 'Unattached kernel callback and packet-access probes passed; complete datapath validation is still required.'
+		else
+			add_check kernel_datapath error "Kernel cannot load required transparent-proxy features: $kernel_result"
+		fi
 	else
 		add_check btf error "BTF cannot be parsed at $btf_path: $probe_result"
 	fi

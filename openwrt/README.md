@@ -1,9 +1,17 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.19](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.19)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.20](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.20)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.20 内核兼容与断线恢复
+
+- 修复接口快速删除/重建、多个处理器匹配同一接口时，防抖覆盖先前回调的问题。按接口保留回调顺序，先清理再绑定；重复状态通知仍过滤，关闭时不被排队任务阻塞。
+- 安装和服务启动时，BTF 解析后实际加载并关闭临时 TC 探针，验证 `bpf_loop` 回调和数据包访问；不挂载网络钩子、不修改 sysctl、DNS 或防火墙。拒绝不兼容内核，安装检查失败时保留已有服务和数据。
+- 收紧 32 位支持说明：OpenWrt 24.10.4 / Linux 6.6.110 的 ARMv7、MIPS 大端/小端均未通过回调加载；x86_64 对照通过。不能仅以 CPU、版本号、BTF 或 API 启动判断透明代理可用。
+- 三种 32 位程序增加 DNS 规则、缓存、上游恢复与接口生命周期回归；这些模块检查不代表完整的透明 DNS 截获已通过。
+- 保留 32 位实验构建供后续内核适配验证，当前不推荐在常见 ARMv7/MIPS 固件上作为透明代理使用；不自动替换用户内核或绕过加载失败。
 
 ## 0.6.19 多架构试验支持
 
@@ -153,7 +161,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，打开中文菜单后选择 **1 安装 / 更新**：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.19/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.19
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.20/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.20
 ```
 
 安装后可直接运行 `nailink` 再次打开菜单。选择安装/更新时才联网获取最新发布脚本；卸载可以离线执行。
@@ -161,7 +169,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/relea
 若菜单提示无法解析 `raw.githubusercontent.com`，旧版也可用下面的命令绕过 Raw 入口，直接下载指定发行版：
 
 ```sh
-nailink --install --release openwrt-v0.6.19
+nailink --install --release openwrt-v0.6.20
 ```
 
 如果 `github.com` 也无法解析，请先检查路由器自身的 DNS：`nslookup github.com`。
@@ -181,7 +189,7 @@ nailink --install --release openwrt-v0.6.19
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.19/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.19
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.20/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.20
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
@@ -295,18 +303,18 @@ HTTPS 成功只能说明当前路径可用，使用 PassWall 时的成功不代�
 
 ## 兼容性与架构范围
 
-| 程序架构        | 固件包标签                                                       | 状态与基线                                   |
-| --------------- | ---------------------------------------------------------------- | -------------------------------------------- |
-| x86_64          | `x86_64`                                                         | 保留原支持，amd64 v1                         |
-| ARM64           | `aarch64`、`aarch64_generic`、Cortex-A35/A53/A55/A72/A73/A75/A76 | 保留原支持，ARMv8.0                          |
-| ARMv7 小端      | Cortex-A5/A7/A8/A9/A15，具体标签见 `sdk-matrix.json`             | 新增试验支持，Go ARMv7 软浮点                |
-| MIPS32r2 大端   | `mips_24kc`、`mips_74kc`                                         | 新增试验支持，CGO/musl 全静态 SQLite，软浮点 |
-| MIPSel32r2 小端 | `mipsel_24kc`、`mipsel_74kc`                                     | 新增试验支持，同上                           |
+| 程序架构        | 固件包标签                                                       | 状态与基线                                 |
+| --------------- | ---------------------------------------------------------------- | ------------------------------------------ |
+| x86_64          | `x86_64`                                                         | 保留原支持，amd64 v1                       |
+| ARM64           | `aarch64`、`aarch64_generic`、Cortex-A35/A53/A55/A72/A73/A75/A76 | 保留原支持，ARMv8.0                        |
+| ARMv7 小端      | Cortex-A5/A7/A8/A9/A15，具体标签见 `sdk-matrix.json`             | 实验构建；已测常见内核无法加载透明代理回调 |
+| MIPS32r2 大端   | `mips_24kc`、`mips_74kc`                                         | 实验构建；已测常见内核无法加载透明代理回调 |
+| MIPSel32r2 小端 | `mipsel_24kc`、`mipsel_74kc`                                     | 实验构建；已测常见内核无法加载透明代理回调 |
 
 ARMv5/v6、32 位 x86、MIPS64、RISC-V 及矩阵之外的固件 ABI 暂不提供安装包。
 脚本结合 `uname -m` 与包管理器的有效架构选择运行包、对应字节序的 BTF 解析器；不会只用 `mips` 这一名称判断大小端，也不会强制安装其他 ABI 的包。
 
-**32 位版本为试验支持。** 三种新增架构已通过交叉构建、QEMU 下的数据库迁移、API 写入与重启持久化检查；这些检查不加载目标内核 eBPF，不能证明设备的透明代理或长期稳定性。[固定 eBPF 依赖未承诺支持 32 位平台](https://github.com/cilium/ebpf/blob/v0.20.0/README.md#requirements)。本项目保留条件检查，不升级或替换用户内核来绕过限制。
+**32 位版本仅保留实验构建，当前不推荐用于透明代理。** 上轮交叉构建和 API/数据库检查通过，但本轮完整系统 QEMU 已证实 OpenWrt 24.10.4 / Linux 6.6.110 的 ARMv7、MIPS 大端/小端均无法加载当前核心需要的 `bpf_loop` 回调；Debian 6.1 的完整核心加载另有回调/数据包对齐拒绝。安装器增加实际内核探针，在替换程序前拒绝这些内核。DNS 模块测试通过不能替代透明 DNS 截获验证。[固定 eBPF 依赖未承诺支持 32 位平台](https://github.com/cilium/ebpf/blob/v0.20.0/README.md#requirements)。不自动升级内核、修改 JIT 设置或强行绕过校验；自定义内核通过最小探针后仍需完整代理验证。
 
 其他环境要求：
 
@@ -317,7 +325,7 @@ ARMv5/v6、32 位 x86、MIPS64、RISC-V 及矩阵之外的固件 ABI 暂不提�
   `kmod-sched-bpf`、`kmod-veth` 及 `ca-bundle`、`v2ray-geoip`、`v2ray-geosite`。
 - 足够的临时下载空间和 overlay 存储。APK 格式要求 apk-tools 3.x。
 
-  0.6.19 的运行程序本体约 53–57 MiB，另需规则库、依赖、下载及升级备份空间。常见 16/32 MiB 闪存设备不能仅凭 CPU 匹配直接安装；需要用户自行提供足够的可写存储，脚本不自动扩容或配置 extroot。
+  0.6.20 的运行程序本体约 53–57 MiB，另需规则库、依赖、下载及升级备份空间。常见 16/32 MiB 闪存设备不能仅凭 CPU 匹配直接安装；需要用户自行提供足够的可写存储，脚本不自动扩容或配置 extroot。
 
 安装器不刷固件、不替换 BTF、不修改其他代理、DNS 或防火墙。
 ARM64 架构标签以 `sdk-matrix.json` 为准，程序使用 ARMv8 基线。APK 按
@@ -345,10 +353,10 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.19 --work /path/to/sdk-cache --output /path/to/runtime
-python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.19 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.20 --work /path/to/sdk-cache --output /path/to/runtime
+python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.20 --work /path/to/sdk-cache --output /path/to/packages
 # 全部 SDK 目标构建完成后再生成完整发行清单
-python3 openwrt/manifest.py /path/to/packages --version 0.6.19
+python3 openwrt/manifest.py /path/to/packages --version 0.6.20
 node --test tests/openwrt/ui.test.cjs
 ```
 
