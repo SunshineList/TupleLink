@@ -1,4 +1,6 @@
-export const NODE_ROW_HEIGHT = 76
+// Card plus its trailing gap. Touch layouts override the same value in CSS;
+// NodeResource reads that value so virtual positions follow the visible cards.
+export const NODE_ROW_HEIGHT = 132
 export const NODE_OVERSCAN = 5
 
 // A bounded window keeps both DOM size and drag measurements independent of the

@@ -13,6 +13,7 @@ import {
   GripVertical,
   MoreHorizontal,
   Pencil,
+  Plus,
   Search,
   Trash2,
 } from 'lucide-react'
@@ -56,9 +57,7 @@ function NodeRow({
   latency,
   onAction,
   tests,
-  compact = false,
 }: {
-  compact?: boolean
   tests: LatencyTests
   entry: LibraryNode
   provided: DraggableProvided
@@ -77,7 +76,6 @@ function NodeRow({
       className={cn('panel-node-row', snapshot.isDragging && 'panel-node-dragging')}
       data-node-id={node.id}
       data-name-card
-      data-density={compact ? 'compact' : 'normal'}
       role="listitem"
     >
       <div
@@ -97,37 +95,39 @@ function NodeRow({
           onClick={() => onAction(entry, 'details')}
         >
           <NodeName name={name} />
+          <span className="panel-node-meta" title={sources.map((source) => source.name).join(' · ')}>
+            <span className="panel-node-protocol">{node.protocol}</span>
+            <span className="truncate">
+              {sources.length ? sources.map((source) => source.name).join(' · ') : t('panel.manual')}
+            </span>
+          </span>
         </button>
-        <p
-          className="mt-1 truncate text-xs text-muted-foreground"
-          title={sources.map((source) => source.name).join(' · ')}
-        >
-          <span className="font-medium">{node.protocol}</span>
-          {' · '}
-          {sources.length ? sources.map((source) => source.name).join(' · ') : t('panel.manual')}
-        </p>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="panel-node-probe"
-        loading={tests.pending.has(node.id)}
-        disabled={tests.busy}
-        aria-label={`${t('latency.testNode')} ${name}`}
-        title={t('latency.testNode')}
-        onClick={() => tests.test([node.id], 'manual')}
-      >
-        <LatencyBadge result={latency} fallback={t('latency.test')} />
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="panel-node-join"
-        aria-label={t('panel.addToGroup')}
-        onClick={() => onAction(entry, 'join')}
-      >
-        {t('panel.join')}
-      </Button>
+      <div className="panel-node-actions">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="panel-node-probe"
+          loading={tests.pending.has(node.id)}
+          disabled={tests.busy}
+          aria-label={`${t('latency.testNode')} ${name}`}
+          title={t('latency.testNode')}
+          onClick={() => tests.test([node.id], 'manual')}
+        >
+          {!tests.pending.has(node.id) && !latency && <Gauge aria-hidden="true" className="size-4" />}
+          {latency ? <LatencyBadge result={latency} /> : t('latency.test')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="panel-node-join"
+          aria-label={t('panel.addToGroup')}
+          onClick={() => onAction(entry, 'join')}
+        >
+          <Plus aria-hidden="true" className="size-3.5" />
+          {t('panel.addToGroup')}
+        </Button>
+      </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -224,7 +224,9 @@ export function NodeResource({
       // Each column remains a vertical droppable, preserving keyboard and pointer sorting.
       const columns = element.clientWidth >= 560 ? 2 : 1
       setColumnCount(columns)
-      setRowHeight(columns === 2 && matchMedia('(pointer: coarse), (max-width: 640px)').matches ? 96 : NODE_ROW_HEIGHT)
+      setRowHeight(
+        Number.parseFloat(getComputedStyle(element).getPropertyValue('--node-row-height')) || NODE_ROW_HEIGHT,
+      )
     })
     observer.observe(element)
     return () => observer.disconnect()
@@ -384,7 +386,6 @@ export function NodeResource({
                   mode="virtual"
                   renderClone={(provided, snapshot, rubric) => (
                     <NodeRow
-                      compact={columnCount === 2}
                       entry={entries[rubric.source.index]}
                       provided={provided}
                       snapshot={snapshot}
@@ -415,7 +416,6 @@ export function NodeResource({
                           <Draggable draggableId={`node-${entries[index].node.id}`} index={index}>
                             {(rowProvided, rowSnapshot) => (
                               <NodeRow
-                                compact={columnCount === 2}
                                 entry={entries[index]}
                                 provided={rowProvided}
                                 snapshot={rowSnapshot}
