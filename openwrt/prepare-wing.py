@@ -70,6 +70,15 @@ def router_dns_recovery(text):
     if 'if ctx.Err() != nil { return nil, primaryDialArg, ctx.Err() }' not in text:
         text = text.replace('primaryErr := err', 'primaryErr := err\n\tif ctx.Err() != nil { return nil, primaryDialArg, ctx.Err() }', 1)
     text = text.replace('if !errors.Is(err, ErrDNSTruncated) {', 'if !errors.Is(err, ErrDNSTruncated) && !commonerrors.IsCanceledOrClosed(err) {')
+    text = text.replace('func (c *DnsController) logDnsForwardFailure(upstream *dns.Upstream, dialArg *dialArgument, err error) {',
+                        'func (c *DnsController) logDnsForwardFailure(upstream *dns.Upstream, dialArg *dialArgument, err error, elapsed time.Duration) {')
+    begin = text.index('func (c *DnsController) logDnsForwardFailure(')
+    end = text.index('\n}', begin)
+    logger = text[begin:end].replace('fields := logrus.Fields{}', 'fields := logrus.Fields{"phase": "dns_forward", "elapsed_ms": elapsed.Milliseconds(), "result": routerDiagnosticResult(err)}')
+    text = text[:begin] + logger + text[end:]
+    if 'forwardStarted := time.Now()' not in text:
+        text = text.replace('respMsg, err := entry.forwarder.ForwardDNS(ctx, data)', 'forwardStarted := time.Now()\n\t\trespMsg, err := entry.forwarder.ForwardDNS(ctx, data)\n\t\trouterLogAttempt(c.log, "dns_forward", 1, forwardStarted, err, nil)')
+    text = text.replace('c.logDnsForwardFailure(upstream, dialArg, err)', 'c.logDnsForwardFailure(upstream, dialArg, err, time.Since(forwardStarted))')
     return text
 
 
@@ -97,7 +106,56 @@ def router_dns_transport(text):
     if 'stopCancel := routerDNSInterruptOnCancel(ctx, pc.conn)' not in text:
         text = text.replace(marker, '\tstopCancel := routerDNSInterruptOnCancel(ctx, pc.conn)\n\tdefer stopCancel()\n\n' + marker)
     text = text.replace('pc.writeMu.Unlock()\n\n\tif err != nil {', 'pc.writeMu.Unlock()\n\tif ctx.Err() != nil { pc.Close(); return nil, ctx.Err() }\n\n\tif err != nil {')
+    text = replace_go_function(text, 'func (d *DoQ) ForwardDNS(', '\treturn d.routerForwardDNS(ctx, data)')
+    for kind in ('DoTCP', 'DoTLS'):
+        text = replace_go_function(text, f'func (d *{kind}) ForwardDNS(', '\treturn routerForwardPipeline(ctx, data, d.getPConn)')
+    text = text.replace('c, e := quic.DialEarly(ctx, fakePkt, udpAddr, tlsCfg, cfg)\n\t\t\treturn c, e',
+                        'return routerQUICDial(ctx, conn, fakePkt, udpAddr, tlsCfg, cfg)')
+    text = text.replace('qc, err := quic.DialEarly(ctx, fakePkt, addr, tlsCfg, nil)\n\tif err != nil {\n\t\t_ = conn.Close() // Ensure underlying connection is closed\n\t\treturn nil, err\n\t}\n\treturn qc, nil',
+                        'return routerQUICDial(ctx, conn, fakePkt, addr, tlsCfg, nil)')
+    text = text.replace('writeMu sync.Mutex', '''routerWrite chan struct{}
+    routerMu sync.Mutex
+    routerRetiring bool
+    routerAbandoned [dnsPipelineMaxIDs]bool
+    routerAbandonedCount int''')
+    if 'routerWrite: make(chan struct{}, 1)' not in text:
+        text = text.replace('idAlloc: newIdBitmap(),', 'idAlloc: newIdBitmap(),\n\t\trouterWrite: make(chan struct{}, 1),')
+    text = replace_go_function(text, 'func (pc *pipelinedConn) RoundTrip(', '\treturn pc.routerRoundTrip(ctx, data)')
+    begin = text.index('\t\tfor i := range pc.pending {', text.index('func (pc *pipelinedConn) closeWithErr(')) if '\t\tfor i := range pc.pending {' in text else -1
+    if begin >= 0:
+        end = text.index('\n\t\t}', begin) + len('\n\t\t}')
+        text = text[:begin] + '\t\tpc.routerClosePending()' + text[end:]
+    begin = text.index('\t\tif respMsg.Id < dnsPipelineMaxIDs {') if '\t\tif respMsg.Id < dnsPipelineMaxIDs {' in text else -1
+    if begin >= 0:
+        end = text.index('\n\t\t}', begin) + len('\n\t\t}')
+        text = text[:begin] + '\t\tpc.routerDeliver(respMsg)' + text[end:]
     return text
+
+
+def replace_go_function(text, signature, body):
+    begin = text.index(signature)
+    brace = text.index(' {', begin) + 2
+    end = text.index('\n}', brace)
+    return text[:brace] + '\n' + body + text[end:]
+
+
+def router_bootstrap(text):
+    text = replace_go_function(text, 'func (c *ControlPlane) resolveIp46WithBootstrapResolvers(',
+                               '\treturn c.routerResolveBootstrap(ctx, host, network, race, resolve)')
+    return text.replace('\t"github.com/daeuniverse/outbound/protocol/direct"\n', '')
+
+
+def router_udp_pool_test(text):
+    begin = text.index('func TestDoUDPForwardDNSPoolSaturationFailsFast(')
+    end = text.index('\nfunc ', begin)
+    test = text[begin:end]
+    # A context deadline may retire the socket; a real dialer creates a new
+    # one. The old fixture returned the same already-closed object on redial.
+    test = test.replace('dialCalls.Add(1)\n\t\t\treturn timeoutConn, nil',
+                        'if dialCalls.Add(1) == 1 { return timeoutConn, nil }\n\t\t\treturn &deadlineTimeoutUpstreamConn{serverAddr: serverAddr}, nil')
+    test = test.replace('if got := dialCalls.Load(); got != 1 {\n\t\tt.Fatalf("dial calls after timed-out reuse = %d, want 1", got)',
+                        'if got := dialCalls.Load(); got < 1 || got > 2 {\n\t\tt.Fatalf("dial calls after timeout/recovery = %d, want one reuse or one replacement", got)')
+    return text[:begin] + test + text[end:]
 
 
 def _prepare_in_place(root):
@@ -211,7 +269,9 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         "dae-core/control/dial.go": ("4e9948fde01eed541c5a828a83cdae8f74278ed55d95958e145bd1f113964bfe", router_control_dial),
         "dae-core/control/dns_control.go": ("5f57ad79f164b45f226e0acc130f2b64c1ec4f0eaae90bef6368810339dd8fb8", router_dns_recovery),
         "dae-core/control/dns.go": ("c1e0bc78f71bff6ef4f15ea02f9a078a3f1d7776537578155055999a9b2b28d2", router_dns_transport),
+        "dae-core/control/control_plane.go": ("8b57c9d9635aa6c764319a2263421263a52f4dfde8ac398b1d47929b71e53e76", router_bootstrap),
         "dae-core/control/dns_lifecycle_test.go": ("075d244882bb623dce5e37fae748594ee602611ffa2e2697c51d49f46026f44d", lambda value: value.replace('func(client *http.Client,', 'func(ctx context.Context, client *http.Client,')),
+        "dae-core/control/dns_udp_packetconn_test.go": ("ac72b165c59e24795c4581740c5a4657c9ef7c305ef361a378124ca96517eba8", router_udp_pool_test),
         "dae-core/component/outbound/dialer/dialer.go": ("c6615ddf375371b1974c6d35ef8660aea8ee907fe88ebe09207560b5da5d39ad", lambda value: value.replace('return &netproxy.FakeNetConn{\n\t\t\t\t\tConn:  conn,\n\t\t\t\t\tLAddr: nil,\n\t\t\t\t\tRAddr: nil,\n\t\t\t\t}, nil', 'return routerCheckConn(conn), nil', 1)),
         "dae-core/component/outbound/dialer/register.go": ("59aa07ff1a3bf7c7dd38353091c3e9cdb2510f256e02e327c1fc768ef4e3ca99", lambda value: value.replace('normalizedLink := normalizeShadowTLSPluginOptions(link)\n\tbaseDialer := newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp)', 'normalizedLink, baseDialer, err := routerProtocolOptions(normalizeShadowTLSPluginOptions(link), newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp), gOption.UDPHopInterval)\n\tif err != nil { return nil, err }', 1)),
         "dae-core/common/subscription/subscription.go": ("c48c3a14937aac13fde5d10af24e6d5774c6b5d2f09f8f23872201c06dcdd05f", lambda value: value.replace('url.Values{"plugin": []string{server.PluginOpts}}.Encode()', 'routerSIP008Plugin(server.Plugin, server.PluginOpts)', 1)),
@@ -230,7 +290,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         elif relative in ("graphql/service/node/latency_mutation_utils.go", "dae/runtime.go", "dae/httpclient.go", "dae-core/component/interface_manager.go"):
             replacement = "node_latency.go" if relative.endswith("latency_mutation_utils.go") else relative.split("/")[-1]
             data = (HERE / "wing" / replacement).read_bytes()
-        elif relative in ("cmd/run.go", "dae/run.go") or transform in (router_transactions, router_control_dial, router_dns_recovery, router_dns_transport):
+        elif relative in ("cmd/run.go", "dae/run.go") or transform in (router_transactions, router_control_dial, router_dns_recovery, router_dns_transport, router_bootstrap, router_udp_pool_test):
             data = transform(data.decode()).encode()
         destination.write_bytes(data)
         generated[relative] = digest(data)
@@ -296,6 +356,8 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         ("dae-core/control/router_connection_test.go", "connection_recovery_test.go"),
         ("dae-core/control/router_dns_transport.go", "dns_transport.go"),
         ("dae-core/control/router_dns_transport_test.go", "dns_transport_test.go"),
+        ("dae-core/control/router_dns_stability.go", "dns_stability.go"),
+        ("dae-core/control/router_dns_stability_test.go", "dns_stability_test.go"),
     ):
         destination = root / relative
         data = (HERE / "wing" / source).read_bytes()
@@ -332,7 +394,8 @@ def prepare(root):
         "dae-core/component/outbound/dialer/dialer.go", "dae-core/component/outbound/dialer/register.go",
         "dae-core/component/interface_manager.go",
         "dae-core/control/dial.go", "dae-core/control/dns_control.go",
-        "dae-core/control/dns.go", "dae-core/control/dns_lifecycle_test.go",
+        "dae-core/control/dns.go", "dae-core/control/dns_lifecycle_test.go", "dae-core/control/control_plane.go",
+        "dae-core/control/dns_udp_packetconn_test.go",
         "dae-core/common/subscription/subscription.go",
     )
     manifest = root / ".daed-openwrt-prepare.json"

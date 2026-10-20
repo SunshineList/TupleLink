@@ -118,6 +118,25 @@ done</code></pre>
   如果升级后仍出现，记录失败时间、使用的节点协议、群组策略，以及同一网络下其他网站的表现；保留发生时的运行日志。
   延迟测试成功只能证明测试目标当时可达，不能保证所有网站或 UDP 路径可用。
 </p>
+<h2 id="connection-diagnostics">连接阶段诊断</h2>
+<p>
+  从 v0.6.28 起，可在<strong>高级设置 → 当前配置</strong>中临时将日志等级设为
+  <code>debug</code>，保存并应用后复现一次问题，随后在运行日志中搜索 <code>Connection diagnostic</code>。排查结束后改回
+  <code>info</code>，减少日志量；应用配置会重载服务。
+</p>
+<ul>
+  <li><code>phase=dns_bootstrap</code>：启动 DNS 解析器的单次解析，包含尝试次数。</li>
+  <li><code>phase=dns_forward</code>：一次 DNS 转发的总等待时间，包含其连接建立与响应等待。</li>
+  <li><code>phase=route_select</code>：路由及节点选择耗时。</li>
+  <li><code>phase=proxy_connect</code>：节点拨号耗时，<code>attempt=2</code> 表示发生了第二次建连尝试。</li>
+</ul>
+<p>
+  <code>elapsed_ms</code> 是该阶段耗时，单位毫秒；<code>result</code> 为
+  <code>ok</code>、<code>timeout</code>、<code>canceled</code>、<code>closed</code> 或 <code>failed</code>。 DNS
+  失败警告也包含阶段、耗时和结果分类。诊断不改变原有分流或日志等级，不额外输出节点凭据、完整链接或原始错误正文。已有
+  Debug 日志仍可能含域名、IP 和节点名称，分享前请脱敏。
+</p>
+<p>这些记录用于定位等待发生在哪一段，不能单独证明某个网站可用，也不测量页面完整加载或浏览器首字节时间。</p>
 <h2 id="reconnect">断网恢复后仍不通</h2>
 <p>
   先确认路由器 WAN 已恢复，默认路由与 DNS 正常，再检查代理。当前服务监听 WAN

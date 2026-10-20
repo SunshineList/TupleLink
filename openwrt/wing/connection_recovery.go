@@ -69,7 +69,11 @@ func (c *ControlPlane) routerRouteDial(ctx context.Context, p *proxyDialParam) (
 		if err := ctx.Err(); err != nil {
 			return nil, lastRes, err
 		}
+		selectStarted := time.Now()
 		res, err := c.chooseProxyDialer(ctx, &params)
+		if c.log != nil && c.log.IsLevelEnabled(logrus.DebugLevel) {
+			c.routerLogAttempt("route_select", attempt+1, selectStarted, err, logrus.Fields{"network": params.Network})
+		}
 		if err != nil {
 			if retryingProxy {
 				return nil, lastRes, lastErr
@@ -88,11 +92,22 @@ func (c *ControlPlane) routerRouteDial(ctx context.Context, p *proxyDialParam) (
 			budget = time.Until(deadline) / 2
 		}
 		dialCtx, cancel := context.WithTimeout(ctx, budget)
+		dialStarted := time.Now()
 		conn, err := res.Dialer.DialContext(dialCtx, res.Network, res.DialTarget)
 		attemptErr := dialCtx.Err()
 		cancel()
 		if err == nil && attemptErr != nil {
 			err = attemptErr
+		}
+		if c.log != nil && c.log.IsLevelEnabled(logrus.DebugLevel) {
+			fields := logrus.Fields{"network": params.Network}
+			if res.Outbound != nil {
+				fields["outbound"] = res.Outbound.Name
+			}
+			if res.Dialer.Property() != nil {
+				fields["dialer"] = res.Dialer.Property().Name
+			}
+			c.routerLogAttempt("proxy_connect", attempt+1, dialStarted, err, fields)
 		}
 		// Dialers can race cancellation and still return a socket. Never leak it,
 		// or return a connection which belongs to an already cancelled operation.
