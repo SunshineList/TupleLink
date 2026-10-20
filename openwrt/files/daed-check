@@ -62,7 +62,8 @@ else
 fi
 case "$arch" in
 	x86_64|aarch64) add_check architecture ok "$arch" ;;
-	*) add_check architecture error 'This release supports x86_64 and ARM64 only.' ;;
+	armv7|armv7l|mips|mipsel|mipsle) add_check architecture warning "$arch: experimental 32-bit build; compatible eBPF/BTF kernel required, device validation incomplete." ;;
+	*) add_check architecture error 'Supported: x86_64/ARM64; experimental: ARMv7/MIPS32/MIPSel32. ARMv5/v6, MIPS64 and other CPUs have no release package.' ;;
 esac
 major=${kernel%%.*}
 minor=${kernel#*.}; minor=${minor%%.*}

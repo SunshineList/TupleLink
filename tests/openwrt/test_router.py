@@ -139,11 +139,12 @@ for package in "$@"; do rm -f "/tmp/installed-$package"; done''')
 
     def assets(self, fmt="ipk", arch="x86_64", version="0.1.0"):
         records = []
+        cpu = next((cpu for prefix, cpu in (("aarch64", "arm64"), ("arm_", "armv7"), ("mipsel_", "mipsle"), ("mips_", "mips")) if arch.startswith(prefix)), "x86_64")
         for package, architecture, filename, content in [
             ("daed-router", arch, "runtime." + fmt, b"package manager fixture, not a real runtime"),
             ("luci-app-daed-router", "all", "luci." + fmt, b"LuCI package fixture"),
             ("check", "all", "daed-check", (OPENWRT / "files/daed-check").read_bytes()),
-            ("btf-probe", "arm64" if arch.startswith("aarch64") else "x86_64", "btf-probe-" + ("arm64" if arch.startswith("aarch64") else "x86_64"), (self.root / "fixtures/btf-probe").read_bytes()),
+            ("btf-probe", cpu, "btf-probe-" + cpu, (self.root / "fixtures/btf-probe").read_bytes()),
         ]:
             self.write("/assets/" + filename, content)
             records.append("\t".join(["support" if package in ("check", "btf-probe") else fmt, architecture, package, filename, hashlib.sha256(content).hexdigest(), version]))

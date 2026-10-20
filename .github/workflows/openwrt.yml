@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.6.18'
+        default: '0.6.19'
         required: true
 
 permissions:
@@ -72,16 +72,9 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        include:
-          - cpu: x86_64
-            goarch: amd64
-          - cpu: arm64
-            goarch: arm64
+        cpu: [x86_64, arm64, armv7, mips, mipsle]
     env:
       GOOS: linux
-      GOARCH: ${{ matrix.goarch }}
-      GOAMD64: v1
-      GOARM64: v8.0
       CGO_ENABLED: '0'
       VERSION: ${{ inputs.version }}
     steps:
@@ -100,16 +93,17 @@ jobs:
         run: |
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends clang llvm
+          sudo apt-get install -y --no-install-recommends clang llvm zstd
           mkdir -p .build/runtime
-          python3 openwrt/prepare-wing.py wing
-          make -C wing APPNAME=daed VERSION="$VERSION" WEB_DIST="$PWD/dist" OUTPUT="$PWD/.build/runtime/daed" bundle
-          (cd wing && go build -trimpath -ldflags='-s -w' -o "$GITHUB_WORKSPACE/.build/runtime/btf-probe" "$GITHUB_WORKSPACE/openwrt/btf-probe.go")
-          (cd wing && go build -trimpath -ldflags='-s -w' -o "$GITHUB_WORKSPACE/.build/runtime/luci-proxy" "$GITHUB_WORKSPACE/openwrt/luci-proxy.go")
-          python3 -c 'import sys; sys.path.insert(0,"openwrt"); from build import verify_elf; verify_elf(".build/runtime/daed", sys.argv[1])' '${{ matrix.cpu }}'
+          python3 openwrt/runtime.py --cpu '${{ matrix.cpu }}' --wing wing --web dist --version "$VERSION" --work /tmp/daed-runtime-sdk --output .build/runtime
       - name: BTF parser tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
+      - name: Foreign architecture SQLite and API smoke test
+        if: matrix.cpu == 'armv7' || matrix.cpu == 'mips' || matrix.cpu == 'mipsle'
+        run: |
+          sudo apt-get install -y --no-install-recommends qemu-user-static
+          python3 tests/openwrt/architecture_smoke.py --cpu '${{ matrix.cpu }}' --binary .build/runtime/daed
       - name: Live TCP and UDP runtime overview regression
         if: matrix.cpu == 'x86_64'
         run: |
@@ -168,6 +162,18 @@ jobs:
             cpu: x86_64
           - target: apk-arm64
             cpu: arm64
+          - target: ipk-armv7
+            cpu: armv7
+          - target: apk-armv7
+            cpu: armv7
+          - target: ipk-mips
+            cpu: mips
+          - target: apk-mips
+            cpu: mips
+          - target: ipk-mipsle
+            cpu: mipsle
+          - target: apk-mipsle
+            cpu: mipsle
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8

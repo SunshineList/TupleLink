@@ -4,6 +4,7 @@ package main
 
 import (
 	"debug/elf"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +12,23 @@ import (
 
 	"github.com/cilium/ebpf/btf"
 )
+
+func elfArchitecture(arch string) (elf.Class, elf.Data, elf.Machine) {
+	switch arch {
+	case "amd64":
+		return elf.ELFCLASS64, elf.ELFDATA2LSB, elf.EM_X86_64
+	case "arm64":
+		return elf.ELFCLASS64, elf.ELFDATA2LSB, elf.EM_AARCH64
+	case "arm":
+		return elf.ELFCLASS32, elf.ELFDATA2LSB, elf.EM_ARM
+	case "mips":
+		return elf.ELFCLASS32, elf.ELFDATA2MSB, elf.EM_MIPS
+	case "mipsle":
+		return elf.ELFCLASS32, elf.ELFDATA2LSB, elf.EM_MIPS
+	default:
+		return elf.ELFCLASSNONE, elf.ELFDATANONE, elf.EM_NONE
+	}
+}
 
 func validateBTF(path string) error {
 	file, err := os.Open(path)
@@ -31,12 +49,12 @@ func validateBTF(path string) error {
 		if err != nil {
 			return err
 		}
-		machine := map[string]elf.Machine{"amd64": elf.EM_X86_64, "arm64": elf.EM_AARCH64}[runtime.GOARCH]
-		if image.Class != elf.ELFCLASS64 || image.Data != elf.ELFDATA2LSB || image.Machine != machine {
+		class, data, machine := elfArchitecture(runtime.GOARCH)
+		if class == elf.ELFCLASSNONE || image.Class != class || image.Data != data || image.Machine != machine {
 			return fmt.Errorf("vmlinux ELF architecture does not match this router")
 		}
-	} else if header[0] != 0x9f || header[1] != 0xeb || header[2] != 1 {
-		return fmt.Errorf("invalid little-endian BTF header")
+	} else if binary.NativeEndian.Uint16(header[:2]) != 0xeb9f || header[2] != 1 {
+		return fmt.Errorf("invalid native-endian BTF header")
 	}
 	spec, err := btf.LoadSpec(path)
 	if err != nil {

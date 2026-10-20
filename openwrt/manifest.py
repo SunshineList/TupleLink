@@ -49,7 +49,7 @@ def main():
     checker = args.directory / "daed-check"
     shutil.copyfile(HERE / "files" / "daed-check", checker)
     rows.append(["support", "all", "check", checker.name, hashlib.sha256(checker.read_bytes()).hexdigest(), args.version])
-    for cpu in ("x86_64", "arm64"):
+    for cpu in sorted({target["cpu"] for target in json.loads((HERE / "sdk-matrix.json").read_text())}):
         probe = args.directory / ("btf-probe-" + cpu)
         rows.append(["support", cpu, "btf-probe", probe.name, hashlib.sha256(probe.read_bytes()).hexdigest(), args.version])
     installer = (HERE / "install.sh").read_text(encoding="utf-8")

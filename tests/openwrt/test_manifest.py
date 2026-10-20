@@ -22,13 +22,13 @@ class ManifestTests(unittest.TestCase):
         self.assertIn("default: '" + version + "'", (OPENWRT.parent / ".github/workflows/openwrt.yml").read_text())
         readme = (OPENWRT.parent / "README.md").read_text(encoding="utf-8")
         self.assertIn("/releases/tag/openwrt-v" + version, readme)
-        self.assertIn("https://raw.githubusercontent.com/slobys/NaiLink/main/openwrt/install.sh", readme)
+        self.assertIn("https://github.com/slobys/NaiLink/releases/download/openwrt-v" + version + "/install.sh", readme)
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name)
         self.rows = []
-        for cpu in ("x86_64", "arm64"):
+        for cpu in {target["cpu"] for target in json.loads((OPENWRT / "sdk-matrix.json").read_text())}:
             (self.directory / ("btf-probe-" + cpu)).write_bytes(b"non-executable parser fixture")
         for target in json.loads((OPENWRT / "sdk-matrix.json").read_text()):
             packages = [(arch, "daed-router") for arch in target["architectures"]]
@@ -85,7 +85,7 @@ class ManifestTests(unittest.TestCase):
     def test_non_elf_runtime_is_rejected_before_sdk_download(self):
         binary = self.directory / "fake-daed"
         binary.write_bytes(b"this is not an executable")
-        with self.assertRaisesRegex(ValueError, "ELF64"):
+        with self.assertRaisesRegex(ValueError, "ELF"):
             BUILD.verify_elf(binary, "x86_64")
 
     def test_sdk_base_feed_pin_preserves_root_options_and_other_feeds(self):

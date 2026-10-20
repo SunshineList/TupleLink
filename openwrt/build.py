@@ -15,6 +15,13 @@ import tempfile
 import urllib.request
 
 HERE = Path(__file__).resolve().parent
+ARCHITECTURES = {
+    "x86_64": {"goarch": "amd64", "elf": (2, 1, 62), "env": {"GOAMD64": "v1"}},
+    "arm64": {"goarch": "arm64", "elf": (2, 1, 183), "env": {"GOARM64": "v8.0"}},
+    "armv7": {"goarch": "arm", "elf": (1, 1, 40), "env": {"GOARM": "7,softfloat"}},
+    "mips": {"goarch": "mips", "elf": (1, 2, 8), "env": {"GOMIPS": "softfloat"}, "cgo": True},
+    "mipsle": {"goarch": "mipsle", "elf": (1, 1, 8), "env": {"GOMIPS": "softfloat"}, "cgo": True},
+}
 
 
 def pin_base_feed(feeds, commit):
@@ -28,24 +35,48 @@ def pin_base_feed(feeds, commit):
 
 
 def verify_elf(path, cpu):
+    elf_class, encoding, expected_machine = ARCHITECTURES[cpu]["elf"]
+    endian = "<" if encoding == 1 else ">"
     with open(path, "rb") as stream:
         header = stream.read(64)
-        if len(header) != 64 or header[:6] != b"\x7fELF\x02\x01":
-            raise ValueError("Runtime must be a little-endian ELF64 executable")
-        machine = struct.unpack_from("<H", header, 18)[0]
-        if machine != {"x86_64": 62, "arm64": 183}[cpu]:
+        if len(header) != 64 or header[:6] != b"\x7fELF" + bytes((elf_class, encoding)):
+            raise ValueError("Runtime ELF bitness/byte order does not match the SDK matrix")
+        machine = struct.unpack_from(endian + "H", header, 18)[0]
+        if machine != expected_machine:
             raise ValueError("Runtime ELF architecture does not match the SDK matrix")
-        offset = struct.unpack_from("<Q", header, 32)[0]
-        size, count = struct.unpack_from("<HH", header, 54)
-        if size < 56 or not count:
+        offset = struct.unpack_from(endian + ("Q" if elf_class == 2 else "I"), header, 32 if elf_class == 2 else 28)[0]
+        size, count = struct.unpack_from(endian + "HH", header, 54 if elf_class == 2 else 42)
+        if size < (56 if elf_class == 2 else 32) or not count:
             raise ValueError("Runtime has no valid program headers")
         for index in range(count):
             stream.seek(offset + size * index)
             entry = stream.read(size)
             if len(entry) != size:
                 raise ValueError("Truncated ELF")
-            if struct.unpack_from("<I", entry)[0] == 3:
-                raise ValueError("Runtime has a dynamic interpreter; build with CGO_ENABLED=0")
+            if struct.unpack_from(endian + "I", entry)[0] == 3:
+                raise ValueError("Runtime has a dynamic interpreter; a fully static binary is required")
+
+
+def prepare_sdk(target, work):
+    """Fetch the pinned SDK before building CGO architectures or native packages."""
+    work = Path(work).resolve()
+    work.mkdir(parents=True, exist_ok=True)
+    archive = work / (target["name"] + ".tar.zst")
+    if not archive.exists():
+        partial = archive.with_suffix(".download")
+        urllib.request.urlretrieve(target["url"], partial)
+        if sha256(partial) != target["sha256"]:
+            partial.unlink()
+            raise ValueError("SDK checksum mismatch")
+        partial.replace(archive)
+    if sha256(archive) != target["sha256"]:
+        raise ValueError("SDK checksum mismatch; remove the failed download and retry")
+    sdk = work / target["name"]
+    if not sdk.exists():
+        with tempfile.TemporaryDirectory(prefix=".sdk-unpack-", dir=work) as temporary:
+            run("tar", "--zstd", "-xf", str(archive), "--strip-components=1", "-C", temporary, cwd=work)
+            Path(temporary).rename(sdk)
+    return sdk
 
 
 def sha256(path):
@@ -167,15 +198,7 @@ def main():
     args.output = args.output.resolve()
     args.work.mkdir(parents=True, exist_ok=True)
     args.output.mkdir(parents=True, exist_ok=True)
-    archive = args.work / (args.target + ".tar.zst")
-    if not archive.exists():
-        urllib.request.urlretrieve(target["url"], archive)
-    if sha256(archive) != target["sha256"]:
-        raise ValueError("SDK checksum mismatch; remove the failed download and retry")
-    sdk = args.work / args.target
-    if not sdk.exists():
-        sdk.mkdir()
-        run("tar", "--zstd", "-xf", str(archive), "--strip-components=1", "-C", str(sdk), cwd=args.work)
+    sdk = prepare_sdk(target, args.work)
     package = sdk / "package" / "daed-router"
     package.mkdir(parents=True, exist_ok=True)
     shutil.copy2(HERE / "Makefile", package)

@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/NaiLink
-release=openwrt-v0.6.18
+release=openwrt-v0.6.19
 asset_dir=''
 mode=install
 action=install
@@ -172,7 +172,8 @@ fi
 if [ "$action" != uninstall ]; then
 	[ -r /www/luci-static/resources/luci.js ] || fail 'Install the firmware-provided LuCI first.'
 	machine=$(uname -m)
-	case "$machine" in x86_64|aarch64) ;; *) fail "Unsupported CPU: $machine" ;; esac
+	case "$machine" in x86_64|aarch64|armv7|armv7l|mips|mipsel|mipsle) ;;
+	*) fail "Unsupported CPU: $machine. This release provides x86_64, ARM64 and experimental ARMv7/MIPS32/MIPSel32 packages; ARMv5/v6 and MIPS64 are not supported." ;; esac
 	for tool in jsonfilter sha256sum awk mktemp; do
 		command -v "$tool" >/dev/null 2>&1 || fail "Missing tool: $tool"
 	done
@@ -328,7 +329,25 @@ verify_record() {
 support=$(record support all check) || fail 'Manifest has no unique compatibility checker.'
 [ "$(printf '%s\n' "$support" | cut -f4)" = daed-check ] || fail 'Unexpected checker filename.'
 verify_record "$support"
-case "$machine" in x86_64) probe_cpu=x86_64 ;; aarch64) probe_cpu=arm64 ;; esac
+# Linux often reports 'mips' for both byte orders. Select the native package
+# architecture first, rather than guessing endianness from uname alone.
+runtime=''
+selected_arch=''
+probe_cpu=''
+for architecture in $architectures; do
+	case "$machine:$architecture" in
+	x86_64:x86_64) candidate_cpu=x86_64 ;;
+	aarch64:aarch64|aarch64:aarch64_*) candidate_cpu=arm64 ;;
+	armv7:arm_cortex-a*|armv7l:arm_cortex-a*) candidate_cpu=armv7 ;;
+	mips:mipsel_*|mipsel:mipsel_*|mipsle:mipsel_*) candidate_cpu=mipsle ;;
+	mips:mips_*) candidate_cpu=mips ;;
+	*) continue ;;
+	esac
+	if runtime=$(record "$format" "$architecture" daed-router); then
+		selected_arch=$architecture; probe_cpu=$candidate_cpu; break
+	fi
+done
+[ -n "$selected_arch" ] || fail "No $format runtime for CPU $machine and the firmware's package architectures: $architectures"
 probe_record=$(record support "$probe_cpu" btf-probe) || fail 'Manifest has no unique BTF parser for this CPU.'
 [ "$(printf '%s\n' "$probe_record" | cut -f4)" = "btf-probe-$probe_cpu" ] || fail 'Unexpected BTF parser filename.'
 [ "$(printf '%s\n' "$probe_record" | cut -f6)" = "$(printf '%s\n' "$support" | cut -f6)" ] || fail 'BTF parser and checker versions do not match.'
@@ -337,13 +356,6 @@ chmod 700 "$stage/btf-probe-$probe_cpu"
 DAED_BTF_PROBE="$stage/btf-probe-$probe_cpu" sh "$stage/daed-check" --check || fail 'Compatibility check failed. No packages or network settings were changed.'
 [ "$mode" != check ] || exit 0
 
-runtime=''
-selected_arch=''
-for architecture in $architectures; do
-	case "$machine:$architecture" in x86_64:x86_64|aarch64:aarch64|aarch64:aarch64_*) ;; *) continue ;; esac
-	if runtime=$(record "$format" "$architecture" daed-router); then selected_arch=$architecture; break; fi
-done
-[ -n "$selected_arch" ] || fail "No $format runtime for the firmware's package architectures: $architectures"
 plugin=$(record "$format" all luci-app-daed-router) || fail 'Manifest has no unique LuCI package.'
 version=$(printf '%s\n' "$runtime" | cut -f6)
 if [ "$version" != "$(printf '%s\n' "$plugin" | cut -f6)" ] || \
@@ -365,6 +377,9 @@ elif [ -e /usr/bin/daed ] || [ -e /etc/config/daed ] || [ -e /etc/init.d/daed ] 
 fi
 if [ "$action" != reinstall ] && { installed daed || installed luci-app-daed; }; then fail 'Another NaiLink package is installed; use --reinstall for a backed-up fresh installation.'; fi
 printf 'NaiLink: %s / %s / %s, release %s\n' "$machine" "$format" "$selected_arch" "$version"
+case "$probe_cpu" in armv7|mips|mipsle)
+	printf 'NaiLink: 32 位架构为试验支持；需要兼容的 eBPF/BTF 内核，尚未完成全部设备的透明代理与长期运行验证。\n' ;;
+esac
 
 # Native package managers resolve kmods against the router's own feeds/kernel ABI.
 # Never force dependencies or add a feed for a different firmware.

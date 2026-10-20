@@ -54,5 +54,77 @@
       "aarch64_cortex-a75",
       "aarch64_cortex-a76"
     ]
+  },
+  {
+    "name": "ipk-armv7",
+    "cpu": "armv7",
+    "format": "ipk",
+    "base_commit": "78b23a26c4c98938d549e7ff5876508544e33d4d",
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/armsr/armv7/openwrt-sdk-24.10.4-armsr-armv7_gcc-13.3.0_musl_eabi.Linux-x86_64.tar.zst",
+    "sha256": "2a0e63635ab95f9e5a48435e89d2c45784a47b2a2b74c422cfdf1cb10c00407f",
+    "architectures": [
+      "arm_cortex-a5_vfpv4",
+      "arm_cortex-a7",
+      "arm_cortex-a7_neon-vfpv4",
+      "arm_cortex-a8_vfpv3",
+      "arm_cortex-a9",
+      "arm_cortex-a9_neon",
+      "arm_cortex-a9_vfpv3-d16",
+      "arm_cortex-a15_neon-vfpv4"
+    ]
+  },
+  {
+    "name": "apk-armv7",
+    "cpu": "armv7",
+    "format": "apk",
+    "base_commit": "ba915c2ee711d047d5be8575c1e98699119429ab",
+    "url": "https://downloads.openwrt.org/releases/25.12.4/targets/armsr/armv7/openwrt-sdk-25.12.4-armsr-armv7_gcc-14.3.0_musl_eabi.Linux-x86_64.tar.zst",
+    "sha256": "b204ea6b79310b1630ec324c14f6d8a0ca644540682b735e79e821ff11f7e410",
+    "architectures": [
+      "arm_cortex-a5_vfpv4",
+      "arm_cortex-a7",
+      "arm_cortex-a7_neon-vfpv4",
+      "arm_cortex-a8_vfpv3",
+      "arm_cortex-a9",
+      "arm_cortex-a9_neon",
+      "arm_cortex-a9_vfpv3-d16",
+      "arm_cortex-a15_neon-vfpv4"
+    ]
+  },
+  {
+    "name": "ipk-mips",
+    "cpu": "mips",
+    "format": "ipk",
+    "base_commit": "78b23a26c4c98938d549e7ff5876508544e33d4d",
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/ath79/generic/openwrt-sdk-24.10.4-ath79-generic_gcc-13.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "0b693ad6492c1f20fd48f08b4f5309beb5e2c4d0345bc98f0b567f3ab52cdec5",
+    "architectures": ["mips_24kc", "mips_74kc"]
+  },
+  {
+    "name": "apk-mips",
+    "cpu": "mips",
+    "format": "apk",
+    "base_commit": "ba915c2ee711d047d5be8575c1e98699119429ab",
+    "url": "https://downloads.openwrt.org/releases/25.12.4/targets/ath79/generic/openwrt-sdk-25.12.4-ath79-generic_gcc-14.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "001468f22df86efd13344863b6fcd705e99e92a7c402ddaf69d82f1648c74850",
+    "architectures": ["mips_24kc", "mips_74kc"]
+  },
+  {
+    "name": "ipk-mipsle",
+    "cpu": "mipsle",
+    "format": "ipk",
+    "base_commit": "78b23a26c4c98938d549e7ff5876508544e33d4d",
+    "url": "https://downloads.openwrt.org/releases/24.10.4/targets/ramips/mt7621/openwrt-sdk-24.10.4-ramips-mt7621_gcc-13.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "e857be9826272de900094246d2cea51c409ebc3b8da428471a4333814112a498",
+    "architectures": ["mipsel_24kc", "mipsel_74kc"]
+  },
+  {
+    "name": "apk-mipsle",
+    "cpu": "mipsle",
+    "format": "apk",
+    "base_commit": "ba915c2ee711d047d5be8575c1e98699119429ab",
+    "url": "https://downloads.openwrt.org/releases/25.12.4/targets/ramips/mt7621/openwrt-sdk-25.12.4-ramips-mt7621_gcc-14.3.0_musl.Linux-x86_64.tar.zst",
+    "sha256": "03f4766fcfbae86a814cbbf194226fa7e9ec66be2d4273bc1a0927a72a43a333",
+    "architectures": ["mipsel_24kc", "mipsel_74kc"]
   }
 ]

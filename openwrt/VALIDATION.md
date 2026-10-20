@@ -1,3 +1,21 @@
+# 0.6.19 多架构试验支持
+
+日期：2026-10-20；分支：`codex/multiarch-support`。
+测试发行：[openwrt-v0.6.19](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.19)。
+
+- **构建范围**：保留 x86_64、ARM64，新增 ARMv7 小端、MIPS32r2 大端与 MIPSel32r2 小端。10 组固定版本、SHA-256 和 feed 提交的 SDK 生成 46 个原生 IPK/APK 包；程序和五个 BTF 解析器通过 ELF 位数、字节序、机器类型、静态链接、版本、内容及权限校验。
+- **修复实际启动故障**：MIPS 纯 Go 构建虽然成功，但 QEMU 启动时复现 SQLite 的 CGO stub 错误。使用已有 CGO SQLite 驱动、固定 musl 交叉编译器及外部静态链接，并启用 musl 所需大文件声明。子模块、Go 模块版本及数据库结构不变，无新增项目依赖。
+- **自动识别**：安装器结合 CPU 与包管理器接受的原生架构选择程序；通用 `uname -m=mips` 根据 `mips_*` / `mipsel_*` 包标签区分大小端。真实 BusyBox/UCI 的 IPK/APK 场景覆盖三个新增架构、解析器校验失败与不支持架构拒绝，失败时不修改服务和用户数据。
+- **安装与构建回归**：106 项 OpenWrt 检查全部通过、无跳过；ShellCheck 与 BTF 解析器测试通过。覆盖 SDK 校验后暂存解包、缓存复用及 32/64 位 ELF 架构与动态解释器拒绝。三个新增架构在 QEMU 中执行 BTF 正确字节序、反向字节序与外来 ELF 拒绝测试。
+- **最终安装包启动**：从 ARMv7、MIPS、MIPSel 的最终 IPK 和 APK 分别提取运行程序，六组 QEMU 检查均通过真实 API、SQLite 初始化/写入/读取、认证操作与重启持久化。CI 增加对应架构的 API-only 启动检查。
+- **协议传输**：三个新增架构各通过独立本地 sing-box 服务端的 15 组节点和 15 组订阅传输用例，共 90 组，覆盖 SS/SS2022、HY2、AnyTLS 的 HTTP/UDP、端口跳跃、证书拒绝与连接生命周期。结果不代表机场公网节点可用性。
+- **原生升级**：最终 x86_64 IPK 完成 0.6.18 → 0.6.19 的隔离 API-only 升级，10 张用户表摘要一致，节点、订阅、群组、绑定、配置及偏好保留。两轮八节点无响应 SS 测试分别在 3.020 / 3.007 秒返回超时，随后正常 SOCKS/HTTP 测试成功。
+- **内核验证边界**：完整系统 QEMU 启动 OpenWrt 24.10.4 ARMv7、Linux 6.6.110，成功创建 BPF hash map 并加载最小 SchedCLS 程序。该镜像没有内核 BTF，未验证完整核心加载和透明代理数据通路。当前固定的 cilium/ebpf 上游仍不承诺维护 32 位支持，因此新增架构明确标为试验支持。
+
+未修改用户路由器。没有 ARMv7/MIPS 目标设备的完整透明代理或长期运行验证；CPU 架构匹配不能替代 Linux 5.17+、所需 eBPF、匹配 BTF、固件依赖与可写空间检查。单个运行程序约 53–57 MiB，16/32 MiB 闪存设备不能仅凭 CPU 型号判断可安装。ARMv5/v6、MIPS64、RISC-V 和 32 位 x86 本轮不提供安装包。
+
+---
+
 # 0.6.18 更新下载恢复
 
 日期：2026-10-20；分支：`codex/update-download-recovery`。

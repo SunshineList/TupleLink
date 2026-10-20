@@ -1,6 +1,7 @@
 package main
 
 import (
+	"debug/elf"
 	"encoding/binary"
 	"os"
 	"path/filepath"
@@ -9,6 +10,29 @@ import (
 
 	"github.com/cilium/ebpf/btf"
 )
+
+func TestELFArchitectureProfiles(t *testing.T) {
+	for _, item := range []struct {
+		arch    string
+		class   elf.Class
+		data    elf.Data
+		machine elf.Machine
+	}{
+		{"amd64", elf.ELFCLASS64, elf.ELFDATA2LSB, elf.EM_X86_64},
+		{"arm64", elf.ELFCLASS64, elf.ELFDATA2LSB, elf.EM_AARCH64},
+		{"arm", elf.ELFCLASS32, elf.ELFDATA2LSB, elf.EM_ARM},
+		{"mips", elf.ELFCLASS32, elf.ELFDATA2MSB, elf.EM_MIPS},
+		{"mipsle", elf.ELFCLASS32, elf.ELFDATA2LSB, elf.EM_MIPS},
+	} {
+		class, data, machine := elfArchitecture(item.arch)
+		if class != item.class || data != item.data || machine != item.machine {
+			t.Fatal("wrong ELF ABI", item.arch, class, data, machine)
+		}
+	}
+	if class, _, _ := elfArchitecture("unsupported"); class != elf.ELFCLASSNONE {
+		t.Fatal("unsupported ABI accepted")
+	}
+}
 
 func rawBTF(t *testing.T, names ...string) []byte {
 	t.Helper()
