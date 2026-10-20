@@ -2,12 +2,35 @@
 """Build a versioned static runtime and helpers for one reviewed CPU profile."""
 import argparse
 import json
+import gzip
+import hashlib
 import os
 from pathlib import Path
 import re
 import subprocess
 
 from build import ARCHITECTURES, HERE, prepare_sdk, verify_elf
+
+
+def verify_web_bundle(web, bundled):
+    """Reject make/copy failures that otherwise silently embed a stale UI."""
+    expected = {p.relative_to(web).as_posix(): p for p in web.rglob("*") if p.is_file()}
+    used = set()
+    for name, source in expected.items():
+        target = bundled / name
+        if target.is_file():
+            content = target.read_bytes()
+        elif not name.endswith(".gz") and target.with_name(target.name + ".gz").is_file():
+            target = target.with_name(target.name + ".gz")
+            content = gzip.decompress(target.read_bytes())
+        else:
+            raise ValueError("Bundled frontend missing: " + name)
+        if hashlib.sha256(content).digest() != hashlib.sha256(source.read_bytes()).digest():
+            raise ValueError("Bundled frontend differs from current build: " + name)
+        used.add(target.relative_to(bundled).as_posix())
+    actual = {p.relative_to(bundled).as_posix() for p in bundled.rglob("*") if p.is_file()}
+    if actual != used or "index.html" not in expected:
+        raise ValueError("Unexpected or incomplete bundled frontend; refuse stale assets")
 
 
 def main():
@@ -48,6 +71,7 @@ def main():
     subprocess.run(["python3", str(HERE / "prepare-wing.py"), str(wing)], check=True)
     subprocess.run(["make", "APPNAME=daed", "VERSION=" + args.version, "WEB_DIST=" + str(web),
                     "OUTPUT=" + str(output / "daed"), "bundle"], cwd=wing, env=env, check=True)
+    verify_web_bundle(web, wing / "webrender/web")
     # The helpers do not use SQLite and remain pure Go on every architecture.
     env["CGO_ENABLED"] = "0"
     for name in ("btf-probe", "luci-proxy"):

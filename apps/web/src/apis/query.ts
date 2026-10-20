@@ -212,12 +212,13 @@ export function useTrafficOverviewQuery(windowSec: number, maxPoints: number) {
   })
 }
 
-export function useNodeLatenciesQuery(refetchIntervalMs: number) {
+export function useNodeLatenciesQuery(refetchIntervalMs: number, enabled = true) {
   const gqlClient = useGQLQueryClient()
   const safeInterval = Math.max(1_000, refetchIntervalMs)
 
   return useQuery({
     queryKey: QUERY_KEY_NODE_LATENCY,
+    enabled,
     queryFn: async ({ signal }) => {
       const data = await gqlClient.request<{ nodeLatencies: NodeLatencyProbeResult[] }>(
         `
@@ -243,11 +244,13 @@ export function useNodeLatenciesQuery(refetchIntervalMs: number) {
   })
 }
 
-export function useNodesQuery() {
+export function useNodesQuery(enabled = true) {
   const gqlClient = useGQLQueryClient()
 
   return useQuery({
     queryKey: QUERY_KEY_NODE,
+    enabled,
+    staleTime: 15_000,
     queryFn: async () =>
       gqlClient.request(
         graphql(`
@@ -268,11 +271,13 @@ export function useNodesQuery() {
   })
 }
 
-export function useSubscriptionsQuery() {
+export function useSubscriptionsQuery(enabled = true) {
   const gqlClient = useGQLQueryClient()
 
   return useQuery({
     queryKey: QUERY_KEY_SUBSCRIPTION,
+    enabled,
+    staleTime: 15_000,
     queryFn: async () =>
       gqlClient.request(
         graphql(`
@@ -306,6 +311,7 @@ export function useConfigsQuery() {
 
   return useQuery({
     queryKey: QUERY_KEY_CONFIG,
+    staleTime: 15_000,
     queryFn: async () =>
       gqlClient.request(
         graphql(`
@@ -348,11 +354,13 @@ export function useConfigsQuery() {
   })
 }
 
-export function useGroupsQuery() {
+export function useGroupsQuery(enabled = true) {
   const gqlClient = useGQLQueryClient()
 
   return useQuery({
     queryKey: QUERY_KEY_GROUP,
+    enabled,
+    staleTime: 15_000,
     queryFn: async () =>
       gqlClient.request(
         graphql(`
@@ -407,6 +415,7 @@ export function useRoutingsQuery() {
 
   return useQuery({
     queryKey: QUERY_KEY_ROUTING,
+    staleTime: 15_000,
     queryFn: async () =>
       gqlClient.request(
         graphql(`
@@ -430,6 +439,7 @@ export function useDNSsQuery() {
 
   return useQuery({
     queryKey: QUERY_KEY_DNS,
+    staleTime: 15_000,
     queryFn: async () =>
       gqlClient.request(
         graphql(`

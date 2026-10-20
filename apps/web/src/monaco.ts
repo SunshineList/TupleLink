@@ -21,6 +21,7 @@ import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
 import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
+import { subscribeEditorCompletions } from '~/utils/editor-completions'
 
 // Configure Monaco workers for Vite
 globalThis.MonacoEnvironment = {
@@ -208,7 +209,7 @@ export function syncModelWithLsp(model: monacoEditor.editor.ITextModel): monacoE
  * Set dynamic completion items for routingA language
  * Use this to add user-configured groups to autocomplete suggestions
  */
-export function setDynamicCompletionItems(items: RoutingACompletionItem[]): void {
+function setDynamicCompletionItems(items: RoutingACompletionItem[]): void {
   // Always cache the items for when LSP client is initialized later
   pendingDynamicCompletionItems = items
 
@@ -233,12 +234,4 @@ export function setDynamicCompletionItems(items: RoutingACompletionItem[]): void
  * @param groupNames - Array of group names configured by user
  * @returns Completion items for group outbounds
  */
-export function createGroupCompletionItems(groupNames: string[]): RoutingACompletionItem[] {
-  return groupNames.map((name) => ({
-    label: name,
-    kind: 'variable',
-    detail: 'User group outbound',
-    documentation: `Route traffic to group: ${name}`,
-    insertText: name,
-  }))
-}
+subscribeEditorCompletions(setDynamicCompletionItems)

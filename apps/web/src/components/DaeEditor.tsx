@@ -1,125 +1,53 @@
-import type { Monaco } from '@monaco-editor/react'
-import type * as monacoEditor from 'monaco-editor'
-import { Editor } from '@monaco-editor/react'
-import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { EDITOR_OPTIONS, EDITOR_THEME_DARK, EDITOR_THEME_LIGHT } from '~/constants'
-import {
-  applyShikiThemes,
-  getLspClient,
-  handleEditorBeforeMount,
-  initLsp,
-  isShikiReady,
-  syncModelWithLsp,
-} from '~/monaco'
+import type { ReactNode } from 'react'
+import { Component, lazy, Suspense } from 'react'
 
-import { colorSchemeAtom } from '~/store'
-
-/**
- * Config type for the editor - used to filter completions appropriately
- */
 export type DaeConfigType = 'routing' | 'dns'
-
 export interface DaeEditorProps {
-  /** The config text content */
   value: string
-  /** Callback when content changes */
   onChange: (value: string) => void
-  /** Type of config being edited - affects completion filtering */
   configType?: DaeConfigType
-  /** CSS height - defaults to 100% */
   height?: string | number
-  /** Whether the editor is disabled */
   disabled?: boolean
 }
 
-/**
- * DAE config editor component with LSP support
- *
- * Wraps Monaco editor with:
- * - Shiki syntax highlighting
- * - DAE LSP for completions, hover, diagnostics
- * - Context-aware completion filtering based on configType
- */
-export function DaeEditor({ value, onChange, configType = 'routing', height = '100%', disabled }: DaeEditorProps) {
-  const colorScheme = useStore(colorSchemeAtom)
-  const [, forceUpdate] = useState({})
-  const monacoRef = useRef<Monaco | null>(null)
-  const lspSyncRef = useRef<{ dispose: () => void } | null>(null)
-  const modelRef = useRef<monacoEditor.editor.ITextModel | null>(null)
+const Editor = lazy(() => import('./DaeEditorImpl').then((module) => ({ default: module.DaeEditor })))
 
-  // Cleanup LSP sync on unmount
-  useEffect(() => {
-    return () => {
-      lspSyncRef.current?.dispose()
-      lspSyncRef.current = null
-    }
-  }, [])
+class EditorBoundary extends Component<DaeEditorProps & { children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div className="space-y-2">
+        <p role="alert" className="text-sm text-muted-foreground">
+          代码编辑器加载失败，可继续使用文本模式编辑，或刷新页面后重试。
+        </p>
+        <textarea
+          aria-label="配置代码"
+          className="min-h-64 w-full rounded border bg-background p-3 font-mono text-sm"
+          value={this.props.value}
+          disabled={this.props.disabled}
+          onChange={(event) => this.props.onChange(event.target.value)}
+        />
+      </div>
+    )
+  }
+}
 
-  // Update config type context for LSP
-  useEffect(() => {
-    const lspClient = getLspClient()
-    if (lspClient) {
-      lspClient.setConfigContext(configType)
-    }
-  }, [configType])
-
-  const handleEditorDidMount = useCallback(
-    async (
-      editor: Parameters<typeof Editor>[0]['onMount'] extends ((e: infer E, ...args: unknown[]) => void) | undefined
-        ? E
-        : never,
-      monacoInstance: Monaco,
-    ) => {
-      monacoRef.current = monacoInstance
-
-      // Apply Shiki themes if not ready
-      if (!isShikiReady()) {
-        await applyShikiThemes(monacoInstance)
-        forceUpdate({})
-      }
-
-      // Initialize LSP client
-      await initLsp(monacoInstance)
-
-      // Set config context for completion filtering
-      const lspClient = getLspClient()
-      if (lspClient) {
-        lspClient.setConfigContext(configType)
-      }
-
-      // Sync document with LSP
-      const model = editor.getModel()
-      if (model) {
-        modelRef.current = model
-        lspSyncRef.current?.dispose()
-        lspSyncRef.current = syncModelWithLsp(model)
-      }
-    },
-    [configType],
-  )
-
-  const theme = isShikiReady()
-    ? colorScheme === 'dark'
-      ? EDITOR_THEME_DARK
-      : EDITOR_THEME_LIGHT
-    : colorScheme === 'dark'
-      ? 'vs-dark'
-      : 'vs'
-
+export function DaeEditor(props: DaeEditorProps) {
   return (
-    <Editor
-      height={height}
-      theme={theme}
-      options={{
-        ...EDITOR_OPTIONS,
-        readOnly: disabled,
-      }}
-      language={configType === 'dns' ? 'dnsA' : 'routingA'}
-      value={value}
-      onChange={(v) => onChange(v || '')}
-      beforeMount={handleEditorBeforeMount}
-      onMount={handleEditorDidMount}
-    />
+    <EditorBoundary {...props}>
+      <Suspense
+        fallback={
+          <div role="status" className="p-4 text-sm text-muted-foreground">
+            正在加载代码编辑器…
+          </div>
+        }
+      >
+        <Editor {...props} />
+      </Suspense>
+    </EditorBoundary>
   )
 }

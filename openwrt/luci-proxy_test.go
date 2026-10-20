@@ -137,3 +137,66 @@ func TestSessionAccessRejectsAnonymousAndUsesLuCIWritePermission(t *testing.T) {
 		t.Fatal("valid access check rejected")
 	}
 }
+
+func TestGatewayCachesOnlyAuthorizedFingerprintedStaticAssets(t *testing.T) {
+	directory := t.TempDir()
+	data, _ := json.Marshal(credentials{"router", "test-private-secret"})
+	os.WriteFile(filepath.Join(directory, credentialName), data, 0600)
+	type fixture struct {
+		name, contentType string
+		status            int
+		cached            bool
+	}
+	for _, item := range []fixture{
+		{"assets/index-AbCd1234.js", "text/javascript; charset=utf-8", 200, true},
+		{"assets/index-AbCd1234.css", "text/css", 200, true},
+		{"assets/editor.worker-AbCd1234.js", "application/javascript", 200, true},
+		{"assets/font-AbCd1234.woff2", "font/woff2", 200, true},
+		{"assets/index-AbCd1234.js", "text/html", 200, false},
+		{"assets/index-AbCd1234.js", "text/javascript", 404, false},
+		{"assets/index.js", "text/javascript", 200, false},
+		{"assets/config-AbCd1234.json", "application/json", 200, false},
+		{"index.html", "text/html", 200, false},
+		{"graphql", "application/json", 200, false},
+	} {
+		t.Run(item.name+item.contentType+http.StatusText(item.status), func(t *testing.T) {
+			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", item.contentType)
+				w.WriteHeader(item.status)
+				w.Write([]byte("fixture"))
+			}))
+			defer backend.Close()
+			target, _ := url.Parse(backend.URL)
+			active := true
+			handler := gateway(directory, target, func(_ context.Context, session string) bool { return active && session == testSession })
+			request := func() *httptest.ResponseRecorder {
+				method := "GET"
+				if item.name == "graphql" {
+					method = "POST"
+				}
+				r := httptest.NewRequest(method, "https://router.test"+gatewayPath+item.name, nil)
+				r.Header.Set("Origin", "https://router.test")
+				r.AddCookie(&http.Cookie{Name: sessionCookie, Value: testSession})
+				w := httptest.NewRecorder()
+				handler.ServeHTTP(w, r)
+				return w
+			}
+			response := request()
+			expected := "no-store"
+			if item.cached {
+				expected = "private, max-age=31536000, immutable"
+			}
+			if response.Header().Get("Cache-Control") != expected {
+				t.Fatalf("wrong cache policy: %s", response.Header().Get("Cache-Control"))
+			}
+			if len(response.Header().Values("Cache-Control")) != 1 {
+				t.Fatal("ambiguous duplicate cache policy")
+			}
+			active = false
+			response = request()
+			if response.Code != 401 || response.Header().Get("Cache-Control") != "no-store" {
+				t.Fatal("revoked authorization was cached or ignored")
+			}
+		})
+	}
+}

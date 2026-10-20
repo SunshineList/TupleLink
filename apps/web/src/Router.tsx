@@ -1,11 +1,18 @@
-import { createGraphiQLFetcher } from '@graphiql/toolkit'
 import { useStore } from '@nanostores/react'
-import { GraphiQL } from 'graphiql'
-import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 
 import { MainLayout, OrchestratePage, SetupPage } from '~/pages'
 import { endpointURLAtom, tokenAtom } from '~/store'
 import { routerMode } from '~/utils/router-mode'
+
+const GraphQLPage = import.meta.env.VITE_OPENWRT === '1' ? null : lazy(() => import('~/pages/GraphQLPage'))
+
+function RouterWorkspace() {
+  const { area = 'dashboard' } = useParams()
+  if (!['dashboard', 'resources', 'advanced', 'logs'].includes(area)) return <Navigate to="/" replace />
+  return <OrchestratePage area={area as 'dashboard' | 'resources' | 'advanced' | 'logs'} />
+}
 
 export function Router() {
   const endpointURL = useStore(endpointURLAtom)
@@ -16,23 +23,22 @@ export function Router() {
     <RouterType>
       <Routes>
         <Route path="/" element={<MainLayout />}>
-          <Route index element={<OrchestratePage area={routerMode ? 'dashboard' : 'all'} />} />
-          {routerMode && <Route path="resources" element={<OrchestratePage area="resources" />} />}
-          {routerMode && <Route path="advanced" element={<OrchestratePage area="advanced" />} />}
+          {routerMode ? (
+            <Route path=":area?" element={<RouterWorkspace />} />
+          ) : (
+            <Route index element={<OrchestratePage />} />
+          )}
         </Route>
 
         <Route path="/setup" element={routerMode ? <Navigate to="/" replace /> : <SetupPage />} />
 
-        {!routerMode && endpointURL && (
+        {!routerMode && endpointURL && GraphQLPage && (
           <Route
             path="/graphiql"
             element={
-              <GraphiQL
-                fetcher={createGraphiQLFetcher({
-                  url: endpointURL,
-                  headers: { authorization: `Bearer ${token}` },
-                })}
-              />
+              <Suspense fallback={<div className="p-6">正在加载调试工具…</div>}>
+                <GraphQLPage endpointURL={endpointURL} token={token} />
+              </Suspense>
             }
           />
         )}

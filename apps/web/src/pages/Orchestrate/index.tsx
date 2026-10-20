@@ -30,6 +30,7 @@ import { appStateAtom, groupSortOrdersAtom } from '~/store'
 import { deriveTime } from '~/utils'
 import { groupColumnBase, groupColumnLocations } from '~/utils/group-columns'
 import { useLatencyTests } from '~/hooks/useLatencyTests'
+import { RouterLogs } from '~/pages/RouterLogs'
 import { Config } from './Config'
 import { DNS } from './DNS'
 import { GroupResource } from './Group'
@@ -45,7 +46,8 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
   return newArray
 }
 
-export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' | 'resources' | 'advanced' }) {
+export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' | 'resources' | 'advanced' | 'logs' }) {
+  const commonVisible = area !== 'advanced' && area !== 'logs'
   const { t } = useTranslation()
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [activeArea, setActiveArea] = useState('panel-common')
@@ -85,10 +87,10 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
     })
   }
   const { data: configsQuery } = useConfigsQuery()
-  const nodesRequest = useNodesQuery()
+  const nodesRequest = useNodesQuery(commonVisible)
   const nodesQuery = nodesRequest.data
-  const { data: groupsQuery } = useGroupsQuery()
-  const subscriptionsRequest = useSubscriptionsQuery()
+  const { data: groupsQuery } = useGroupsQuery(commonVisible)
+  const subscriptionsRequest = useSubscriptionsQuery(commonVisible)
   const subscriptionsQuery = subscriptionsRequest.data
 
   const groupAddNodesMutation = useGroupAddNodesMutation()
@@ -151,7 +153,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
     const ms = deriveTime(configuredInterval, 'ms')
     return Math.max(1_000, Number.isFinite(ms) ? ms : 30_000)
   }, [selectedConfig?.global.checkInterval])
-  const nodeLatenciesQuery = useNodeLatenciesQuery(nodeLatencyRefetchIntervalMs)
+  const nodeLatenciesQuery = useNodeLatenciesQuery(nodeLatencyRefetchIntervalMs, commonVisible)
   const nodeLatencies = useMemo<Record<string, NodeLatencyProbeResult>>(
     () => Object.fromEntries((nodeLatenciesQuery.data ?? []).map((result) => [result.id, result])),
     [nodeLatenciesQuery.data],
@@ -671,6 +673,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
 
   return (
     <div className="panel-workspace flex flex-col gap-5" data-workspace={area}>
+      {area === 'logs' && <RouterLogs />}
       {area === 'dashboard' && (
         <section id="panel-monitor">
           <TrafficOverview compact />
@@ -696,123 +699,130 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
           ))}
         </nav>
       )}
-      <section
-        id="panel-common"
-        hidden={area === 'advanced'}
-        tabIndex={-1}
-        className="scroll-mt-36 outline-none"
-        aria-label={t(area === 'dashboard' ? 'group' : 'panel.resources')}
-      >
-        {area === 'all' && (
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold">{t('panel.common')}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{t('panel.commonDescription')}</p>
-          </div>
-        )}
-        <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
-          {area !== 'dashboard' && (
-            <div className="panel-mobile-tabs" role="tablist" aria-label={t('panel.common')}>
-              {[
-                ['groups', t('group'), groups.length],
-                ['nodes', t('node'), nodeLibrary.length],
-                ['subscriptions', t('subscription'), subscriptions.length],
-              ]
-                .filter(([id]) => area === 'all' || id !== 'groups')
-                .map(([id, label, count], index, tabs) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="tab"
-                    id={`workspace-tab-${id}`}
-                    aria-controls={`workspace-${id}`}
-                    aria-selected={mobilePanel === id}
-                    tabIndex={mobilePanel === id ? 0 : -1}
-                    onClick={() => setMobilePanel(String(id))}
-                    onKeyDown={(event) => {
-                      const keys = tabs.map(([id]) => String(id))
-                      const next =
-                        event.key === 'ArrowRight'
-                          ? (index + 1) % keys.length
-                          : event.key === 'ArrowLeft'
-                            ? (index + keys.length - 1) % keys.length
-                            : event.key === 'Home'
-                              ? 0
-                              : event.key === 'End'
-                                ? keys.length - 1
-                                : -1
-                      if (next < 0) return
-                      event.preventDefault()
-                      setMobilePanel(keys[next])
-                      document.getElementById(`workspace-tab-${keys[next]}`)?.focus()
-                    }}
-                  >
-                    {label} <span className="tabular-nums">{count}</span>
-                  </button>
-                ))}
+      {commonVisible && (
+        <section
+          id="panel-common"
+          tabIndex={-1}
+          className="scroll-mt-36 outline-none"
+          aria-label={t(area === 'dashboard' ? 'group' : 'panel.resources')}
+        >
+          {area === 'all' && (
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">{t('panel.common')}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t('panel.commonDescription')}</p>
             </div>
           )}
-          <div className="panel-common-grid" ref={workspaceRef}>
-            <div
-              id="workspace-groups"
-              hidden={area === 'resources'}
-              className="panel-resource-pane"
-              data-active={area === 'dashboard' || mobilePanel === 'groups'}
-              role="region"
-              aria-label={t('group')}
-            >
-              <GroupResource
-                latencyTests={latencyTests}
-                quickAdd={area === 'dashboard'}
-                highlight={!!draggingResource}
-                draggingResource={draggingResource}
-                dragDestinationDroppableId={dragDestinationDroppableId}
-                hoveredGroupId={hoveredGroupId}
-                nodeLatencies={nodeLatencies}
-              />
+          <DragDropContext onDragStart={onDragStart} onDragUpdate={onDragUpdate} onDragEnd={onDragEnd}>
+            {area !== 'dashboard' && (
+              <div className="panel-mobile-tabs" role="tablist" aria-label={t('panel.common')}>
+                {[
+                  ['groups', t('group'), groups.length],
+                  ['nodes', t('node'), nodeLibrary.length],
+                  ['subscriptions', t('subscription'), subscriptions.length],
+                ]
+                  .filter(([id]) => area === 'all' || id !== 'groups')
+                  .map(([id, label, count], index, tabs) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      id={`workspace-tab-${id}`}
+                      aria-controls={`workspace-${id}`}
+                      aria-selected={mobilePanel === id}
+                      tabIndex={mobilePanel === id ? 0 : -1}
+                      onClick={() => setMobilePanel(String(id))}
+                      onKeyDown={(event) => {
+                        const keys = tabs.map(([id]) => String(id))
+                        const next =
+                          event.key === 'ArrowRight'
+                            ? (index + 1) % keys.length
+                            : event.key === 'ArrowLeft'
+                              ? (index + keys.length - 1) % keys.length
+                              : event.key === 'Home'
+                                ? 0
+                                : event.key === 'End'
+                                  ? keys.length - 1
+                                  : -1
+                        if (next < 0) return
+                        event.preventDefault()
+                        setMobilePanel(keys[next])
+                        document.getElementById(`workspace-tab-${keys[next]}`)?.focus()
+                      }}
+                    >
+                      {label} <span className="tabular-nums">{count}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
+            <div className="panel-common-grid" ref={workspaceRef}>
+              <div
+                id="workspace-groups"
+                hidden={area === 'resources'}
+                className="panel-resource-pane"
+                data-active={area === 'dashboard' || mobilePanel === 'groups'}
+                role="region"
+                aria-label={t('group')}
+              >
+                {(area === 'dashboard' || area === 'all') && (
+                  <GroupResource
+                    latencyTests={latencyTests}
+                    quickAdd={area === 'dashboard'}
+                    highlight={!!draggingResource}
+                    draggingResource={draggingResource}
+                    dragDestinationDroppableId={dragDestinationDroppableId}
+                    hoveredGroupId={hoveredGroupId}
+                    nodeLatencies={nodeLatencies}
+                  />
+                )}
+              </div>
+              <div
+                id="workspace-nodes"
+                hidden={area === 'dashboard'}
+                className="panel-resource-pane"
+                data-active={mobilePanel === 'nodes'}
+                role="region"
+                aria-label={t('node')}
+                tabIndex={-1}
+              >
+                {area !== 'dashboard' && (
+                  <NodeResource
+                    library={nodeLibrary}
+                    nodes={visibleNodes}
+                    totalCount={nodeLibrary.length}
+                    filters={nodeFilters}
+                    onFiltersChange={setNodeFilters}
+                    loading={nodesRequest.isPending}
+                    error={nodesRequest.isError}
+                    onRetry={() => {
+                      nodesRequest.refetch()
+                    }}
+                    latencyTests={latencyTests}
+                    dragging={isDragging}
+                    highlight={draggingResource?.type === DraggableResourceType.groupNode}
+                    nodeLatencies={nodeLatencies}
+                  />
+                )}
+              </div>
+              <div
+                id="workspace-subscriptions"
+                hidden={area === 'dashboard'}
+                className="panel-resource-pane"
+                data-active={mobilePanel === 'subscriptions'}
+                role="region"
+                aria-label={t('subscription')}
+              >
+                {area !== 'dashboard' && (
+                  <SubscriptionResource
+                    sortedSubscriptions={sortedSubscriptions}
+                    nodeLatencies={nodeLatencies}
+                    latencyTests={latencyTests}
+                  />
+                )}
+              </div>
             </div>
-            <div
-              id="workspace-nodes"
-              hidden={area === 'dashboard'}
-              className="panel-resource-pane"
-              data-active={mobilePanel === 'nodes'}
-              role="region"
-              aria-label={t('node')}
-              tabIndex={-1}
-            >
-              <NodeResource
-                library={nodeLibrary}
-                nodes={visibleNodes}
-                totalCount={nodeLibrary.length}
-                filters={nodeFilters}
-                onFiltersChange={setNodeFilters}
-                loading={nodesRequest.isPending}
-                error={nodesRequest.isError}
-                onRetry={() => {
-                  nodesRequest.refetch()
-                }}
-                latencyTests={latencyTests}
-                dragging={isDragging}
-                highlight={draggingResource?.type === DraggableResourceType.groupNode}
-                nodeLatencies={nodeLatencies}
-              />
-            </div>
-            <div
-              id="workspace-subscriptions"
-              hidden={area === 'dashboard'}
-              className="panel-resource-pane"
-              data-active={mobilePanel === 'subscriptions'}
-              role="region"
-              aria-label={t('subscription')}
-            >
-              <SubscriptionResource
-                sortedSubscriptions={sortedSubscriptions}
-                nodeLatencies={nodeLatencies}
-                latencyTests={latencyTests}
-              />
-            </div>
-          </div>
-        </DragDropContext>
-      </section>
+          </DragDropContext>
+        </section>
+      )}
 
       <section
         id="panel-advanced"
@@ -844,9 +854,13 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
           hidden={area !== 'advanced' && !advancedOpen}
           className="panel-advanced-grid grid grid-cols-1 gap-4 p-4 lg:grid-cols-3"
         >
-          <Config />
-          <DNS />
-          <Routing />
+          {(area === 'advanced' || (area === 'all' && advancedOpen)) && (
+            <>
+              <Config />
+              <DNS />
+              <Routing />
+            </>
+          )}
         </div>
       </section>
       {area === 'all' && (

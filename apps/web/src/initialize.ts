@@ -50,13 +50,13 @@ export function useInitialize() {
       return
     }
 
-    const lanInterfaces = (await getInterfaces()).general.interfaces
-      .filter(({ flag }) => !!flag.default)
-      .map(({ name }) => name)
-
-    const { defaultConfigID, defaultRoutingID, defaultDNSID, defaultGroupID } = await getDefaults()
+    const [defaults, mode] = await Promise.all([getDefaults(), getMode()])
+    const { defaultConfigID, defaultRoutingID, defaultDNSID, defaultGroupID } = defaults
 
     if (!defaultConfigID) {
+      const lanInterfaces = (await getInterfaces()).general.interfaces
+        .filter(({ flag }) => !!flag.default)
+        .map(({ name }) => name)
       const {
         createConfig: { id },
       } = await createConfigMutation.mutateAsync({
@@ -66,6 +66,7 @@ export function useInitialize() {
 
       await selectConfigMutation.mutateAsync({ id })
       await setJsonStorageMutation.mutateAsync({ defaultConfigID: id })
+      defaults.defaultConfigID = id
     }
 
     if (!defaultRoutingID) {
@@ -75,6 +76,7 @@ export function useInitialize() {
 
       await selectRoutingMutation.mutateAsync({ id })
       await setJsonStorageMutation.mutateAsync({ defaultRoutingID: id })
+      defaults.defaultRoutingID = id
     }
 
     if (!defaultDNSID) {
@@ -84,6 +86,7 @@ export function useInitialize() {
 
       await selectDNSMutation.mutateAsync({ id })
       await setJsonStorageMutation.mutateAsync({ defaultDNSID: id })
+      defaults.defaultDNSID = id
     }
 
     if (!defaultGroupID) {
@@ -95,9 +98,8 @@ export function useInitialize() {
         policyParams: [],
       })
       await setJsonStorageMutation.mutateAsync({ defaultGroupID: id })
+      defaults.defaultGroupID = id
     }
-
-    const mode = await getMode()
 
     if (!mode) {
       await setJsonStorageMutation.mutateAsync({ mode: MODE.simple })
@@ -107,11 +109,7 @@ export function useInitialize() {
       modeAtom.set(mode as MODE)
     }
 
-    {
-      const { defaultConfigID, defaultDNSID, defaultGroupID, defaultRoutingID } = await getDefaults()
-
-      defaultResourcesAtom.set({ defaultConfigID, defaultDNSID, defaultGroupID, defaultRoutingID })
-    }
+    defaultResourcesAtom.set(defaults)
   }, [
     createConfigMutation,
     createDNSMutation,

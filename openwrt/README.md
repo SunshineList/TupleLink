@@ -1,9 +1,19 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.20](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.20)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.21](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.21)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.21 菜单切换与加载优化
+
+- 管理面板、节点和订阅、高级设置与运行日志在已打开的面板中切换，保留 iframe、查询缓存和外层浏览器历史；其他 LuCI 菜单继续正常跳转。
+- 代码编辑器和 GraphiQL 调试工具按需加载；隐藏页面不再初始化全部高级设置、节点列表与延迟轮询。
+- 已有配置的初始化改为两次并行读取；仅首次缺少默认配置时查询接口，避免每次重复读取和修复默认资源。
+- 只有带内容指纹且 MIME 类型匹配的成功静态资源可进入浏览器私有缓存；HTML、会话、API 和错误仍禁止缓存，每次网络请求仍校验 LuCI 权限。
+- 日志沿用原有只读 LuCI RPC；直接进入原生日志页面仍支持原权限。保留配置、全部架构限制，无新依赖或数据库迁移。
+- 编辑器脚本下载失败时回退为可编辑、可保存的文本框；构建后逐一校验嵌入前端，拒绝因缓存权限异常而打入旧页面。
+- 本地隔离 LuCI 环境中，菜单切换约从 0.9 秒降至 0.08–0.10 秒，首次入口脚本从 6.25 MB 减至 1.59 MB；实际速度取决于设备和浏览器。更新后刷新后台加载新页面。
 
 ## 0.6.20 内核兼容与断线恢复
 
@@ -161,7 +171,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，打开中文菜单后选择 **1 安装 / 更新**：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.20/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.20
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.21/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.21
 ```
 
 安装后可直接运行 `nailink` 再次打开菜单。选择安装/更新时才联网获取最新发布脚本；卸载可以离线执行。
@@ -169,7 +179,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/relea
 若菜单提示无法解析 `raw.githubusercontent.com`，旧版也可用下面的命令绕过 Raw 入口，直接下载指定发行版：
 
 ```sh
-nailink --install --release openwrt-v0.6.20
+nailink --install --release openwrt-v0.6.21
 ```
 
 如果 `github.com` 也无法解析，请先检查路由器自身的 DNS：`nslookup github.com`。
@@ -189,7 +199,7 @@ nailink --install --release openwrt-v0.6.20
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.20/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.20
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.21/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.21
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
@@ -325,7 +335,7 @@ ARMv5/v6、32 位 x86、MIPS64、RISC-V 及矩阵之外的固件 ABI 暂不提�
   `kmod-sched-bpf`、`kmod-veth` 及 `ca-bundle`、`v2ray-geoip`、`v2ray-geosite`。
 - 足够的临时下载空间和 overlay 存储。APK 格式要求 apk-tools 3.x。
 
-  0.6.20 的运行程序本体约 53–57 MiB，另需规则库、依赖、下载及升级备份空间。常见 16/32 MiB 闪存设备不能仅凭 CPU 匹配直接安装；需要用户自行提供足够的可写存储，脚本不自动扩容或配置 extroot。
+  0.6.21 的运行程序本体约 52–57 MiB，另需规则库、依赖、下载及升级备份空间。常见 16/32 MiB 闪存设备不能仅凭 CPU 匹配直接安装；需要用户自行提供足够的可写存储，脚本不自动扩容或配置 extroot。
 
 安装器不刷固件、不替换 BTF、不修改其他代理、DNS 或防火墙。
 ARM64 架构标签以 `sdk-matrix.json` 为准，程序使用 ARMv8 基线。APK 按
@@ -353,10 +363,10 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.20 --work /path/to/sdk-cache --output /path/to/runtime
-python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.20 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.21 --work /path/to/sdk-cache --output /path/to/runtime
+python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.21 --work /path/to/sdk-cache --output /path/to/packages
 # 全部 SDK 目标构建完成后再生成完整发行清单
-python3 openwrt/manifest.py /path/to/packages --version 0.6.20
+python3 openwrt/manifest.py /path/to/packages --version 0.6.21
 node --test tests/openwrt/ui.test.cjs
 ```
 

@@ -13,11 +13,13 @@ export function RouterHeader() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
   const title =
-    pathname === '/resources'
-      ? t('panel.resources')
-      : pathname === '/advanced'
-        ? t('panel.advanced')
-        : t('panel.dashboard')
+    pathname === '/logs'
+      ? '运行日志'
+      : pathname === '/resources'
+        ? t('panel.resources')
+        : pathname === '/advanced'
+          ? t('panel.advanced')
+          : t('panel.dashboard')
   const query = useGeneralQuery()
   const run = useRunMutation()
   const saving =

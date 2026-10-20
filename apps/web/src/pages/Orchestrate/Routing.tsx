@@ -20,8 +20,8 @@ import { Button } from '~/components/ui/button'
 import { SimpleTooltip } from '~/components/ui/tooltip'
 import { DEFAULT_GROUP_NAME } from '~/constants/default'
 import { useDisclosure } from '~/hooks'
-import { createGroupCompletionItems, setDynamicCompletionItems } from '~/monaco'
 import { defaultResourcesAtom } from '~/store'
+import { createGroupCompletionItems, setDynamicCompletionItems } from '~/utils/editor-completions'
 
 export function Routing() {
   const { t } = useTranslation()

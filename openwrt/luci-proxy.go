@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -32,6 +33,29 @@ const sessionCookie = "daed_luci_session"
 const credentialName = "luci-session.json"
 
 var validSession = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
+var fingerprintedAsset = regexp.MustCompile(`^assets/[a-zA-Z0-9_][a-zA-Z0-9_.-]*-[a-zA-Z0-9_-]{8,}\.(js|css|woff2?|ttf|svg|png|webp|wasm)$`)
+
+func cacheableAsset(name string, response *http.Response) bool {
+	if response.StatusCode != http.StatusOK || !fingerprintedAsset.MatchString(name) {
+		return false
+	}
+	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	switch path.Ext(name) {
+	case ".js":
+		return contentType == "text/javascript" || contentType == "application/javascript"
+	case ".css":
+		return contentType == "text/css"
+	case ".woff", ".woff2", ".ttf":
+		return strings.HasPrefix(contentType, "font/") || contentType == "application/font-woff" || contentType == "application/x-font-ttf"
+	case ".svg":
+		return contentType == "image/svg+xml"
+	case ".png", ".webp":
+		return contentType == "image/"+strings.TrimPrefix(path.Ext(name), ".")
+	case ".wasm":
+		return contentType == "application/wasm"
+	}
+	return false
+}
 
 type credentials struct {
 	Username string `json:"username"`
@@ -225,7 +249,17 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 			request.Header.Set("Authorization", "Bearer "+token)
 		}
 		proxy.ModifyResponse = func(response *http.Response) error {
+			// ReverseProxy appends upstream headers. Remove the initial error
+			// policy so a successful response has one unambiguous cache policy.
+			w.Header().Del("Cache-Control")
 			response.Header.Set("Cache-Control", "no-store")
+			// Only public, content-fingerprinted build assets may be retained in
+			// this browser's private cache. HTML, sessions, GraphQL and errors
+			// remain uncached, and every request still passes LuCI authorization.
+			if (r.Method == http.MethodGet || r.Method == http.MethodHead) && cacheableAsset(path, response) {
+				response.Header.Set("Cache-Control", "private, max-age=31536000, immutable")
+				response.Header.Add("Vary", "Cookie")
+			}
 			response.Header.Del("Set-Cookie")
 			response.Header.Del("Access-Control-Allow-Origin")
 			return nil

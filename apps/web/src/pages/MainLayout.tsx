@@ -1,21 +1,25 @@
 import type { RouterMenuHost } from '~/utils/router-menu'
 import { useStore } from '@nanostores/react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { Outlet, useNavigate } from 'react-router-dom'
 import { HeaderWithActions } from '~/components/Header'
 import { RouterHeader } from '~/components/RouterHeader'
+import { QUERY_KEY_GENERAL } from '~/constants'
 import { useInitialize } from '~/initialize'
 import { isMockMode } from '~/mocks'
 import { endpointURLAtom, tokenAtom } from '~/store'
 import { refreshStaleRouterMenu } from '~/utils/router-menu'
 import { routerMode } from '~/utils/router-mode'
+import { bindRouterNavigation } from '~/utils/router-navigation'
 
 export function MainLayout() {
   const navigate = useNavigate()
   const token = useStore(tokenAtom)
   const endpointURL = useStore(endpointURLAtom)
   const initialize = useInitialize()
+  const queries = useQueryClient()
   const [ready, setReady] = useState(!routerMode)
   const [error, setError] = useState('')
 
@@ -42,6 +46,20 @@ export function MainLayout() {
       navigate('/setup')
     }
   }, [endpointURL, navigate, token])
+
+  useEffect(() => {
+    if (!routerMode || !ready || window.parent === window) return
+    try {
+      return bindRouterNavigation(window.parent, (route) => {
+        // The outer LuCI URL owns history; do not add a second iframe entry.
+        navigate(route, { replace: true })
+        void queries.invalidateQueries({ queryKey: QUERY_KEY_GENERAL })
+        window.scrollTo(0, 0)
+      })
+    } catch {
+      // Alternate/cross-origin hosts retain ordinary LuCI navigation.
+    }
+  }, [navigate, queries, ready])
 
   if (routerMode && !ready) return <div className="p-6">{error || '正在准备面板…'}</div>
 

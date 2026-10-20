@@ -27,6 +27,7 @@ def main():
     for name in ("rootfs", "old-runtime", "runtime", "proxy", "workspace", "control"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--old-menu", type=Path, help="Use a real previous-release LuCI menu until upgrade")
+    parser.add_argument("--old-proxy", type=Path, help="Use the previous gateway until upgrade for cache/performance comparisons")
     args = parser.parse_args()
     if os.geteuid() != 0:
         parser.error("Run as root with an isolated, checksum-verified OpenWrt rootfs")
@@ -51,7 +52,7 @@ def main():
     files = {
         "www/cgi-bin/daed-router": project / "openwrt/files/luci-cgi",
         "usr/libexec/rpcd/daed-router": project / "openwrt/files/rpcd-daed",
-        "usr/libexec/daed/luci-proxy": args.proxy,
+        "usr/libexec/daed/luci-proxy": args.old_proxy or args.proxy,
         "usr/libexec/daed/subscription-proxy": project / "openwrt/files/subscription-proxy",
         "usr/share/rpcd/acl.d/luci-app-daed-router.json": project / "openwrt/files/acl.json",
         "usr/share/luci/menu.d/luci-app-daed-router.json": project / "openwrt/files/menu.json",
@@ -196,6 +197,7 @@ def main():
                         raise RuntimeError("Take a seeded database snapshot before upgrading")
                     daemon.terminate()
                     daemon.wait(timeout=10)
+                    shutil.copyfile(args.proxy, root / "usr/libexec/daed/luci-proxy")
                     shutil.copyfile(project / "openwrt/files/menu.json", root / "usr/share/luci/menu.d/luci-app-daed-router.json")
                     # Model the installed LuCI package's postinst invalidation.
                     # The browser session menu intentionally remains untouched.
@@ -209,6 +211,11 @@ def main():
                     answer["changed_tables"] = sorted(name for name in set(baseline) | set(after) if baseline.get(name) != after.get(name))
                 elif action == "subscription_fail":
                     state["fail"] = request["enabled"]
+                elif action == "revoke_session":
+                    session = request.get("session", "")
+                    if len(session) != 32 or any(c not in "0123456789abcdef" for c in session):
+                        raise ValueError("Invalid fixture session")
+                    subprocess.run(["chroot", str(root), "ubus", "call", "session", "destroy", json.dumps({"ubus_rpc_session": session})], check=True)
                 elif action == "proxy_state":
                     if "down" in request:
                         state["proxy_down"] = request["down"]
