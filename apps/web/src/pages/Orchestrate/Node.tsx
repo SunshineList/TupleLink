@@ -118,7 +118,7 @@ function NodeRow({
           {latency ? <LatencyBadge result={latency} /> : t('latency.test')}
         </Button>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           className="panel-node-join"
           aria-label={t('panel.addToGroup')}

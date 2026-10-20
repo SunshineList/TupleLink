@@ -562,16 +562,16 @@ form {
 }
 .panel-node-row {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) 32px;
-  grid-template-rows: minmax(0, 1fr) 32px;
+  grid-template-columns: 16px minmax(0, 1fr) 28px;
+  grid-template-rows: minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 8px;
-  height: 120px;
-  margin-bottom: 12px;
+  gap: 6px;
+  height: 92px;
+  margin-bottom: 10px;
   box-sizing: border-box;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 8px;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  border-radius: 10px;
   background: var(--card);
   transition:
     border-color 150ms,
@@ -587,7 +587,7 @@ form {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
+  height: 32px;
   cursor: grab;
   touch-action: none;
   color: var(--muted-foreground);
@@ -599,18 +599,18 @@ form {
 .panel-node-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 11px;
   font-weight: 400;
-  line-height: 18px;
+  line-height: 16px;
   color: var(--muted-foreground);
 }
 .panel-node-protocol {
   flex-shrink: 0;
   border-radius: 4px;
-  padding-inline: 5px;
+  padding-inline: 4px;
   background: color-mix(in oklab, var(--primary) 8%, var(--card));
   color: var(--muted-foreground);
   font-size: 11px;
@@ -627,10 +627,15 @@ form {
   min-width: 0;
 }
 .panel-node-actions .panel-node-probe {
-  height: 32px;
-  min-height: 32px;
+  height: 28px;
+  min-height: 28px;
   padding-inline: 4px;
   color: var(--muted-foreground);
+}
+.panel-node-probe [data-latency-tone] {
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 16px;
 }
 .panel-node-dragging {
   z-index: 60;
@@ -640,15 +645,18 @@ form {
 .panel-node-row .panel-node-more {
   grid-column: 3;
   grid-row: 1;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   color: var(--muted-foreground);
 }
 .panel-node-row .panel-node-join {
-  padding-inline: 8px;
+  height: 28px;
+  padding-inline: 6px;
+  font-size: 12px;
+  line-height: 16px;
 }
 [data-node-scroll] {
-  --node-row-height: 132px;
+  --node-row-height: 102px;
   scrollbar-gutter: stable;
 }
 @media (max-width: 899px) {
@@ -1110,7 +1118,7 @@ form {
 
 .manual-node-columns {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 .subscription-node-grid {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
@@ -1285,12 +1293,18 @@ form {
 }
 @media (max-width: 640px), (pointer: coarse) {
   [data-node-scroll] {
-    --node-row-height: 148px;
+    --node-row-height: 122px;
   }
   .panel-node-row {
-    height: 136px;
+    height: 112px;
     grid-template-columns: 20px minmax(0, 1fr) 44px;
     grid-template-rows: minmax(0, 1fr) 44px;
+  }
+  .panel-node-content > button {
+    min-height: 44px;
+  }
+  .panel-node-handle {
+    height: 44px;
   }
   .panel-node-row :is(.panel-node-probe, .panel-node-join, .panel-node-more) {
     min-height: 44px;

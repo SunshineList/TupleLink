@@ -4,11 +4,11 @@ import { NODE_ROW_HEIGHT, nodeWindow } from './node-window'
 describe('node window', () => {
   it('bounds rendered rows even for thousands of nodes and overscans both sides', () => {
     const range = nodeWindow(10_000, NODE_ROW_HEIGHT * 700, 456)
-    expect(range).toEqual({ start: 695, end: 710 })
+    expect(range).toEqual({ start: 695, end: 711 })
     expect(range.end - range.start).toBeLessThan(20)
   })
   it('uses taller touch rows to keep both virtual columns aligned while scrolling', () => {
-    expect(nodeWindow(1000, 148 * 10, 480, 148)).toEqual({ start: 5, end: 20 })
+    expect(nodeWindow(1000, 122 * 10, 480, 122)).toEqual({ start: 5, end: 20 })
   })
   it('handles empty lists, viewport resize and shrinkage after subscription updates', () => {
     expect(nodeWindow(0, 1000, 400)).toEqual({ start: 0, end: 0 })

@@ -1,9 +1,16 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.23](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.23)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.24](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.24)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.24 紧凑节点卡片
+
+- 在分离名称与操作的基础上减少留白，电脑卡片从 120 缩至 92 像素，手机从 136 缩至 112 像素；卡片间距为 10 像素。
+- 加入群组采用轻量文字按钮，延迟标签同步缩小，保留名称字号和完整名称查看方式。
+- 手机常用点击区域仍至少 44 像素；虚拟列表与拖动尺寸同步调整，保留两列排序与窄屏单列。
+- 仅调整展示，无新依赖、数据库迁移或代理/DNS/路由配置变更。
 
 ## 0.6.23 节点卡片布局
 
@@ -185,7 +192,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，打开中文菜单后选择 **1 安装 / 更新**：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.23/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.23
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.24/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.24
 ```
 
 安装后可直接运行 `nailink` 再次打开菜单。选择安装/更新时才联网获取最新发布脚本；卸载可以离线执行。
@@ -193,7 +200,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/relea
 若菜单提示无法解析 `raw.githubusercontent.com`，旧版也可用下面的命令绕过 Raw 入口，直接下载指定发行版：
 
 ```sh
-nailink --install --release openwrt-v0.6.23
+nailink --install --release openwrt-v0.6.24
 ```
 
 如果 `github.com` 也无法解析，请先检查路由器自身的 DNS：`nslookup github.com`。
@@ -213,7 +220,7 @@ nailink --install --release openwrt-v0.6.23
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.23/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.23
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.24/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.24
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
@@ -377,10 +384,10 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.23 --work /path/to/sdk-cache --output /path/to/runtime
-python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.23 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.24 --work /path/to/sdk-cache --output /path/to/runtime
+python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.24 --work /path/to/sdk-cache --output /path/to/packages
 # 全部 SDK 目标构建完成后再生成完整发行清单
-python3 openwrt/manifest.py /path/to/packages --version 0.6.23
+python3 openwrt/manifest.py /path/to/packages --version 0.6.24
 node --test tests/openwrt/ui.test.cjs
 ```
 
