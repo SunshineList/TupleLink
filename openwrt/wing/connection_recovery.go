@@ -89,7 +89,11 @@ func (c *ControlPlane) routerRouteDial(ctx context.Context, p *proxyDialParam) (
 		}
 		dialCtx, cancel := context.WithTimeout(ctx, budget)
 		conn, err := res.Dialer.DialContext(dialCtx, res.Network, res.DialTarget)
+		attemptErr := dialCtx.Err()
 		cancel()
+		if err == nil && attemptErr != nil {
+			err = attemptErr
+		}
 		// Dialers can race cancellation and still return a socket. Never leak it,
 		// or return a connection which belongs to an already cancelled operation.
 		if parentErr := ctx.Err(); parentErr != nil {

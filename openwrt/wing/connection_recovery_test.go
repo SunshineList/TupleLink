@@ -128,6 +128,31 @@ func TestRouterConnectionTCPReservesBackupBudget(t *testing.T) {
 	}
 }
 
+func TestRouterConnectionTCPLatePrimarySuccessUsesBackup(t *testing.T) {
+	late, latePeer := net.Pipe()
+	defer late.Close()
+	defer latePeer.Close()
+	client, peer := net.Pipe()
+	defer client.Close()
+	defer peer.Close()
+	var backup atomic.Int32
+	cp, ds := routerTestTCPGroup(t, consts.DialerSelectionPolicy_MinLastLatency,
+		func(ctx context.Context, _, _ string) (netproxy.Conn, error) { <-ctx.Done(); return late, nil },
+		func(context.Context, string, string) (netproxy.Conn, error) { backup.Add(1); return client, nil })
+	ctx, cancel := context.WithTimeout(context.Background(), 160*time.Millisecond)
+	defer cancel()
+	conn, res, err := cp.routeDial(ctx, routerTestTCPParam())
+	if conn != nil {
+		defer conn.Close()
+	}
+	if err != nil || res.Dialer != ds[1] || backup.Load() != 1 {
+		t.Fatalf("accepted primary after its deadline: %v, backup=%d", err, backup.Load())
+	}
+	if _, err = late.Write([]byte("x")); err == nil {
+		t.Fatal("late primary socket was retained")
+	}
+}
+
 func TestRouterConnectionTCPBoundaries(t *testing.T) {
 	for _, tc := range []struct {
 		name           string

@@ -1,9 +1,17 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.26](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.26)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.27](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.27)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.27 DNS 连接与取消恢复
+
+- 修复 DoH 请求、DoT 握手及 TCP DNS 写入未正确受请求期限或取消控制的问题，避免上游无响应时长期拖住解析。
+- 同一 DNS 转发器的冷启动连接创建串行合并，已有连接继续并行处理查询；连接池关闭后拒绝晚到连接，防止重载后重新留下旧资源。
+- UDP DNS 取消时及时中断读取，取消回调结束后才回收连接。正常取消不再累计节点失败次数；DoH 不再修改调用方共享的查询数据。
+- TCP 拨号即使在单次尝试到期后返回成功，也会关闭晚到连接，按原有条件尝试同群组备用节点。固定选择、单节点和应用数据不重放的约束保持不变。
+- 保留节点、配置、分流和证书校验，不新增依赖。主要修复已重现的等待与清理问题，不承诺每条公网线路或网站均恢复。
 
 ## 0.6.26 运行日志实时跟随
 
@@ -401,10 +409,10 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.26 --work /path/to/sdk-cache --output /path/to/runtime
-python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.26 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.27 --work /path/to/sdk-cache --output /path/to/runtime
+python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.27 --work /path/to/sdk-cache --output /path/to/packages
 # 全部 SDK 目标构建完成后再生成完整发行清单
-python3 openwrt/manifest.py /path/to/packages --version 0.6.26
+python3 openwrt/manifest.py /path/to/packages --version 0.6.27
 node --test tests/openwrt/ui.test.cjs
 ```
 

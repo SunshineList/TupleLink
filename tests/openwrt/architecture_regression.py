@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
     goarch, emulator = {'armv7': ('arm', 'arm'), 'mips': ('mips', 'mips'), 'mipsle': ('mipsle', 'mipsel')}[args.cpu]
     env = dict(os.environ, GOOS='linux', GOARCH=goarch, CGO_ENABLED='0', GOARM='7,softfloat', GOMIPS='softfloat')
-    regex = '^Test(RouterConnection|RouteDial|DnsController|DnsCache|DnsSingleflight|DNS|DnsPreference|DnsFallback|DnsForwarder|DnsListener|DnsDialer|DnsConnPool|ProxyHealth|DialFamily|RouteDialFamily|ControlPlane.*(Drain|Close|Shutdown)|Udp.*(Recovery|Instability))'
+    regex = '^Test(RouterDNS|RouterConnection|RouteDial|DnsController|DnsCache|DnsSingleflight|DNS|DnsPreference|DnsFallback|DnsForwarder|DnsListener|DnsDialer|DnsConnPool|ProxyHealth|DialFamily|RouteDialFamily|ControlPlane.*(Drain|Close|Shutdown)|Udp.*(Recovery|Instability))'
     with tempfile.TemporaryDirectory(prefix='nailink-architecture-regression-') as temporary:
         for package, selected in (('./component', '^TestRouterInterface'), ('./component/dns', '.'), ('./control', regex)):
             binary = Path(temporary) / 'regression'
