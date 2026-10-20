@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.6.21'
+        default: '0.6.22'
         required: true
 
 permissions:
@@ -112,12 +112,12 @@ jobs:
           (cd wing/dae-core && go test -count=1 ./control -run 'Runtime|RelayTCP|Tracked|ActiveTCP')
       - name: Transaction, node cancellation, subscription cron and failure preservation tests
         if: matrix.cpu == 'x86_64'
-        run: cd wing && go test -count=1 -v ./graphql ./graphql/service/node ./graphql/service/subscription
+        run: cd wing && go test -count=1 -v ./graphql ./graphql/service/node ./graphql/service/subscription ./webrender
       - name: Backend concurrency regression
         if: matrix.cpu == 'x86_64'
         run: |
           cd wing
-          CGO_ENABLED=1 go test -race -count=1 ./graphql ./graphql/service/node ./graphql/service/subscription ./cmd ./dae
+          CGO_ENABLED=1 go test -race -count=1 ./graphql ./graphql/service/node ./graphql/service/subscription ./cmd ./dae ./webrender
           CGO_ENABLED=1 go test -race -count=1 github.com/daeuniverse/dae/component -run '^TestRouterInterface'
       - name: LuCI gateway authentication and upgrade tests
         if: matrix.cpu == 'x86_64'

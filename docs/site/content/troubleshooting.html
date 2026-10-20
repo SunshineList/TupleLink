@@ -28,6 +28,28 @@ nslookup raw.githubusercontent.com</code></pre>
   <li>确认使用具有管理权限的 LuCI 账户。只读权限不等于可以修改代理。</li>
   <li>页面提示管理服务未启动时，使用页面提供的启动入口；仍失败再看运行日志。</li>
 </ul>
+<h2 id="memory">内存占用为什么看起来很高</h2>
+<p>
+  先区分整机内存和 NaiLink 进程。部分进程列表显示的 <code>VSZ</code> 或
+  <code>VmSize</code> 是虚拟地址空间，不能直接当成实际占用。 <code>VmRSS</code> 是进程的驻留内存；整机是否紧张还要结合
+  <code>MemAvailable</code>、连接数、规则规模和其他服务判断。
+</p>
+<p>在路由器 SSH 中执行以下只读命令，不会重启服务或修改配置：</p>
+<pre><code class="language-sh">free -m
+grep -E '^(MemTotal|MemAvailable|Cached|SReclaimable):' /proc/meminfo
+for pid in $$(pidof daed); do
+  echo "NaiLink PID: $$pid"
+  grep -E '^(Name|VmSize|VmRSS|RssAnon|RssFile):' /proc/$$pid/status
+done</code></pre>
+<p>
+  若没有 NaiLink 输出，先检查服务是否运行。<code>RssAnon</code> 主要用于观察匿名内存，<code>RssFile</code>
+  包含驻留的代码与文件映射；透明代理的内核映射等开销不全部计入进程 RSS。
+  程序安装大小也不等于运行内存。先记录启动后、测试节点后和运行一段时间的数值，再判断是否持续增长。
+</p>
+<p>
+  0.6.22
+  已将前端资源改为按需索引，减少基础驻留开销。没有用固定小内存上限约束代理核心，也不建议为了降低显示数值而定时重启服务或清空整机缓存。
+</p>
 <h2 id="test-timeout">节点测试超时、失败</h2>
 <p>
   先选一条<strong>真实节点</strong>单独测试。订阅里的“剩余流量”“套餐到期”等信息条目即使被解析为节点，也不适合作为可用线路判断依据。

@@ -11,6 +11,7 @@ SPEC = importlib.util.spec_from_file_location("prepare_wing", ROOT / "openwrt/pr
 PREPARE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PREPARE)
 SOURCES = (
+    "webrender/webrender.go",
     "graphql/service/config/mutation_utils.go",
     "graphql/service/dns/mutation_utils.go",
     "graphql/service/routing/mutation_utils.go",
@@ -46,6 +47,8 @@ class BackendPrepareTests(unittest.TestCase):
 
     def test_runtime_patch_is_reproducible_and_idempotent(self):
         PREPARE.prepare(self.root)
+        self.assertIn('routerFileServer(webFS.', (self.root / "webrender/webrender.go").read_text(encoding="utf-8"))
+        self.assertEqual((self.root / "webrender/router_assets.go").read_bytes(), (ROOT / "openwrt/wing/web_assets.go").read_bytes())
         self.assertIn("return routerCheckConn(conn), nil", (self.root / "dae-core/component/outbound/dialer/dialer.go").read_text(encoding="utf-8"))
         self.assertEqual((self.root / "dae/runtime.go").read_bytes(), (ROOT / "openwrt/wing/runtime.go").read_bytes())
         before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}

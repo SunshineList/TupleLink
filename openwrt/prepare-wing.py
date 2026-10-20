@@ -154,6 +154,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         generated[name] = digest(data)
     # Keep latency fixes in the release source, without changing submodule pins.
     patches = {
+        "webrender/webrender.go": ("24edc6844f7683ef8cfc6f3e9f8a4345cd9527c9725cbfe4b0f0898a455f5dc9", lambda value: value.replace('statigz.FileServer(webFS.', 'routerFileServer(webFS.', 1)),
         "graphql/service/config/mutation_utils.go": ("f57a5aa16fec110ff2906046aed26897d7ca22308200a45d85394602ab8113c3", router_transactions),
         "graphql/service/dns/mutation_utils.go": ("229f064ba7f4004f1bbdf2c0494f0cffc7cfd57c4c692c0e0f00b704351a1e89", router_transactions),
         "graphql/service/routing/mutation_utils.go": ("651bbbccbf1288da50dfffce15f70ae02434ac1b84be423574f54a382798c2a7", router_transactions),
@@ -211,6 +212,8 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
     destination.write_bytes(data)
     generated[key] = digest(data)
     for relative, source in (
+        ("webrender/router_assets.go", "web_assets.go"),
+        ("webrender/router_assets_test.go", "web_assets_test.go"),
         ("db/router_transaction.go", "transaction.go"),
         ("graphql/router_transactions_test.go", "transaction_test.go"),
         ("cmd/router_http_context_test.go", "http_context_test.go"),
@@ -258,6 +261,7 @@ def prepare(root):
     # Validate/transform the small reviewed input set in isolation first. An
     # unknown edit in a late file must not leave earlier sources half updated.
     inputs = (
+        "webrender/webrender.go",
         "cmd/run.go", "dae/run.go", "dae/httpclient.go", "dae/runtime.go",
         "graphql/mutation.go", "graphql/service/config/mutation_utils.go",
         "graphql/service/dns/mutation_utils.go", "graphql/service/routing/mutation_utils.go",
