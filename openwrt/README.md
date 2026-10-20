@@ -1,9 +1,18 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.25](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.25)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.26](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.26)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.26 运行日志实时跟随
+
+- 主界面和直接打开的 LuCI 日志页统一每 2 秒读取一次最近日志，默认定位到底部并持续跟随最新记录。
+- 字体加载与窗口变化造成日志重新换行时继续跟随，查看历史时保持位置；内容高度观察器在主界面离页时清理。
+- 向上滚动会固定正在查看的日志快照，后台继续读取有界的新快照；点击“回到最新”或按 End 恢复跟随，也可使用“暂停跟随”方便阅读和复制。
+- 读取失败保留已有内容并提示，恢复后继续更新。离开主界面日志页后停止轮询；LuCI 兼容入口防止重叠请求，无新内容时不重复替换日志文本。
+- 继续使用已有登录态、只读 RPC、32 KiB / 120 行尾部限制及脱敏规则。没有新依赖、日志流监听端口或数据库迁移，不修改代理连接与分流设置。
+- 真实 LuCI/rpcd 配合隔离日志文件，验证电脑及手机触控模拟中的初次定位、定时跟随、滚动暂停、历史快照、恢复、键盘和离页行为。
 
 ## 0.6.25 首次连接恢复
 
@@ -200,7 +209,7 @@ CGI 网关内嵌面板，不再要求新窗口。管理服务未运行时，面�
 以 root 在路由器 SSH 中执行，打开中文菜单后选择 **1 安装 / 更新**：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.25/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.25
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.26/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.26
 ```
 
 安装后可直接运行 `nailink` 再次打开菜单。选择安装/更新时才联网获取最新发布脚本；卸载可以离线执行。
@@ -208,7 +217,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/relea
 若菜单提示无法解析 `raw.githubusercontent.com`，旧版也可用下面的命令绕过 Raw 入口，直接下载指定发行版：
 
 ```sh
-nailink --install --release openwrt-v0.6.25
+nailink --install --release openwrt-v0.6.26
 ```
 
 如果 `github.com` 也无法解析，请先检查路由器自身的 DNS：`nslookup github.com`。
@@ -228,7 +237,7 @@ nailink --install --release openwrt-v0.6.25
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.25/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.25
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.26/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.26
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有
@@ -392,10 +401,10 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.25 --work /path/to/sdk-cache --output /path/to/runtime
-python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.25 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.26 --work /path/to/sdk-cache --output /path/to/runtime
+python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.26 --work /path/to/sdk-cache --output /path/to/packages
 # 全部 SDK 目标构建完成后再生成完整发行清单
-python3 openwrt/manifest.py /path/to/packages --version 0.6.25
+python3 openwrt/manifest.py /path/to/packages --version 0.6.26
 node --test tests/openwrt/ui.test.cjs
 ```
 

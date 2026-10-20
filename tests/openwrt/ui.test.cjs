@@ -13,6 +13,7 @@ function load(name, protocol = 'http:', page = 'dashboard') {
   const calls = [];
   const fetchCalls = [];
   let authorized = true;
+  let rpcFailure = false;
   let result = { running: true, listen: '127.0.0.1:2023', checks: [] };
   const context = vm.createContext({
     window: { location: { protocol, pathname: '/cgi-bin/luci/admin/services/daed/' + page } },
@@ -20,16 +21,23 @@ function load(name, protocol = 'http:', page = 'dashboard') {
     fetch: async (url, options) => { fetchCalls.push([url, options]); return {ok: authorized}; },
     view: { extend: value => value },
     baseclass: { extend: value => value },
-    rpc: { declare: spec => async (...args) => { calls.push([spec.method, ...args]); return result; } },
-    poll: { add: fn => polls.push(fn) },
+    rpc: { declare: spec => async (...args) => { calls.push([spec.method, ...args]); if (rpcFailure) throw new Error('read failed'); return result; } },
+    poll: { add: (fn, interval) => { fn.interval = interval; polls.push(fn); } },
     ui: { createHandlerFn: (self, fn) => fn.bind(self), addNotification: () => {} },
     dom: { content: (node, content) => { node.children = content; } },
-    E: (tag, attrs, children) => ({ tag, attrs, children }),
+    E: (tag, attrs, children) => {
+      const node = { tag, attrs, children, style: {}, scrollTop: 0, scrollHeight: 1000, clientHeight: 200 };
+      Object.defineProperty(node,'textContent',{
+        get(){ return (Array.isArray(this.children) ? this.children : [this.children]).map(child=>typeof child==='object' ? child?.textContent || '' : child || '').join(''); },
+        set(value){ this.children = String(value); },
+      });
+      return node;
+    },
   });
   vm.runInContext("String.prototype.format = function(...args) { let i=0; return this.replace(/%s/g, () => args[i++]); };", context);
   context.community = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'community.js'), 'utf8') + '\n})()', context);
   const view = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, name + '.js'), 'utf8') + '\n})()', context);
-  return { view, polls, calls, fetchCalls, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; } };
+  return { view, polls, calls, fetchCalls, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; }, setFailure: value => { rpcFailure = value; } };
 }
 
 function elements(node, tag) {
@@ -104,10 +112,57 @@ test('rejected bootstrap cannot render the management iframe', async () => {
 
 test('logs are rendered as text instead of executable HTML', async () => {
   const module = load('logs');
-  const tree = module.view.render();
   module.setResult({ logs: '<script>alert(1)</script>' });
+  const tree = module.view.render();
   await module.polls[0]();
   assert.equal(elements(tree, 'pre')[0].textContent, '<script>alert(1)</script>');
+});
+
+test('native logs follow the tail, freeze history and resume to the latest bounded snapshot', async () => {
+  const module = load('logs');
+  module.setResult({ logs: 'old snapshot' });
+  const tree = module.view.render();
+  const output = elements(tree, 'pre')[0];
+  const button = elements(tree, 'button')[0];
+  assert.equal(module.polls[0].interval, 2);
+  await module.polls[0]();
+  assert.equal(output.scrollTop, output.scrollHeight);
+  output.scrollTop = 100;
+  output.attrs.scroll();
+  assert.equal(button.textContent, '回到最新');
+  module.setResult({ logs: 'rotated tail: new snapshot' });
+  await module.polls[0]();
+  assert.equal(output.textContent, 'old snapshot');
+  assert.equal(output.scrollTop, 100);
+  button.attrs.click();
+  assert.equal(output.textContent, 'rotated tail: new snapshot');
+  assert.equal(output.scrollTop, output.scrollHeight);
+  assert.equal(button.textContent, '暂停跟随');
+  button.attrs.click();
+  module.setResult({ logs: 'keyboard latest' });
+  await module.polls[0]();
+  let prevented = false;
+  output.attrs.keydown({key:'End', preventDefault:()=>{prevented=true;}});
+  assert.equal(prevented,true);
+  assert.equal(output.textContent,'keyboard latest');
+});
+
+test('native log refresh errors preserve previous data and recover on the next successful poll', async () => {
+  const module = load('logs');
+  module.setResult({ logs:'last good snapshot' });
+  const tree = module.view.render();
+  await module.polls[0]();
+  module.setFailure(true);
+  await module.polls[0]();
+  assert.equal(elements(tree,'pre')[0].textContent,'last good snapshot');
+  const alert = elements(tree,'p').find(node=>node.attrs.role==='alert');
+  assert.match(alert.textContent,/日志读取失败/);
+  assert.equal(alert.style.display,'');
+  module.setFailure(false);
+  module.setResult({ logs:'recovered snapshot' });
+  await module.polls[0]();
+  assert.equal(elements(tree,'pre')[0].textContent,'recovered snapshot');
+  assert.equal(alert.style.display,'none');
 });
 
 test('community links are reachable from logs and service fallback pages', () => {

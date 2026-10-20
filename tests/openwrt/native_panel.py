@@ -211,6 +211,14 @@ def main():
                     answer["changed_tables"] = sorted(name for name in set(baseline) | set(after) if baseline.get(name) != after.get(name))
                 elif action == "subscription_fail":
                     state["fail"] = request["enabled"]
+                elif action == "logs":
+                    # Synthetic records in this disposable rootfs, consumed by
+                    # the real authenticated LuCI RPC and its bounded tail.
+                    logfile = root / "var/log/daed/daed.log"
+                    if not logfile.resolve().is_relative_to(root.resolve()):
+                        raise ValueError("Fixture log path escapes disposable rootfs")
+                    logfile.parent.mkdir(parents=True, exist_ok=True)
+                    logfile.write_text(request["text"], encoding="utf-8")
                 elif action == "revoke_session":
                     session = request.get("session", "")
                     if len(session) != 32 or any(c not in "0123456789abcdef" for c in session):
