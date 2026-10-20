@@ -155,7 +155,7 @@ class InstallerMenuTests(unittest.TestCase):
 while [ "$#" -gt 0 ]; do
  case "$1" in
  --output) output=$2; shift 2 ;;
- https://*) url=$1; shift ;;
+ http://*|https://*) url=$1; shift ;;
  *) shift ;;
  esac
 done
@@ -183,6 +183,75 @@ exit 44''')
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.router.root / 'tmp/invalid-executed').exists())
         self.unchanged()
+
+    def prepare_network_update(self):
+        source = (test_router.OPENWRT / 'install.sh').read_text()
+        source = re.sub(r'^release=openwrt-v\d+\.\d+\.\d+$', 'release=openwrt-v0.7.99', source, flags=re.MULTILINE)
+        self.router.write('/fixtures/latest-installer', source)
+        self.router.assets(version='0.7.99')
+
+    def downloader(self, client, raw_failure=False, all_failure=False):
+        self.router.script('/bin/' + client, '''output=''; url=''; accept=''
+while [ "$#" -gt 0 ]; do
+ case "$1" in
+ --output|-O) output=$2; shift 2 ;;
+ --header) accept=$2; shift 2 ;;
+ --header=*) accept=${1#--header=}; shift ;;
+ http://*|https://*) url=$1; shift ;;
+ *) shift ;;
+ esac
+done
+printf '%s %s\\n' "''' + client + '''" "$url" >> /tmp/download-urls
+[ "$url" != http://127.0.0.1:2023/ ] || exit 0
+''' + ('printf partial > "$output"; exit 6\n' if all_failure else '') + '''case "$url" in
+ https://raw.githubusercontent.com/slobys/NaiLink/main/openwrt/install.sh)
+ ''' + ('exit 6' if raw_failure else 'cp /fixtures/latest-installer "$output"') + ''' ;;
+ 'https://api.github.com/repos/slobys/NaiLink/contents/openwrt/install.sh?ref=main')
+ [ "$accept" = 'Accept: application/vnd.github.raw+json' ] || exit 45
+ cp /fixtures/latest-installer "$output" ;;
+ https://github.com/slobys/NaiLink/releases/download/openwrt-v0.7.99/*) cp "/assets/${url##*/}" "$output" ;;
+ *) exit 44 ;;
+esac''')
+
+    def assert_network_update_preserved_data(self, result):
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn('release 0.7.99', result.stdout)
+        self.assertEqual((self.router.root / 'etc/daed/wing.db-wal').read_text(), 'existing WAL')
+        self.assertTrue((self.router.root / 'tmp/daemon-running').exists())
+        self.assertFalse(list((self.router.root / 'tmp').glob('daed-install.*')))
+
+    def test_raw_dns_failure_uses_official_api_without_stopping_service(self):
+        self.prepare_network_update()
+        self.downloader('curl', raw_failure=True)
+        self.downloader('uclient-fetch', all_failure=True)
+        result = self.menu('1\n')
+        self.assert_network_update_preserved_data(result)
+        self.assertIn('api.github.com/repos/slobys/NaiLink/contents/openwrt/install.sh?ref=main', (self.router.root / 'tmp/download-urls').read_text())
+
+    def test_curl_failure_uses_firmware_downloader_for_installer_and_assets(self):
+        self.prepare_network_update()
+        self.downloader('curl', all_failure=True)
+        self.downloader('uclient-fetch')
+        self.assert_network_update_preserved_data(self.menu('1\n'))
+        urls = (self.router.root / 'tmp/download-urls').read_text()
+        self.assertIn('uclient-fetch https://raw.githubusercontent.com/', urls)
+        self.assertIn('uclient-fetch https://github.com/', urls)
+
+    def test_firmware_downloader_alone_can_use_official_api(self):
+        self.prepare_network_update()
+        self.downloader('uclient-fetch', raw_failure=True)
+        self.assert_network_update_preserved_data(self.menu('1\n'))
+
+    def test_both_origins_fail_preserves_data_and_explains_dns(self):
+        self.downloader('curl', all_failure=True)
+        self.downloader('uclient-fetch', all_failure=True)
+        result = self.menu('1\n')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('raw.githubusercontent.com', result.stderr)
+        self.assertIn('api.github.com', result.stderr)
+        self.assertIn('DNS', result.stderr)
+        self.unchanged()
+        self.assertFalse(list((self.router.root / 'tmp').glob('daed-install.*')))
 
     def test_stale_installer_cannot_downgrade_script_or_installed_version(self):
         self.router.script('/bin/curl', '''while [ "$#" -gt 0 ]; do

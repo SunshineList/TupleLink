@@ -1,9 +1,16 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.17](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.17)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.18](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.18)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.18 更新下载恢复
+
+- 菜单更新先尝试 Raw 下载，失败后使用同一仓库的 GitHub 官方 API；不依赖第三方镜像。
+- curl 下载失败时尝试固件自带的 uclient-fetch，安装脚本和安装包均支持回退；失败的残留文件会清理。
+- 保留 HTTPS 证书校验、脚本校验、禁止隐式降级与安装包校验；下载阶段失败不停止已有服务或修改配置。
+- 修复只涉及安装下载，不修改路由器 DNS、代理节点或其他插件设置。
 
 ## 0.6.17 保存与连接稳定性
 
@@ -143,6 +150,15 @@ uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/sloby
 
 安装后可直接运行 `nailink` 再次打开菜单。选择安装/更新时才联网获取最新发布脚本；卸载可以离线执行。
 
+若菜单提示无法解析 `raw.githubusercontent.com`，旧版也可用下面的命令绕过 Raw 入口，直接下载指定发行版：
+
+```sh
+nailink --install --release openwrt-v0.6.18
+```
+
+如果 `github.com` 也无法解析，请先检查路由器自身的 DNS：`nslookup github.com`。
+手机或电脑能够上网，并不能证明路由器 SSH 中的域名解析正常；无需因此删除节点或清空配置。
+
 升级先停止 NaiLink 并等待进程退出，将配置、SQLite 数据库及 WAL 备份到
 `/root/daed-backups`，然后更新程序；保留既有节点、规则、账户数据和自启选择。
 新入口复用原用户的面板存储；没有用户时自动准备本地服务身份。
@@ -157,7 +173,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://raw.githubusercontent.com/sloby
 固定版本的非交互安装/升级仍可执行：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.17/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.17
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.18/install.sh && sh /tmp/nailink-install.sh --install --release openwrt-v0.6.18
 ```
 
 `--check` 仅检查环境；`--dry-run` 另下载并核对本机安装包，APK 使用已有

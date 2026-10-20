@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/NaiLink
-release=openwrt-v0.6.17
+release=openwrt-v0.6.18
 asset_dir=''
 mode=install
 action=install
@@ -65,17 +65,38 @@ show_menu() {
 		esac
 	done
 }
+download_https() {
+	dl_output=$1; dl_url=$2; dl_timeout=$3; dl_accept=${4:-}
+	case "$dl_url" in https://*) ;; *) return 1 ;; esac
+	# Some firmware curl builds/resolvers fail while uclient-fetch still works.
+	# Never keep a partial response or disable HTTPS certificate verification.
+	if command -v curl >/dev/null 2>&1; then
+		set -- --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+			--connect-timeout 10 --max-time "$dl_timeout" --user-agent 'NaiLink-installer'
+		[ -z "$dl_accept" ] || set -- "$@" --header "$dl_accept"
+		if curl "$@" --output "$dl_output" "$dl_url" && [ -s "$dl_output" ]; then return 0; fi
+		rm -f "$dl_output"
+	fi
+	if command -v uclient-fetch >/dev/null 2>&1; then
+		set -- -T "$dl_timeout" -U 'NaiLink-installer'
+		[ -z "$dl_accept" ] || set -- "$@" "--header=$dl_accept"
+		if uclient-fetch "$@" -O "$dl_output" "$dl_url" && [ -s "$dl_output" ]; then return 0; fi
+		rm -f "$dl_output"
+	fi
+	return 1
+}
 install_latest() {
 	stage=$(mktemp -d /tmp/daed-install.XXXXXX) || fail 'Cannot create staging directory.'
 	url="https://raw.githubusercontent.com/$REPOSITORY/main/openwrt/install.sh"
 	printf '\n正在获取最新安装脚本，现有服务和数据尚未改动…\n'
-	if command -v curl >/dev/null 2>&1; then
-		curl --fail --location --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 60 \
-			--output "$stage/install.sh" "$url" || fail 'Cannot download the latest installer. Existing service/data were not changed.'
-	elif command -v uclient-fetch >/dev/null 2>&1; then
-		uclient-fetch -T 60 -O "$stage/install.sh" "$url" || fail 'Cannot download the latest installer. Existing service/data were not changed.'
-	else
+	if ! command -v curl >/dev/null 2>&1 && ! command -v uclient-fetch >/dev/null 2>&1; then
 		fail 'Requires curl or uclient-fetch with working HTTPS certificate verification.'
+	fi
+	if ! download_https "$stage/install.sh" "$url" 60; then
+		printf '主下载入口不可用，正在尝试 GitHub 官方 API 备用入口…\n'
+		url="https://api.github.com/repos/$REPOSITORY/contents/openwrt/install.sh?ref=main"
+		download_https "$stage/install.sh" "$url" 60 'Accept: application/vnd.github.raw+json' || \
+			fail 'Cannot download the latest installer. 请检查路由器自身的 DNS 和 HTTPS 连接（raw.githubusercontent.com / api.github.com）。Existing service/data were not changed.'
 	fi
 	if [ ! -s "$stage/install.sh" ] || ! sh -n "$stage/install.sh"; then
 		fail 'Downloaded installer is empty or invalid.'
@@ -277,14 +298,9 @@ fetch() {
 	case "$name" in ''|.*|*[!a-zA-Z0-9._-]*) fail 'Invalid asset filename.' ;; esac
 	if [ -n "$asset_dir" ]; then
 		cp "$asset_dir/$name" "$stage/$name" || fail "Missing local asset: $name"
-	elif command -v curl >/dev/null 2>&1; then
-		curl --fail --location --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 180 \
-			--output "$stage/$name" "https://github.com/$REPOSITORY/releases/download/$release/$name" || \
-			fail "Cannot download $name. This tag must contain the OpenWrt release assets."
-	elif command -v uclient-fetch >/dev/null 2>&1; then
-		uclient-fetch -T 180 -O "$stage/$name" "https://github.com/$REPOSITORY/releases/download/$release/$name" || fail "Cannot download $name. Check release assets, network and CA certificates."
 	else
-		fail 'Requires curl or uclient-fetch with working HTTPS certificate verification.'
+		download_https "$stage/$name" "https://github.com/$REPOSITORY/releases/download/$release/$name" 180 || \
+			fail "Cannot download $name. Check router DNS, HTTPS access, CA certificates and release assets. Existing service/data were not changed."
 	fi
 }
 

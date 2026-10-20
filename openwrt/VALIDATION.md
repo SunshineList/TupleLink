@@ -1,3 +1,23 @@
+# 0.6.18 更新下载恢复
+
+日期：2026-10-20；分支：`codex/update-download-recovery`。
+测试发行：[openwrt-v0.6.18](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.18)。
+
+用户的 0.6.16 菜单在获取 Raw 安装脚本时出现 curl 错误 6，尚未下载安装包或停止服务。这证明该次请求未能解析目标域名；不能据此判断路由器所有 DNS 均故障，也不代表节点配置损坏。本轮只修改安装下载，保留 0.6.17 的后端和连接修复。
+
+- `openwrt/install.sh`：统一 HTTPS 下载函数，curl 失败后尝试固件 uclient-fetch，清理失败残留；菜单 Raw 入口失败后，使用 GitHub 官方内容 API 的 raw 媒体类型读取同一仓库 main 脚本。
+- 保留 HTTPS 校验、脚本有效性检查、禁止缓存隐式降级、安装包 SHA-256、安装互斥和数据备份。下载失败不停止服务、不修改数据库或 UCI，也不修改系统 DNS、其他代理或防火墙。
+- `tests/openwrt/test_installer_menu.py`：新增 Raw DNS 失败后的 API 回退、curl 失败后的脚本及包下载回退、仅固件下载工具的 API 回退、双入口失败时的数据保护与提示。注入部分响应后失败，验证残留被清理；原无效脚本与降级拒绝测试继续通过。
+- **故障复现**：四个新增场景在修复前均失败；修复后 16 项菜单回归与 102 项完整 OpenWrt 检查通过、无跳过；ShellCheck 通过。
+- **官方 API 实测**：通过真实 HTTPS 请求验证 `Accept: application/vnd.github.raw+json` 返回安装脚本正文，接口无需 Raw 域名重定向。客户端回退和 DNS 故障注入在真实 BusyBox/UCI 隔离根文件系统中验证。
+- 根 README 与详细 README 补充旧版指定版本更新命令及 DNS 故障判断。旧版本可使用 `nailink --install --release openwrt-v0.6.18` 绕过 Raw 下载入口；仍需能够解析和访问 GitHub 及其发行资源域名。
+- **安装包与旧版入口**：x86_64 / ARM64 程序及 22 个 IPK/APK 包的版本、内容和权限校验通过。使用实际 0.6.16 安装脚本、旧 nailink 入口和最终发行资产验证指定版本的 IPK/APK dry-run，未访问 Raw/API，服务、数据库和 WAL 保留。
+- **保留数据升级**：最终 IPK 完成 0.6.16 → 0.6.18 的隔离 API-only 升级，10 张用户表摘要一致。两轮八节点无响应 SS 测试约 3 秒返回，随后正常 SOCKS/HTTP 测试成功；提交检查中的 10 个工作区测试任务通过。
+
+未更改用户路由器；备用入口可处理部分域名或下载工具故障，不能替代不可用的系统 DNS、线路或 HTTPS 连接。没有固定 GitHub IP、关闭证书校验或接入第三方镜像。
+
+---
+
 # 0.6.17 第二轮稳定性检查
 
 日期：2026-10-20；分支：`codex/stability-second-pass`。
