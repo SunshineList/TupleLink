@@ -28,6 +28,7 @@ SOURCES = (
     "dae-core/component/outbound/dialer/dialer.go",
     "dae-core/component/outbound/dialer/register.go",
     "dae-core/component/interface_manager.go",
+    "dae-core/control/dial.go", "dae-core/control/dns_control.go",
     "dae-core/common/subscription/subscription.go",
 )
 
@@ -42,7 +43,7 @@ class BackendPrepareTests(unittest.TestCase):
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text((ROOT / "wing" / relative).read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
-        (self.root / "dae-core/control").mkdir(parents=True)
+        (self.root / "dae-core/control").mkdir(parents=True, exist_ok=True)
         (self.root / "db").mkdir(parents=True)
 
     def test_runtime_patch_is_reproducible_and_idempotent(self):
@@ -51,6 +52,8 @@ class BackendPrepareTests(unittest.TestCase):
         self.assertEqual((self.root / "webrender/router_assets.go").read_bytes(), (ROOT / "openwrt/wing/web_assets.go").read_bytes())
         self.assertIn("return routerCheckConn(conn), nil", (self.root / "dae-core/component/outbound/dialer/dialer.go").read_text(encoding="utf-8"))
         self.assertEqual((self.root / "dae/runtime.go").read_bytes(), (ROOT / "openwrt/wing/runtime.go").read_bytes())
+        self.assertIn("return c.routerRouteDial(ctx, p)", (self.root / "dae-core/control/dial.go").read_text(encoding="utf-8"))
+        self.assertIn("routerDNSPrimaryTimeout(ctx, upstream, primaryDialArg)", (self.root / "dae-core/control/dns_control.go").read_text(encoding="utf-8"))
         before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         PREPARE.prepare(self.root)
         after = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
@@ -132,6 +135,20 @@ class BackendPrepareTests(unittest.TestCase):
         manifest.write_text(json.dumps(state), encoding="utf-8")
         PREPARE.prepare(self.root)
         self.assertEqual(path.read_bytes(), (ROOT / "openwrt/wing/runtime.go").read_bytes())
+
+    def test_unknown_connection_source_is_preserved(self):
+        PREPARE.prepare(self.root)
+        for relative in ("dae-core/control/dial.go", "dae-core/control/dns_control.go", "dae-core/control/router_connection.go"):
+            with self.subTest(source=relative):
+                path = self.root / relative
+                original = path.read_bytes()
+                path.write_bytes(original + b"// unreviewed local edit\n")
+                before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+                with self.assertRaises(ValueError):
+                    PREPARE.prepare(self.root)
+                after = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+                self.assertEqual(before, after)
+                path.write_bytes(original)
 
 
 if __name__ == "__main__":

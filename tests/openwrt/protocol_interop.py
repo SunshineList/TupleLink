@@ -62,6 +62,13 @@ def run_fixture(args, http_port, udp_port):
             "-out", str(work / "cert.pem"), "-subj", "/CN=fixture.test", "-addext", "subjectAltName=DNS:fixture.test,IP:127.0.0.1", "-days", "1",
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         tls = {"enabled": True, "certificate_path": str(work / "cert.pem"), "key_path": str(work / "key.pem")}
+        # Trust only a separate local VLESS test CA. Other protocol fixtures keep
+        # their untrusted certificate so negative TLS checks remain meaningful.
+        subprocess.run([
+            "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(work / "vless-key.pem"),
+            "-out", str(work / "vless-cert.pem"), "-subj", "/CN=vless.fixture.test", "-addext", "subjectAltName=DNS:vless.fixture.test", "-days", "1",
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        vless_tls = {"enabled": True, "certificate_path": str(work / "vless-cert.pem"), "key_path": str(work / "vless-key.pem")}
         inbounds, cases = [], []
         for method in ["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305", "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm", "2022-blake3-chacha20-poly1305"]:
             number = port()
@@ -71,6 +78,18 @@ def run_fixture(args, http_port, udp_port):
             inbounds.append({"type": "shadowsocks", "tag": method, "listen": "127.0.0.1", "listen_port": number, "method": method, "password": password})
             user = base64.urlsafe_b64encode((method + ":" + password).encode()).decode().rstrip("=")
             cases.append({"Name": method, "Link": f"ss://{user}@127.0.0.1:{number}"})
+        # Cover the user's VLESS path with independent TLS and WebSocket servers.
+        for transport in ["tcp", "ws"]:
+            number = port()
+            uuid = "00000000-0000-4000-8000-000000000001"
+            inbound = {"type": "vless", "tag": "vless-" + transport, "listen": "127.0.0.1", "listen_port": number,
+                       "users": [{"name": "fixture", "uuid": uuid}], "tls": vless_tls}
+            if transport == "ws":
+                inbound["transport"] = {"type": "ws", "path": "/fixture"}
+            inbounds.append(inbound)
+            link = f"vless://{uuid}@127.0.0.1:{number}?security=tls&sni=vless.fixture.test&type={transport}&path=%2Ffixture"
+            cases.append({"Name": "vless-tls-" + transport, "Link": link})
+            cases.append({"Name": "vless-tls-" + transport + "-certificate-rejected", "Link": link.replace("sni=vless.fixture.test", "sni=mismatch.invalid"), "Failure": "tls_failed"})
         for kind in ["hysteria2", "anytls"]:
             number = port(kind == "hysteria2")
             password = "fixture:pass:2026" if kind == "hysteria2" else "fixture@pass:2026"
@@ -102,7 +121,8 @@ def run_fixture(args, http_port, udp_port):
                     raise RuntimeError("independent server exited: " + (work / "server.log").read_text())
                 env = os.environ.copy()
                 env["DAED_PROTOCOL_CASES"] = str(casefile)
-                return subprocess.run(["go", "test", "-count=1", "-v", "./graphql/service/node", "./dae", "-run", "TestRouterProtocolInteroperability$|TestRouterHTTPProtocolDownload$"], cwd=args.wing, env=env).returncode
+                env["SSL_CERT_FILE"] = str(work / "vless-cert.pem")
+                return subprocess.run(["go", "test", "-count=1", "-v", "./graphql/service/node", "./dae", "github.com/daeuniverse/dae/control", "-run", "TestRouterProtocolInteroperability$|TestRouterHTTPProtocolDownload$|TestRouterConnectionProtocolFailover$"], cwd=args.wing, env=env).returncode
             finally:
                 process.terminate()
                 process.wait(timeout=5)

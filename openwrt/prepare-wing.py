@@ -56,6 +56,22 @@ def router_lifecycle(text):
     return text.replace('\n\t\t\tWaitForNetwork(log)', '\n\t\t\trouterWaitForNetwork(log)')
 
 
+def router_control_dial(text):
+    begin = text.index('func (c *ControlPlane) routeDial(')
+    return text[:begin] + '''func (c *ControlPlane) routeDial(ctx context.Context, p *proxyDialParam) (netproxy.Conn, *proxyDialResult, error) {
+    return c.routerRouteDial(ctx, p)
+}
+'''
+
+
+def router_dns_recovery(text):
+    text = text.replace('primaryCtx, primaryCancel := context.WithTimeout(ctx, consts.DefaultDialTimeout)',
+                        'primaryCtx, primaryCancel := context.WithTimeout(ctx, routerDNSPrimaryTimeout(ctx, upstream, primaryDialArg))', 1)
+    if 'if ctx.Err() != nil { return nil, primaryDialArg, ctx.Err() }' not in text:
+        text = text.replace('primaryErr := err', 'primaryErr := err\n\tif ctx.Err() != nil { return nil, primaryDialArg, ctx.Err() }', 1)
+    return text
+
+
 def _prepare_in_place(root):
     target = root / "graphql/service/subscription"
     source = target / "mutation_utils.go"
@@ -164,6 +180,8 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         "dae/run.go": ("748a95abac2a3dda0741da10d8278cd1dd8e792061d3a0f02f0fab08dcb6e233", router_lifecycle),
         "dae/httpclient.go": ("ea4b8ec3cabf79d8d08c74931c7ed8877df7eae8da4855b73ccc2cf86f2a86fd", lambda value: (HERE / "wing/httpclient.go").read_text(encoding="utf-8")),
         "dae-core/component/interface_manager.go": ("c8a97c9851c2c21d7af3b48d1c2fc514a80e6c838dce25b9ef15888e02752d2c", lambda value: (HERE / "wing/interface_manager.go").read_text(encoding="utf-8")),
+        "dae-core/control/dial.go": ("4e9948fde01eed541c5a828a83cdae8f74278ed55d95958e145bd1f113964bfe", router_control_dial),
+        "dae-core/control/dns_control.go": ("5f57ad79f164b45f226e0acc130f2b64c1ec4f0eaae90bef6368810339dd8fb8", router_dns_recovery),
         "dae-core/component/outbound/dialer/dialer.go": ("c6615ddf375371b1974c6d35ef8660aea8ee907fe88ebe09207560b5da5d39ad", lambda value: value.replace('return &netproxy.FakeNetConn{\n\t\t\t\t\tConn:  conn,\n\t\t\t\t\tLAddr: nil,\n\t\t\t\t\tRAddr: nil,\n\t\t\t\t}, nil', 'return routerCheckConn(conn), nil', 1)),
         "dae-core/component/outbound/dialer/register.go": ("59aa07ff1a3bf7c7dd38353091c3e9cdb2510f256e02e327c1fc768ef4e3ca99", lambda value: value.replace('normalizedLink := normalizeShadowTLSPluginOptions(link)\n\tbaseDialer := newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp)', 'normalizedLink, baseDialer, err := routerProtocolOptions(normalizeShadowTLSPluginOptions(link), newDefaultNetworkDialer(direct.SymmetricDirect, gOption.SoMarkFromDae, gOption.Mptcp), gOption.UDPHopInterval)\n\tif err != nil { return nil, err }', 1)),
         "dae-core/common/subscription/subscription.go": ("c48c3a14937aac13fde5d10af24e6d5774c6b5d2f09f8f23872201c06dcdd05f", lambda value: value.replace('url.Values{"plugin": []string{server.PluginOpts}}.Encode()', 'routerSIP008Plugin(server.Plugin, server.PluginOpts)', 1)),
@@ -182,7 +200,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         elif relative in ("graphql/service/node/latency_mutation_utils.go", "dae/runtime.go", "dae/httpclient.go", "dae-core/component/interface_manager.go"):
             replacement = "node_latency.go" if relative.endswith("latency_mutation_utils.go") else relative.split("/")[-1]
             data = (HERE / "wing" / replacement).read_bytes()
-        elif relative in ("cmd/run.go", "dae/run.go") or transform == router_transactions:
+        elif relative in ("cmd/run.go", "dae/run.go") or transform in (router_transactions, router_control_dial, router_dns_recovery):
             data = transform(data.decode()).encode()
         destination.write_bytes(data)
         generated[relative] = digest(data)
@@ -242,6 +260,17 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
     cache_text = cache_text.replace('merged := snapshotCachedLatencyResults()', 'merged := latencyCacheForNodes(nodes, ids == nil, before)')
     cache_file.write_text(cache_text, encoding="utf-8", newline="\n")
     generated["graphql/service/node/latency_cache.go"] = digest(cache_text.encode())
+    # Shared recovery helpers apply to both real traffic and routed API dials.
+    for relative, source in (
+        ("dae-core/control/router_connection.go", "connection_recovery.go"),
+        ("dae-core/control/router_connection_test.go", "connection_recovery_test.go"),
+    ):
+        destination = root / relative
+        data = (HERE / "wing" / source).read_bytes()
+        if destination.exists() and destination.read_bytes() != data and previous.get(relative) != digest(destination.read_bytes()):
+            raise ValueError("Unknown connection recovery source: " + relative)
+        destination.write_bytes(data)
+        generated[relative] = digest(data)
     # Tagged socket fixtures validate the real per-plane recorders and adapter.
     # They are not compiled into release binaries and never initialize eBPF.
     for relative, source in (
@@ -270,6 +299,7 @@ def prepare(root):
         "graphql/service/subscription/mutation_utils.go",
         "dae-core/component/outbound/dialer/dialer.go", "dae-core/component/outbound/dialer/register.go",
         "dae-core/component/interface_manager.go",
+        "dae-core/control/dial.go", "dae-core/control/dns_control.go",
         "dae-core/common/subscription/subscription.go",
     )
     manifest = root / ".daed-openwrt-prepare.json"
