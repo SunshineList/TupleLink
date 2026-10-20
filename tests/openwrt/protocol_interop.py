@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import socket
 import socketserver
+import struct
 import subprocess
 import tempfile
 import threading
@@ -20,12 +21,17 @@ import urllib.parse
 
 
 class HTTP(http.server.BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
     def do_GET(self):
-        data = b"protocol-payload" * 4096 if self.path == "/payload" else b""
+        data = b"protocol-payload" * 4096 if self.path in ('/payload', '/stream') else b""
         self.send_response(200 if data else 204)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        for offset in range(0, len(data), 8192):
+            self.wfile.write(data[offset:offset+8192])
+            if self.path == '/stream':
+                self.wfile.flush()
+                time.sleep(0.03)
 
     def log_message(self, *args):
         pass
@@ -34,6 +40,12 @@ class HTTP(http.server.BaseHTTPRequestHandler):
 class UDP(socketserver.BaseRequestHandler):
     def handle(self):
         data, sock = self.request
+        if len(data) > 16 and struct.unpack('!HH', data[2:6]) == (0x100, 1):
+            end = data.find(b'\x00', 12) + 5
+            if end > 16 and end <= len(data):
+                answer = b'\xc0\x0c' + struct.pack('!HHIH', 1, 1, 60, 4) + socket.inet_aton('192.0.2.1')
+                sock.sendto(data[:2] + struct.pack('!HHHHH', 0x8180, 1, 1, 0, 0) + data[12:end] + answer, self.client_address)
+                return
         sock.sendto(data, self.client_address)
 
 
@@ -78,16 +90,40 @@ def run_fixture(args, http_port, udp_port):
             inbounds.append({"type": "shadowsocks", "tag": method, "listen": "127.0.0.1", "listen_port": number, "method": method, "password": password})
             user = base64.urlsafe_b64encode((method + ":" + password).encode()).decode().rstrip("=")
             cases.append({"Name": method, "Link": f"ss://{user}@127.0.0.1:{number}"})
+            if method.startswith('2022'):
+                cases.append({"Name": method + '-sip002', "Link": f"ss://{method}:{urllib.parse.quote(password, safe='')}@127.0.0.1:{number}"})
+        for kind in ['vmess', 'trojan']:
+            for transport in ['tcp', 'ws']:
+                number = port()
+                uuid = '00000000-0000-4000-8000-000000000001'
+                inbound = {'type': kind, 'tag': kind + '-' + transport, 'listen': '127.0.0.1', 'listen_port': number, 'tls': vless_tls}
+                inbound['users'] = [{'uuid': uuid, 'alterId': 0}] if kind == 'vmess' else [{'password': 'fixture@pass:2026'}]
+                if transport == 'ws':
+                    inbound['transport'] = {'type': 'ws', 'path': '/fixture'}
+                inbounds.append(inbound)
+                if kind == 'vmess':
+                    config = {'v': '2', 'ps': kind + '-' + transport, 'add': '127.0.0.1', 'port': str(number), 'id': uuid, 'aid': '0', 'scy': 'auto', 'net': transport, 'type': 'none', 'host': '', 'path': '/fixture', 'tls': 'tls', 'sni': 'vless.fixture.test'}
+                    link = 'vmess://' + base64.b64encode(json.dumps(config).encode()).decode()
+                else:
+                    link = f"trojan://fixture%40pass%3A2026@127.0.0.1:{number}?sni=vless.fixture.test&type={transport}&path=%2Ffixture"
+                cases.append({'Name': kind + '-tls-' + transport, 'Link': link})
+        number = port(True)
+        inbounds.append({'type': 'tuic', 'tag': 'tuic', 'listen': '127.0.0.1', 'listen_port': number,
+                         'users': [{'uuid': uuid, 'password': 'fixture@pass:2026'}], 'congestion_control': 'cubic',
+                         'tls': {**vless_tls, 'alpn': ['h3']}})
+        cases.append({'Name': 'tuic-v5', 'Link': f'tuic://{uuid}:fixture%40pass%3A2026@127.0.0.1:{number}?sni=vless.fixture.test&alpn=h3&congestion_control=cubic&udp_relay_mode=native'})
         # Cover the user's VLESS path with independent TLS and WebSocket servers.
-        for transport in ["tcp", "ws"]:
+        for transport in ["tcp", "ws", "grpc"]:
             number = port()
             uuid = "00000000-0000-4000-8000-000000000001"
             inbound = {"type": "vless", "tag": "vless-" + transport, "listen": "127.0.0.1", "listen_port": number,
                        "users": [{"name": "fixture", "uuid": uuid}], "tls": vless_tls}
             if transport == "ws":
                 inbound["transport"] = {"type": "ws", "path": "/fixture"}
+            elif transport == "grpc":
+                inbound["transport"] = {"type": "grpc", "service_name": "fixture"}
             inbounds.append(inbound)
-            link = f"vless://{uuid}@127.0.0.1:{number}?security=tls&sni=vless.fixture.test&type={transport}&path=%2Ffixture"
+            link = f"vless://{uuid}@127.0.0.1:{number}?security=tls&sni=vless.fixture.test&type={transport}&path=%2Ffixture&serviceName=fixture"
             cases.append({"Name": "vless-tls-" + transport, "Link": link})
             cases.append({"Name": "vless-tls-" + transport + "-certificate-rejected", "Link": link.replace("sni=vless.fixture.test", "sni=mismatch.invalid"), "Failure": "tls_failed"})
         for kind in ["hysteria2", "anytls"]:
@@ -108,6 +144,15 @@ def run_fixture(args, http_port, udp_port):
         cases.append({"Name": "hysteria2-salamander", "Link": link})
         cases.append({"Name": "hysteria2-obfs-alias-ports", "Link": link.replace("obfs-password", "obfsPassword").replace(f":{number}?", ":1?") + f"&ports={number}-{number}"})
         cases.append({"Name": "hysteria2-mport", "Link": link.replace(f":{number}?", ":1?") + f"&mport={number}"})
+        juicity_config = None
+        if args.juicity_server:
+            number = port(True)
+            uuid = '00000000-0000-4000-8000-000000000001'
+            juicity_config = work / 'juicity.json'
+            juicity_config.write_text(json.dumps({'listen': f'127.0.0.1:{number}', 'users': {uuid: 'fixture@pass:2026'},
+                'certificate': str(work / 'vless-cert.pem'), 'private_key': str(work / 'vless-key.pem'),
+                'congestion_control': 'cubic', 'log_level': 'error'}), encoding='utf-8')
+            cases.append({'Name': 'juicity', 'Link': f'juicity://{uuid}:fixture%40pass%3A2026@127.0.0.1:{number}?sni=vless.fixture.test&congestion_control=cubic'})
         config = work / "config.json"
         config.write_text(json.dumps({"log": {"level": "error"}, "inbounds": inbounds, "outbounds": [{"type": "direct", "tag": "direct"}]}), encoding="utf-8")
         casefile = work / "cases.json"
@@ -115,21 +160,28 @@ def run_fixture(args, http_port, udp_port):
         subprocess.run([str(args.sing_box), "check", "-c", str(config)], check=True)
         with (work / "server.log").open("w", encoding="utf-8") as log:
             process = subprocess.Popen([str(args.sing_box), "run", "-c", str(config)], stdout=log, stderr=subprocess.STDOUT)
+            juicity = None
             try:
+                if juicity_config:
+                    juicity = subprocess.Popen([str(args.juicity_server), 'run', '-c', str(juicity_config)], stdout=log, stderr=subprocess.STDOUT)
                 time.sleep(0.6)
-                if process.poll() is not None:
+                if process.poll() is not None or (juicity and juicity.poll() is not None):
                     raise RuntimeError("independent server exited: " + (work / "server.log").read_text())
                 env = os.environ.copy()
                 env["DAED_PROTOCOL_CASES"] = str(casefile)
                 env["SSL_CERT_FILE"] = str(work / "vless-cert.pem")
-                return subprocess.run(["go", "test", "-count=1", "-v", "./graphql/service/node", "./dae", "github.com/daeuniverse/dae/control", "-run", "TestRouterProtocolInteroperability$|TestRouterHTTPProtocolDownload$|TestRouterConnectionProtocolFailover$"], cwd=args.wing, env=env).returncode
+                return subprocess.run(["go", "test", "-count=1", "-timeout=120s", "-v", "./graphql/service/node", "./dae", "github.com/daeuniverse/dae/control", "-run", "TestRouterProtocolInteroperability$|TestRouterHTTPProtocolDownload$|TestRouterConnectionProtocolFailover$"], cwd=args.wing, env=env).returncode
             finally:
                 process.terminate()
                 process.wait(timeout=5)
+                if juicity:
+                    juicity.terminate()
+                    juicity.wait(timeout=5)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wing", type=Path, required=True)
     parser.add_argument("--sing-box", type=Path, required=True)
+    parser.add_argument("--juicity-server", type=Path, help="Optional independent official Juicity server (tested with v0.5.0)")
     raise SystemExit(run(parser.parse_args()))

@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z); build artifacts only, no publishing'
-        default: '0.6.28'
+        default: '0.6.29'
         required: true
 
 permissions:
@@ -121,6 +121,19 @@ jobs:
           CGO_ENABLED=1 go test -race -count=1 ./graphql ./graphql/service/node ./graphql/service/subscription ./cmd ./dae ./webrender
           CGO_ENABLED=1 go test -race -count=1 github.com/daeuniverse/dae/component -run '^TestRouterInterface'
           CGO_ENABLED=1 go test -race -count=1 github.com/daeuniverse/dae/control -run '^TestRouterDNS|^TestRouterConnection|^TestRouteDial|^TestDnsForwarder'
+          CGO_ENABLED=1 go test -race -count=1 github.com/daeuniverse/dae/component/outbound/dialer -run '^TestRouter(ProtocolURIOptions|SSClose)'
+      - name: Independent protocol HTTP and UDP regression
+        if: matrix.cpu == 'x86_64'
+        run: |
+          mkdir -p /tmp/nailink-protocol-servers
+          curl -fL --proto '=https' -o /tmp/nailink-protocol-servers/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.14.3/sing-box-1.14.3-linux-amd64.tar.gz
+          echo 'e2bdf179c15a3652955dc44867e33ca0965c9c9b91b34267dcc5a5d639a5feee  /tmp/nailink-protocol-servers/sing-box.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/nailink-protocol-servers/sing-box.tar.gz -C /tmp/nailink-protocol-servers
+          curl -fL --proto '=https' -o /tmp/nailink-protocol-servers/juicity.zip https://github.com/juicity/juicity/releases/download/v0.5.0/juicity-linux-x86_64.zip
+          echo 'c0c11e8691e6a16b42de7c7a02d83a616fef79e574a88cc3765045c0b91b1e66  /tmp/nailink-protocol-servers/juicity.zip' | sha256sum -c -
+          python3 -m zipfile -e /tmp/nailink-protocol-servers/juicity.zip /tmp/nailink-protocol-servers/juicity
+          chmod +x /tmp/nailink-protocol-servers/juicity/juicity-server
+          sudo env "PATH=$PATH" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" python3 tests/openwrt/protocol_interop.py --wing wing --sing-box /tmp/nailink-protocol-servers/sing-box-1.14.3-linux-amd64/sing-box --juicity-server /tmp/nailink-protocol-servers/juicity/juicity-server
       - name: LuCI gateway authentication and upgrade tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/luci-proxy.go ../openwrt/luci-proxy_test.go

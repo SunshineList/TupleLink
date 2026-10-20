@@ -279,6 +279,16 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         "graphql/service/node/latency_mutation_utils.go": ("b7e722f4c24dd9606fceaf310daf285b30b8d878413ca20702970ef3b4ca805d", lambda value: (HERE / "wing/node_latency.go").read_text(encoding="utf-8")),
         "graphql/service/node/latency_cache.go": ("4d4fd03249c617bcc9fccb508dbc2d567fa74557dd5900ee046cbf307ff64831", lambda value: value.replace('if err := refreshLatencyCacheIfNeeded(ctx); err != nil {\n\t\treturn nil, err\n\t}', '// Reading results must never start network probes.').replace('if _, ok := merged[id]; !ok {', 'if cached, ok := merged[id]; !ok || resolver.TestedAtV.After(cached.TestedAtV) {')),
         "graphql/mutation.go": ("90a8f23ac625f2d3adf79f7f236d40b6529e2857028cc5ed02f02c0e111ee8ef", lambda value: value.replace('TestNodeLatencies(args *struct', 'TestNodeLatencies(ctx context.Context, args *struct').replace('node.TestLatencies(context.TODO(), args.IDs)', 'node.TestLatencies(ctx, args.IDs)')),
+        "graphql/root_schema.go": ("e9cf4836080bf087a0ddba58ed9596abc6e020e437c828d5f718932906b3bef0", lambda value: value.replace('type Mutation {', '''type NodeUdpTest {
+    id: ID!
+    latencyMs: Int
+    alive: Boolean!
+    testedAt: Time!
+    message: String
+    target: String!
+}
+type Mutation {
+    testNodeUDP(id: ID!): NodeUdpTest! @hasRole(role: ADMIN)''', 1)),
     }
     for relative, (original, transform) in patches.items():
         destination = root / relative
@@ -294,6 +304,11 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
             data = transform(data.decode()).encode()
         destination.write_bytes(data)
         generated[relative] = digest(data)
+    register_file = root / "dae-core/component/outbound/dialer/register.go"
+    register_text = register_file.read_text(encoding="utf-8")
+    register_text = register_text.replace('daeDialer := NewDialerContext(ctx, d, gOption, iOption, &p)', 'daeDialer := NewDialerContext(ctx, routerProtocolDialer(normalizedLink, d), gOption, iOption, &p)')
+    register_file.write_text(register_text, encoding="utf-8", newline="\n")
+    generated["dae-core/component/outbound/dialer/register.go"] = digest(register_text.encode())
     mutation_file = root / "graphql/mutation.go"
     mutation_text = mutation_file.read_text(encoding="utf-8")
     mutation_text = mutation_text.replace('ImportSubscription(args *struct', 'ImportSubscription(ctx context.Context, args *struct')
@@ -331,6 +346,10 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
         ("graphql/service/node/router_latency_cache.go", "node_latency_cache.go"),
         ("graphql/service/node/router_latency_cache_test.go", "node_latency_cache_test.go"),
         ("graphql/service/node/router_latency_option_test.go", "node_latency_option_test.go"),
+        ("graphql/service/node/router_udp.go", "node_udp.go"),
+        ("graphql/service/node/router_udp_test.go", "node_udp_test.go"),
+        ("graphql/router_udp.go", "udp_mutation.go"),
+        ("graphql/router_udp_test.go", "udp_mutation_test.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat.go", "protocol_compat.go"),
         ("dae-core/component/outbound/dialer/router_protocol_compat_test.go", "protocol_compat_test.go"),
         ("dae-core/component/router_interface_manager_test.go", "interface_manager_test.go"),
@@ -386,7 +405,7 @@ def prepare(root):
     inputs = (
         "webrender/webrender.go",
         "cmd/run.go", "dae/run.go", "dae/httpclient.go", "dae/runtime.go",
-        "graphql/mutation.go", "graphql/service/config/mutation_utils.go",
+        "graphql/mutation.go", "graphql/root_schema.go", "graphql/service/config/mutation_utils.go",
         "graphql/service/dns/mutation_utils.go", "graphql/service/routing/mutation_utils.go",
         "graphql/service/group/mutation_utils.go", "graphql/service/node/mutation_utils.go",
         "graphql/service/node/latency_mutation_utils.go", "graphql/service/node/latency_cache.go",

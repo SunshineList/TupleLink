@@ -26,6 +26,7 @@ import { ImportResourceFormModal } from '~/components/ImportResourceFormModal'
 import { LatencyBadge } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
 import { NodeName } from '~/components/NodeName'
+import { NodeUDPTest } from '~/components/NodeUDPTest'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceEmpty } from '~/components/ResourceEmpty'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
@@ -499,6 +500,7 @@ export function NodeResource({
                   </dd>
                 </div>
               </dl>
+              <NodeUDPTest key={detailNode.node.id} id={detailNode.node.id} />
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => onAction(detailNode, 'join')}>
                   {t('panel.addToGroup')}

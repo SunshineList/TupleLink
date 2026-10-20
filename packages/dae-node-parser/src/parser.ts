@@ -21,6 +21,13 @@ function explicitTLSPreference(params: URLSearchParams): boolean {
   return false
 }
 
+// Match the pinned Trojan/TUIC/Juicity parser's supported legacy aliases.
+function legacyTLSPreference(params: URLSearchParams): boolean {
+  return ['allowInsecure', 'allow_insecure', 'allowinsecure', 'skipVerify'].some((key) =>
+    ['1', 'true', 't'].includes((params.get(key) || '').toLowerCase()),
+  )
+}
+
 /**
  * Parse HTTP/HTTPS protocol URL
  * Format: http://[username:password@]host:port#name
@@ -82,12 +89,13 @@ export function parseSSUrl(url: string): Partial<SSConfig> | null {
     }
 
     const content = url.slice(5)
-    const hashIndex = content.lastIndexOf('#')
+    const hashIndex = content.indexOf('#')
     const name = hashIndex !== -1 ? decodeURIComponent(content.slice(hashIndex + 1)) : ''
     const mainPart = hashIndex !== -1 ? content.slice(0, hashIndex) : content
 
     // Try to find @ in the URL to determine format
-    const atIndex = mainPart.lastIndexOf('@')
+    const authority = mainPart.split('?')[0]
+    const atIndex = authority.lastIndexOf('@')
 
     let method: string
     let password: string
@@ -286,7 +294,7 @@ export function parseTrojanUrl(url: string): Partial<TrojanConfig> | null {
       port: parsed.port ? Number.parseInt(parsed.port, 10) : 443,
       name: decodeURIComponent(parsed.hash.slice(1) || ''),
       peer: params.get('sni') || params.get('peer') || '',
-      allowInsecure: params.get('allowInsecure') === '1' || params.get('allowInsecure') === 'true',
+      allowInsecure: legacyTLSPreference(params),
     }
 
     // Trojan-Go specific fields
@@ -342,7 +350,7 @@ export function parseTuicUrl(url: string): Partial<TuicConfig> | null {
       congestion_control: params.get('congestion_control') || '',
       alpn: params.get('alpn') || '',
       sni: params.get('sni') || '',
-      allowInsecure: params.get('allow_insecure') === '1' || params.get('allow_insecure') === 'true',
+      allowInsecure: legacyTLSPreference(params),
       disable_sni: params.get('disable_sni') === '1' || params.get('disable_sni') === 'true',
       udp_relay_mode: params.get('udp_relay_mode') || '',
     }
@@ -373,7 +381,7 @@ export function parseJuicityUrl(url: string): Partial<JuicityConfig> | null {
       congestion_control: params.get('congestion_control') || '',
       pinned_certchain_sha256: params.get('pinned_certchain_sha256') || '',
       sni: params.get('sni') || '',
-      allowInsecure: params.get('allow_insecure') === '1' || params.get('allow_insecure') === 'true',
+      allowInsecure: legacyTLSPreference(params),
     }
   } catch {
     return null
@@ -401,7 +409,7 @@ export function parseHysteria2Url(url: string): Partial<Hysteria2Config> | null 
       obfs: params.get('obfs') || '',
       obfsPassword: params.get('obfs-password') || params.get('obfsPassword') || '',
       sni: params.get('sni') || '',
-      ports: params.get('ports') || params.get('mport') || '',
+      ports: params.get('mport') || params.get('ports') || '',
       allowInsecure: explicitTLSPreference(params),
       pinSHA256: params.get('pinSHA256') || '',
     }

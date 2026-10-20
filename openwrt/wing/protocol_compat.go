@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	proxyurl "github.com/daeuniverse/outbound/common/url"
@@ -32,6 +33,51 @@ type routerHTTPConn struct{ net.Conn }
 func (c *routerHTTPConn) Close() error {
 	_ = c.Conn.SetDeadline(time.Now())
 	return c.Conn.Close()
+}
+
+// SS and VMess Close take the same mutex as a blocked encrypted Read. Apply the
+// deadline-before-close rule to their TCP streams, including real traffic,
+// rather than relying on individual HTTP/DNS callers to interrupt it first.
+func routerProtocolDialer(link string, next netproxy.Dialer) netproxy.Dialer {
+	if !strings.HasPrefix(link, "ss://") && !strings.HasPrefix(link, "vmess://") {
+		return next
+	}
+	return &routerStreamDialer{Dialer: next}
+}
+
+type routerStreamDialer struct{ netproxy.Dialer }
+
+func (d *routerStreamDialer) DialContext(ctx context.Context, network, address string) (netproxy.Conn, error) {
+	c, err := d.Dialer.DialContext(ctx, network, address)
+	if err != nil {
+		return c, err
+	}
+	magic, err := netproxy.ParseMagicNetwork(network)
+	if err == nil && magic.Network == "tcp" {
+		return &routerStreamConn{Conn: c}, nil
+	}
+	return c, nil
+}
+
+func (d *routerStreamDialer) Close() error {
+	if closer, ok := d.Dialer.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+type routerStreamConn struct {
+	netproxy.Conn
+	once sync.Once
+	err  error
+}
+
+func (c *routerStreamConn) Close() error {
+	c.once.Do(func() {
+		_ = c.Conn.SetDeadline(time.Now())
+		c.err = c.Conn.Close()
+	})
+	return c.err
 }
 
 // Adapt URI options at the shared constructor so interactive tests, health

@@ -1,4 +1,33 @@
-import type { GenerateHysteria2URLParams, GenerateURLParams } from './types'
+import type { GenerateHysteria2URLParams, GenerateURLParams, SSConfig } from './types'
+import { Base64 } from 'js-base64'
+
+export function formatURLHost(host: string): string {
+  const value = host.trim()
+  return value.includes(':') && !value.startsWith('[') ? `[${value}]` : value
+}
+
+/** SIP002: AEAD-2022 uses percent-encoded plaintext userinfo. */
+export function generateSSURL(data: SSConfig): string {
+  const user = data.method.startsWith('2022-')
+    ? `${encodeURIComponent(data.method)}:${encodeURIComponent(data.password)}`
+    : Base64.encodeURI(`${data.method}:${data.password}`)
+  let link = `ss://${user}@${formatURLHost(data.server)}:${data.port}/`
+  if (data.plugin) {
+    const plugin = [data.plugin as string]
+    if (data.plugin === 'v2ray-plugin') {
+      if (data.tls) plugin.push('tls')
+      if (data.mode !== 'websocket') plugin.push(`mode=${data.mode}`)
+      if (data.host) plugin.push(`host=${data.host}`)
+      if (data.path) plugin.push(`path=${data.path.startsWith('/') ? data.path : `/${data.path}`}`)
+    } else {
+      plugin.push(`obfs=${data.obfs}`, `obfs-host=${data.host}`)
+      if (data.obfs === 'http') plugin.push(`obfs-path=${data.path}`)
+    }
+    if (data.impl) plugin.push(`impl=${data.impl}`)
+    link += `?plugin=${encodeURIComponent(plugin.join(';'))}`
+  }
+  return link + (data.name ? `#${encodeURIComponent(data.name)}` : '')
+}
 
 /**
  * Generate a URL from parameters
@@ -28,7 +57,7 @@ export function generateURL({
   }
 
   // Add host and port
-  url += host || ''
+  url += formatURLHost(host || '')
 
   if (port) {
     url += `:${port}`

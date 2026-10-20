@@ -807,6 +807,22 @@ export interface NodeLatencyProbeResult {
   message?: string | null
 }
 
+export function useTestNodeUDPMutation() {
+  const gqlClient = useGQLQueryClient()
+  return useMutation({
+    mutationKey: ['node-udp-test'],
+    mutationFn: async (id: string) => {
+      const data = await gqlClient.request<{ testNodeUDP: NodeLatencyProbeResult & { target: string } }>(
+        `mutation TestNodeUDP($id: ID!) {
+          testNodeUDP(id: $id) { id latencyMs alive testedAt message target }
+        }`,
+        { id },
+      )
+      return data.testNodeUDP
+    },
+  })
+}
+
 export function useTestNodeLatenciesMutation() {
   const gqlClient = useGQLQueryClient()
   const queryClient = useQueryClient()

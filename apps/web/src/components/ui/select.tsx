@@ -179,20 +179,30 @@ function SimpleSelect({
   description,
   withAsterisk,
 }: SimpleSelectProps) {
+  const inputId = React.useId()
+  const descriptionId = `${inputId}-description`
   return (
     <div className="space-y-2">
       {label && (
-        <Label>
+        <Label htmlFor={inputId}>
           {label}
           {withAsterisk && <span className="ml-1 text-destructive">*</span>}
         </Label>
       )}
-      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      {description && (
+        <p id={descriptionId} className="text-sm text-muted-foreground">
+          {description}
+        </p>
+      )}
       <Select
         value={value === undefined ? undefined : encodeSelectValue(value)}
         onValueChange={(value) => onChange?.(decodeSelectValue(value))}
       >
-        <SelectTrigger className={cn('w-full', className)}>
+        <SelectTrigger
+          id={inputId}
+          aria-describedby={description ? descriptionId : undefined}
+          className={cn('w-full', className)}
+        >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

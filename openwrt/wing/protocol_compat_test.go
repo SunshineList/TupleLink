@@ -2,10 +2,76 @@
 package dialer
 
 import (
+	"context"
 	proxyurl "github.com/daeuniverse/outbound/common/url"
+	"github.com/daeuniverse/outbound/netproxy"
 	"github.com/daeuniverse/outbound/protocol/direct"
+	"net"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
+
+type routerLockedReadConn struct {
+	net.Conn
+	mu      sync.Mutex
+	reading chan struct{}
+	closes  atomic.Int32
+}
+
+func (c *routerLockedReadConn) Read(b []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	close(c.reading)
+	return c.Conn.Read(b)
+}
+
+func (c *routerLockedReadConn) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.closes.Add(1)
+	return c.Conn.Close()
+}
+
+type routerFixedDialer struct{ conn netproxy.Conn }
+
+func (d routerFixedDialer) DialContext(context.Context, string, string) (netproxy.Conn, error) {
+	return d.conn, nil
+}
+
+func TestRouterSSCloseInterruptsEncryptedReadOnce(t *testing.T) {
+	left, right := net.Pipe()
+	defer right.Close()
+	locked := &routerLockedReadConn{Conn: left, reading: make(chan struct{})}
+	d := routerProtocolDialer("ss://fixture", routerFixedDialer{locked})
+	if _, ok := routerProtocolDialer("vmess://fixture", routerFixedDialer{locked}).(*routerStreamDialer); !ok {
+		t.Fatal("VMess is not protected")
+	}
+	conn, err := d.DialContext(context.Background(), "tcp", "127.0.0.1:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	read := make(chan struct{})
+	go func() { _, _ = conn.Read(make([]byte, 1)); close(read) }()
+	<-locked.reading
+	done := make(chan struct{})
+	go func() { _ = conn.Close(); _ = conn.Close(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		_ = right.Close()
+		t.Fatal("SS close blocked behind the encrypted read lock")
+	}
+	<-read
+	if locked.closes.Load() != 1 {
+		t.Fatal("stream closed more than once")
+	}
+	packet, err := d.DialContext(context.Background(), "udp", "127.0.0.1:1")
+	if err != nil || packet != locked {
+		t.Fatal("UDP packet interfaces changed")
+	}
+}
 
 func TestRouterProtocolURIOptions(t *testing.T) {
 	for _, c := range []struct {

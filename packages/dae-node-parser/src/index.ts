@@ -1,5 +1,5 @@
 // Generators
-export { generateAnytlsURL, generateHysteria2URL, generateURL } from './generator'
+export { generateAnytlsURL, generateHysteria2URL, generateSSURL, generateURL } from './generator'
 
 // Parsers
 export {

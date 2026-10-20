@@ -1,9 +1,18 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.28](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.28)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.29](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.29)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.29 协议编辑与 UDP 诊断
+
+- SS 编辑支持三种 SS2022 加密，按 SIP002 生成明文百分号编码的 SS2022 分享链接；普通 AEAD 继续使用 Base64URL，IPv6 地址只加一层方括号。
+- 编辑 SS、HY2、AnyTLS、VLESS 等标准 URI 时保留未改动和未展示的查询参数，以及重复参数；VMess JSON 保留扩展字段。修改已知参数时替换其旧别名，关闭 SS 插件时清理插件参数。保留参数不代表内核支持所有扩展；SSR 和标准 VMess URI 转换不在完整扩展保留范围内。
+- Trojan、TUIC、Juicity 编辑正确读取内核已支持的证书校验别名，HY2 端口别名优先级与内核一致。VLESS 不再显示当前内核不会执行的节点级跳过证书验证开关。
+- 在手动节点和订阅节点的详情中增加可选“UDP 连通性”检查，向配置的 `udp_check_dns` 目标发出 DNS UDP 请求，结果与网页延迟分开；不轮询、不修改健康历史、选中节点和数据库结构。
+- 修复 SS 与 VMess TCP 流关闭等待加密读取锁的问题，关闭时先中断 I/O，并发关闭仅执行一次；不改变正常连接的期限，UDP 包接口保持不变。
+- 独立 sing-box 与官方 Juicity 服务端回归覆盖 SS/SS2022、VMess、VLESS、Trojan、HY2、TUIC v5、AnyTLS、Juicity，检查 HTTP 负载、连接复用、分段响应、关闭后重连、UDP 和证书拒绝。受控测试不能替代实际公网线路和断网场景的长期验证。
 
 ## 0.6.28 DNS 查询隔离与连接诊断
 
@@ -418,14 +427,14 @@ pnpm --dir apps/web build:openwrt
 # 应用主仓库中可审查的订阅下载补丁；子模块提交不变
 python3 openwrt/prepare-wing.py wing
 # 使用独立输出目录，避免工作区测试/普通网页版构建覆盖路由器前端
-python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.28 --work /path/to/sdk-cache --output /path/to/runtime
-python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.28 --work /path/to/sdk-cache --output /path/to/packages
+python3 openwrt/runtime.py --cpu x86_64 --wing wing --web apps/web/dist-openwrt --version 0.6.29 --work /path/to/sdk-cache --output /path/to/runtime
+python3 openwrt/build.py --target ipk-x86_64 --binary /path/to/runtime/daed --btf-probe /path/to/runtime/btf-probe --luci-proxy /path/to/runtime/luci-proxy --version 0.6.29 --work /path/to/sdk-cache --output /path/to/packages
 # 全部 SDK 目标构建完成后再生成完整发行清单
-python3 openwrt/manifest.py /path/to/packages --version 0.6.28
+python3 openwrt/manifest.py /path/to/packages --version 0.6.29
 node --test tests/openwrt/ui.test.cjs
 ```
 
-订阅下载增量源码位于 `openwrt/wing/`，准备工具核对固定上游源文件哈希，
+路由器后端增量源码位于 `openwrt/wing/`，准备工具核对固定上游源文件哈希，
 拒绝覆盖未知修改，并支持重复执行。源码归档同时包含这些文件与原始子模块；
 构建前执行上述准备命令即可复现，不依赖未推送的子模块提交。
 
@@ -444,3 +453,13 @@ python3 openwrt/prepare-wing.py wing
 ```
 
 `daed_runtime_test` 仅用于测试，正式构建不启用该标签。
+
+协议互通回归（仅本地回环，测试工具不随插件安装）：
+
+```sh
+# 独立 sing-box 1.14.3；可选提供官方 juicity-server 0.5.0
+sudo python3 tests/openwrt/protocol_interop.py --wing wing --sing-box /path/to/sing-box --juicity-server /path/to/juicity-server
+```
+
+测试使用临时认证和证书，检查真实 HTTP/UDP、连接复用、分段响应与关闭后重连；运行需要允许测试套接字使用 SO_MARK。
+`tests/openwrt/browser-protocols.cjs` 配合隔离原生 LuCI 面板检查实际协议编辑和 UDP 诊断。独立服务端版本及下载哈希固定在 OpenWrt 工作流中。

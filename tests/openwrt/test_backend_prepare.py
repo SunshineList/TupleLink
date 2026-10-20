@@ -24,6 +24,7 @@ SOURCES = (
     "graphql/service/node/latency_mutation_utils.go",
     "graphql/service/node/latency_cache.go",
     "graphql/mutation.go",
+    "graphql/root_schema.go",
     "dae/runtime.go",
     "dae-core/component/outbound/dialer/dialer.go",
     "dae-core/component/outbound/dialer/register.go",

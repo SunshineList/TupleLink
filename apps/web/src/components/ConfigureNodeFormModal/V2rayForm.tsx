@@ -155,7 +155,7 @@ export function V2rayForm({ onLinkGeneration, initialValues, actionsPortal }: No
         onChange={(val) => setValue('flow', (val || 'none') as V2rayFormValues['flow'])}
       />
 
-      {formValues.tls !== 'none' && (
+      {formValues.tls !== 'none' && formValues.protocol === 'vmess' && (
         <Checkbox
           label="AllowInsecure"
           checked={formValues.allowInsecure}

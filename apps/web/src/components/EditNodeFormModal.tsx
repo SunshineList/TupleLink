@@ -11,11 +11,13 @@ import type { V2rayFormValues } from './ConfigureNodeFormModal/V2rayForm.tsx'
 import { parseNodeUrl } from '@daeuniverse/dae-node-parser'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { preserveNodeLink } from '~/utils/node-link-edit'
 import { useTagNodeMutation, useUpdateNodeMutation } from '../apis/index.ts'
 import { AnyTLSForm } from './ConfigureNodeFormModal/AnyTLSForm.tsx'
 import { HTTPForm } from './ConfigureNodeFormModal/HTTPForm.tsx'
 import { Hysteria2Form } from './ConfigureNodeFormModal/Hysteria2Form.tsx'
 import { JuicityForm } from './ConfigureNodeFormModal/JuicityForm.tsx'
+import { getProtocol } from './ConfigureNodeFormModal/protocols/registry'
 import { Socks5Form } from './ConfigureNodeFormModal/Socks5Form.tsx'
 import { SSForm } from './ConfigureNodeFormModal/SSForm.tsx'
 import { SSRForm } from './ConfigureNodeFormModal/SSRForm.tsx'
@@ -85,6 +87,12 @@ export function EditNodeFormModal({ opened, onClose, node }: EditNodeFormModalPr
 
   // Parse the node link to detect protocol and get initial values
   const { nodeType, initialValues } = useMemo(() => parseNode(node?.link), [node?.link])
+  const initialLink = useMemo(() => {
+    const protocol = getProtocol(nodeType)
+    return protocol && initialValues
+      ? protocol.generateLink({ ...protocol.defaultValues, ...(initialValues as Record<string, unknown>) })
+      : undefined
+  }, [nodeType, initialValues])
 
   // Track user's manual tab selection separately from detected type
   const [manualTab, setManualTab] = useState<NodeType | null>(null)
@@ -126,7 +134,7 @@ export function EditNodeFormModal({ opened, onClose, node }: EditNodeFormModalPr
       if (node) {
         await updateNodeMutation.mutateAsync({
           id: node.id,
-          newLink: link,
+          newLink: activeTab === nodeType && initialLink ? preserveNodeLink(node.link, initialLink, link) : link,
         })
 
         // Update tag if it changed

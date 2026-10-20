@@ -270,7 +270,8 @@
       "timeout": "Timed out",
       "cancelled": "Cancelled",
       "authentication": "Authentication failed",
-      "target": "Check URL failed"
+      "target": "Check URL failed",
+      "udpUnsupported": "UDP unsupported"
     },
     "unavailable": "Unavailable",
     "test": "Test",
@@ -565,5 +566,13 @@
   "importResource": {
     "optionalTag": "Label (optional)",
     "autoName": "Detect automatically"
+  },
+  "udpTest": {
+    "title": "UDP connectivity (optional)",
+    "hint": "Sends a DNS UDP request through this node to the global udp_check_dns target. Verifies UDP forwarding to this target only, without changing HTTP latency, selected nodes or routing.",
+    "action": "Test UDP",
+    "result": "UDP DNS",
+    "target": "Target: {{target}}",
+    "error": "UDP test request failed. Retry later or check the runtime log."
   }
 }

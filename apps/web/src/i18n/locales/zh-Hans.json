@@ -270,7 +270,8 @@
       "timeout": "超时",
       "cancelled": "已取消",
       "authentication": "认证失败",
-      "target": "测试地址异常"
+      "target": "测试地址异常",
+      "udpUnsupported": "不支持 UDP"
     },
     "unavailable": "不可用",
     "test": "测试",
@@ -565,5 +566,13 @@
   "importResource": {
     "optionalTag": "标签（可选）",
     "autoName": "自动识别名称"
+  },
+  "udpTest": {
+    "title": "UDP 连通性（可选）",
+    "hint": "通过此节点向全局 udp_check_dns 目标发送 DNS UDP 请求。仅验证该目标的 UDP 转发，不代表所有 UDP 应用都可用；不会修改网页延迟、节点选择和分流。",
+    "action": "测试 UDP",
+    "result": "UDP DNS",
+    "target": "目标：{{target}}",
+    "error": "UDP 测试请求失败，请稍后重试或查看运行日志。"
   }
 }

@@ -2,6 +2,7 @@ import type { ProtocolConfig } from './types'
 import {
   generateAnytlsURL,
   generateHysteria2URL,
+  generateSSURL,
   generateURL,
   parseAnytlsUrl,
   parseHysteria2Url,
@@ -183,44 +184,12 @@ export const v2rayProtocol: ProtocolConfig<V2rayFormValues> = {
 
 type SSFormValues = z.infer<typeof ssSchema>
 
-function generateSSLink(data: SSFormValues): string {
-  let link = `ss://${Base64.encode(`${data.method}:${data.password}`)}@${data.server}:${data.port}/`
-
-  if (data.plugin) {
-    const plugin: string[] = [data.plugin]
-
-    if (data.plugin === 'v2ray-plugin') {
-      if (data.tls) plugin.push('tls')
-      if (data.mode !== 'websocket') plugin.push(`mode=${data.mode}`)
-      if (data.host) plugin.push(`host=${data.host}`)
-
-      let path = data.path
-      if (path) {
-        if (!path.startsWith('/')) path = `/${path}`
-        plugin.push(`path=${path}`)
-      }
-
-      if (data.impl) plugin.push(`impl=${data.impl}`)
-    } else {
-      plugin.push(`obfs=${data.obfs}`)
-      plugin.push(`obfs-host=${data.host}`)
-      if (data.obfs === 'http') plugin.push(`obfs-path=${data.path}`)
-      if (data.impl) plugin.push(`impl=${data.impl}`)
-    }
-
-    link += `?plugin=${encodeURIComponent(plugin.join(';'))}`
-  }
-
-  link += data.name.length ? `#${encodeURIComponent(data.name)}` : ''
-  return link
-}
-
 export const ssProtocol: ProtocolConfig<SSFormValues> = {
   id: 'ss',
   label: 'SS',
   schema: ssSchema,
   defaultValues: DEFAULT_SS_FORM_VALUES,
-  generateLink: generateSSLink,
+  generateLink: generateSSURL,
   parseLink: parseSSUrl,
   FormComponent: SSForm,
 }
@@ -384,8 +353,8 @@ function generateHysteria2Link(data: Hysteria2FormValues): string {
   const query = {
     obfs: data.obfs,
     'obfs-password': data.obfsPassword,
-    ports: data.ports || '',
     sni: data.sni,
+    ports: data.ports || '',
     insecure: data.allowInsecure ? 1 : 0,
     pinSHA256: data.pinSHA256,
   }

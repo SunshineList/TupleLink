@@ -20,7 +20,7 @@ def main():
     env = dict(os.environ, GOOS='linux', GOARCH=goarch, CGO_ENABLED='0', GOARM='7,softfloat', GOMIPS='softfloat')
     regex = '^Test(RouterDNS|RouterConnection|RouteDial|DnsController|DnsCache|DnsSingleflight|DNS|DnsPreference|DnsFallback|DnsForwarder|DnsListener|DnsDialer|DnsConnPool|ProxyHealth|DialFamily|RouteDialFamily|ControlPlane.*(Drain|Close|Shutdown)|Udp.*(Recovery|Instability))'
     with tempfile.TemporaryDirectory(prefix='nailink-architecture-regression-') as temporary:
-        for package, selected in (('./component', '^TestRouterInterface'), ('./component/dns', '.'), ('./control', regex)):
+        for package, selected in (('./component', '^TestRouterInterface'), ('./component/dns', '.'), ('./component/outbound/dialer', '^TestRouter(ProtocolURIOptions|SSClose)'), ('./control', regex)):
             binary = Path(temporary) / 'regression'
             subprocess.run(['go', 'test', '-c', '-o', str(binary), package], cwd=args.wing / 'dae-core', env=env, check=True)
             subprocess.run([str(args.qemu_dir / ('qemu-' + emulator + '-static')), str(binary), '-test.run', selected, '-test.v', '-test.timeout', '120s'], check=True)

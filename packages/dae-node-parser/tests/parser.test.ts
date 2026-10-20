@@ -4,14 +4,31 @@ import { generateHysteria2URL } from '../src/generator'
 import {
   parseHTTPUrl,
   parseHysteria2Url,
+  parseJuicityUrl,
   parseNodeUrl,
   parseSocks5Url,
   parseSSUrl,
   parseTrojanUrl,
+  parseTuicUrl,
   parseV2rayUrl,
 } from '../src/parser'
 
 describe('protocol compatibility regressions', () => {
+  it('keeps SS fragments containing hash marks and ignores at-signs in query values', () => {
+    expect(parseSSUrl('ss://YWVzLTEyOC1nY206cGFzc3dvcmQ@127.0.0.1:443/?contact=a@example.com#Hong#Kong')).toMatchObject(
+      { name: 'Hong#Kong', server: '127.0.0.1', port: 443, password: 'password' },
+    )
+  })
+  it.each([parseTrojanUrl, parseTuicUrl, parseJuicityUrl])('reads every supported legacy TLS flag', (parse) => {
+    const scheme = parse === parseTrojanUrl ? 'trojan' : parse === parseTuicUrl ? 'tuic' : 'juicity'
+    for (const key of ['allowInsecure', 'allow_insecure', 'allowinsecure', 'skipVerify']) {
+      expect(parse(`${scheme}://id:password@server:443?${key}=true`)).toMatchObject({ allowInsecure: true })
+    }
+  })
+
+  it('matches Hysteria2 mport priority when both port aliases are provided', () => {
+    expect(parseHysteria2Url('hy2://password@server:443?ports=5000&mport=6000')).toMatchObject({ ports: '6000' })
+  })
   it('accepts SIP002 plaintext credentials and preserves special password characters', () => {
     expect(parseSSUrl('ss://chacha20-ietf-poly1305:fixture%3A%40%2B%3D@example.com:51011#HK')).toMatchObject({
       method: 'chacha20-ietf-poly1305',

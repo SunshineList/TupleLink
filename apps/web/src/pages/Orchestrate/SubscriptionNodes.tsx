@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { LatencyBadge } from '~/components/LatencyBadge'
 import { LatencyStatus } from '~/components/LatencyStatus'
 import { NodeName } from '~/components/NodeName'
+import { NodeUDPTest } from '~/components/NodeUDPTest'
 import { QRCodeModal } from '~/components/QRCodeModal'
 import { ResourceGroupPicker } from '~/components/ResourceGroupPicker'
 import { Button } from '~/components/ui/button'
@@ -291,6 +292,7 @@ export function SubscriptionNodes({
                   </dd>
                 </div>
               </dl>
+              <NodeUDPTest key={detail.id} id={detail.id} />
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"

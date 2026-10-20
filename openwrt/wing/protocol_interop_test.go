@@ -4,6 +4,8 @@ package node
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/daeuniverse/dae-wing/common"
 	"github.com/daeuniverse/dae-wing/db"
 	dialer "github.com/daeuniverse/dae/component/outbound/dialer"
 	D "github.com/daeuniverse/outbound/dialer"
@@ -35,6 +37,13 @@ func TestRouterProtocolInteroperability(t *testing.T) {
 	if err = json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatal(err)
 	}
+	if err := db.InitDatabase(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	db.SetOutput(io.Discard)
+	if err := db.DB(context.Background()).Create(&db.Config{Selected: true, Global: fmt.Sprintf("global {\n udp_check_dns: '%s'\n}\n", fixture.UDP)}).Error; err != nil {
+		t.Fatal(err)
+	}
 	for _, c := range fixture.Cases {
 		t.Run(c.Name, func(t *testing.T) {
 			log := logrus.New()
@@ -55,7 +64,9 @@ func TestRouterProtocolInteroperability(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer d.Close()
-			transport := &http.Transport{DisableKeepAlives: true, DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			dials := 0
+			transport := &http.Transport{DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				dials++
 				conn, err := d.DialContext(ctx, network, addr)
 				if err != nil {
 					return nil, err
@@ -74,6 +85,26 @@ func TestRouterProtocolInteroperability(t *testing.T) {
 				t.Fatal("payload mismatch", err)
 			}
 			t.Log("real independent server handshake and 64 KiB response passed")
+			response, err = client.Get(fixture.Target + "/stream")
+			if err != nil {
+				t.Fatal("keep-alive stream failed", err)
+			}
+			data, err = io.ReadAll(response.Body)
+			response.Body.Close()
+			if err != nil || string(data) != strings.Repeat("protocol-payload", 4096) || dials != 1 {
+				t.Fatal("keep-alive reuse or delayed stream failed", err, dials)
+			}
+			transport.CloseIdleConnections()
+			response, err = client.Get(fixture.Target + "/payload")
+			if err != nil {
+				t.Fatal("new connection after idle close failed", err)
+			}
+			_, err = io.Copy(io.Discard, response.Body)
+			response.Body.Close()
+			if err != nil || dials != 2 {
+				t.Fatal("reconnect failed", err, dials)
+			}
+			t.Log("HTTP keep-alive, delayed stream and new connection after close passed")
 			if fixture.UDP != "" {
 				packet, err := d.DialContext(ctx, "udp", fixture.UDP)
 				if err != nil {
@@ -112,6 +143,19 @@ func TestRouterProtocolInteroperability(t *testing.T) {
 			if !result.AliveVal {
 				t.Fatalf("interactive test failed: %+v", result)
 			}
+			model := db.Node{Link: c.Link}
+			if err := db.DB(context.Background()).Create(&model).Error; err != nil {
+				t.Fatal(err)
+			}
+			before := len(snapshotCachedLatencyResults())
+			udpResult, err := TestNodeUDP(context.Background(), common.EncodeCursor(model.ID))
+			if err != nil || !udpResult.AliveVal || udpResult.TargetV != fixture.UDP {
+				t.Fatalf("explicit UDP DNS diagnostic failed: %+v, %v", udpResult, err)
+			}
+			if len(snapshotCachedLatencyResults()) != before {
+				t.Fatal("UDP diagnostic polluted HTTP latency cache")
+			}
+			t.Log("explicit UDP DNS diagnostic passed without changing HTTP latency cache")
 		})
 	}
 }
