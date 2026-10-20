@@ -567,6 +567,7 @@ form {
   align-items: center;
   gap: 8px;
   height: 120px;
+  margin-bottom: 12px;
   box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--border);
@@ -611,8 +612,8 @@ form {
   border-radius: 4px;
   padding-inline: 5px;
   background: color-mix(in oklab, var(--primary) 8%, var(--card));
-  color: var(--primary);
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
 }

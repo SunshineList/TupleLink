@@ -141,6 +141,30 @@ fs.mkdirSync(output, { recursive: true })
     const probeBox = await card.locator('.panel-node-probe').boundingBox()
     const joinBox = await card.locator('.panel-node-join').boundingBox()
     assert.ok(nextCardBox.y - cardBox.y - cardBox.height >= 10, 'Cards need a visible vertical gap')
+    const dragMargin = await card.evaluate((element) => Number.parseFloat(getComputedStyle(element).marginBottom))
+    assert.ok(
+      Math.abs(nextCardBox.y - cardBox.y - cardBox.height - dragMargin) < 1,
+      'Drag measurements must include the card gap',
+    )
+    const contrast = await card.locator('.panel-node-protocol').evaluate((element) => {
+      const style = getComputedStyle(element)
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 1
+      const context = canvas.getContext('2d')
+      const luminance = (color) => {
+        context.fillStyle = color
+        context.fillRect(0, 0, 1, 1)
+        const channels = [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map((value) => {
+          const srgb = value / 255
+          return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4
+        })
+        return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
+      }
+      const foreground = luminance(style.color)
+      const background = luminance(style.backgroundColor)
+      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05)
+    })
+    assert.ok(contrast >= 4.5, `Small protocol labels must remain readable (contrast ${contrast})`)
     assert.ok(nameBox.width > cardBox.width * 0.55, 'Names should retain most of the card width')
     assert.ok(probeBox.y > nameBox.y + nameBox.height, 'Actions must not squeeze the name into a side column')
     assert.ok(Math.abs(joinBox.y - probeBox.y) < 2, 'Test and join actions should share a separate row')
