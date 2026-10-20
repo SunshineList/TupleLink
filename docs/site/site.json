@@ -1,0 +1,37 @@
+{
+  "title": "NaiLink · 奶油互联",
+  "url": "https://slobys.github.io/NaiLink/",
+  "version": "0.6.20",
+  "release": "openwrt-v0.6.20",
+  "groups": [
+    {
+      "title": "开始使用",
+      "pages": [
+        { "id": "index", "title": "使用文档", "description": "从安装到日常管理，一步步设置你的 NaiLink。" },
+        {
+          "id": "installation",
+          "title": "安装与兼容性",
+          "description": "先确认固件、CPU 与内核兼容，再用中文菜单安装。"
+        },
+        { "id": "quick-start", "title": "首次设置", "description": "导入节点、加入群组、应用配置，完成第一次联网。" }
+      ]
+    },
+    {
+      "title": "设置与管理",
+      "pages": [
+        { "id": "nodes", "title": "节点与订阅", "description": "导入、自动命名、订阅更新和节点测试。" },
+        { "id": "groups", "title": "群组与多选", "description": "筛选、多选和测试节点，为不同用途配置群组。" },
+        { "id": "network", "title": "接口、DNS 与路由", "description": "理解网络接口、DNS 上游和分流规则的作用。" },
+        { "id": "dashboard", "title": "概况与日常使用", "description": "查看流量与连接，切换主题，使用手机管理。" }
+      ]
+    },
+    {
+      "title": "维护与排查",
+      "pages": [
+        { "id": "maintenance", "title": "更新、备份与卸载", "description": "保留数据更新，找到备份，安全卸载或重装。" },
+        { "id": "troubleshooting", "title": "常见问题", "description": "按症状排查安装失败、测试超时和无法联网。" },
+        { "id": "development", "title": "源码与文档维护", "description": "获取完整源码，了解验证范围和文档发布方式。" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+<h2 id="menu">打开安装管理菜单</h2>
+<p>安装成功后，在路由器 SSH 中运行：</p>
+<pre><code class="language-sh">nailink</code></pre>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>选项</th>
+        <th>作用</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1 安装 / 更新</td>
+        <td>联网获取发布脚本，已有安装先备份并保留数据升级。</td>
+      </tr>
+      <tr>
+        <td>2 卸载</td>
+        <td>确认后先备份，再删除插件和当前数据；可离线执行。</td>
+      </tr>
+      <tr>
+        <td>3 检查环境</td>
+        <td>检查兼容性，不修改系统。</td>
+      </tr>
+      <tr>
+        <td>0 退出</td>
+        <td>不执行安装或服务操作。</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<h2 id="update">保留数据更新</h2>
+<ol>
+  <li>先到<a href="https://github.com/slobys/NaiLink/releases">发布页</a>查看版本说明及兼容性。</li>
+  <li>运行 <code>nailink</code>，选择 <strong>1 安装 / 更新</strong>。</li>
+  <li>等待下载、校验、环境检查、备份和安装完成。更新期间服务可能短暂停止。</li>
+  <li>重新登录或刷新 LuCI，进入“服务 → NaiLink”；仍显示旧页面时按 <code>Ctrl+F5</code>。</li>
+  <li>检查节点、订阅、群组及原配置，并按需应用配置后验证联网。</li>
+</ol>
+<p>更新保留节点、订阅、群组、规则与自启选择，不需要先卸载。若想固定到本教程对应版本，可直接执行：</p>
+<pre><code class="language-sh">nailink --install --release $release</code></pre>
+<p>
+  旧版菜单遇到 <code>raw.githubusercontent.com</code> 解析失败时，这个固定版本入口也可绕过旧 Raw 下载入口。若
+  <code>github.com</code> 也不能访问，先修复路由器自身 DNS 或网络，参见<a href="troubleshooting.html#download"
+    >下载失败</a
+  >。
+</p>
+<h2 id="backup">备份在哪里，包含什么</h2>
+<p>
+  备份保存在 <code>/root/daed-backups</code>。安装器会先停止服务并等待退出，再归档配置、数据库及
+  WAL，以避免复制正在写入的数据。
+</p>
+<pre><code class="language-sh">ls -lh /root/daed-backups</code></pre>
+<p>
+  请把需要长期保留的归档另存到可信设备。备份可能包含节点密码、订阅令牌和账户信息，不要公开上传。目录权限为
+  0700，归档权限为 0600。
+</p>
+<div class="callout warning">
+  <strong>更新失败不会自动回滚</strong>
+  <p>
+    下载或兼容性检查失败时不会替换现有程序；进入安装后若失败，可能已经停止服务。先保留报错和备份路径，确认软件包状态，再决定恢复。不要重复运行清空重装来排查。
+  </p>
+</div>
+<details>
+  <summary>需要恢复备份时怎么办？</summary>
+  <p>
+    目前菜单没有“一键恢复备份”选项。先停止
+    NaiLink，保留当前目录的另一份副本，核对归档内的路径、原版本和数据库状态，再由熟悉该固件的人恢复。不要直接向运行中的数据库覆盖文件，也不要把另一台路由器的接口配置整体覆盖进来。
+  </p>
+</details>
+<h2 id="uninstall">卸载：先备份，再清理</h2>
+<ol>
+  <li>运行 <code>nailink</code>，选择 <strong>2 卸载</strong>。</li>
+  <li>阅读提示，输入 <code>y</code> 确认。</li>
+  <li>卸载会先停止服务并创建备份，再清理插件及当前节点、订阅、群组与配置。</li>
+  <li>保留的备份仍在 <code>/root/daed-backups</code>；共享依赖和已有 BTF 不会因此一并删除。</li>
+</ol>
+<p><strong>卸载可以离线执行。</strong>旧版或需要直接使用命令时：</p>
+<pre><code class="language-sh">daed-router-setup --uninstall</code></pre>
+<p>上面这条直接命令<strong>不经过菜单确认</strong>，执行前请确认确实要删除插件与当前数据。正常更新不要使用它。</p>
+<h2 id="reinstall">什么时候才用清空重装</h2>
+<p>
+  <code>--reinstall</code> 用于明确需要清空旧配置或替换其他来源的 Daed
+  包的情况，会先备份再清理，但<strong>不会自动导入备份</strong>。原节点和规则需要重新配置，不能把它当普通升级方式。
+</p>
+<p>
+  新旧品牌沿用 <code>daed</code> 服务、<code>daed-router</code> / <code>luci-app-daed-router</code> 包名和
+  <code>/etc/daed</code> 目录，所以系统里看到旧名称属于预期，不代表品牌更新失败。
+</p>

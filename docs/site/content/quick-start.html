@@ -1,0 +1,67 @@
+<h2 id="open">1. 打开管理页面</h2>
+<p>
+  登录路由器后台，进入 <strong>服务 → NaiLink</strong>。页面沿用当前 LuCI
+  登录，不需要额外注册账户，也不用输入内部服务端口。0.6.13 及更早版本的菜单名为 Daed。
+</p>
+<div class="callout">
+  <strong>四个菜单各管什么？</strong>
+  <p>
+    <strong>管理面板</strong
+    >看运行概况、管理群组；<strong>节点和订阅</strong>负责导入与更新；<strong>高级设置</strong>配置接口、DNS、路由；<strong>运行日志</strong>查看运行异常。
+  </p>
+</div>
+<h2 id="import">2. 导入一个确定可用的节点</h2>
+<p>先用少量节点完成验证，再加入更多订阅：</p>
+<ul>
+  <li><strong>分享链接：</strong>进入“节点和订阅 → 导入节点”，粘贴完整链接后提交。</li>
+  <li><strong>订阅链接：</strong>点击“添加订阅”，填写服务商提供的订阅 URL，提交后等待下载完成。</li>
+  <li><strong>名称 / 标签：</strong>新增时可留空自动识别；手动填写的名称优先。</li>
+</ul>
+<p>
+  手动节点显示在“节点”区域；订阅中的节点通过对应订阅的<strong>查看节点</strong>进入。它们不会全部重复出现在手动节点列表里。
+</p>
+<h2 id="group">3. 把节点加入 proxy 群组</h2>
+<ol>
+  <li>回到“管理面板”，找到默认的 <code>proxy</code> 群组。</li>
+  <li>点击群组下的<strong>添加节点</strong>，可先按订阅来源筛选。</li>
+  <li>点击节点条目勾选；需要对比时使用单项<strong>测试</strong>或<strong>测试已选</strong>。</li>
+  <li>点击底部<strong>添加所选节点</strong>。如果希望整个订阅随更新纳入群组，改用<strong>添加订阅组</strong>。</li>
+</ol>
+<p>新增自定义群组后，还需要让路由规则指向它。仅创建一个名为 AI 的群组，不会自动识别所有 AI 网站。</p>
+<h2 id="network">4. 核对接口、DNS 与路由</h2>
+<ul>
+  <li>
+    <strong>LAN 接口：</strong>局域网设备需要通过 NaiLink 上网时，绑定真实承载该网络的设备。常见桥接设备为
+    <code>br-lan</code>，请以你自己的固件为准。
+  </li>
+  <li><strong>WAN 接口：</strong>默认有 <code>auto</code> 自动检测选项；多拨或自定义上联需要核对实际出站设备。</li>
+  <li>
+    <strong>DNS 与路由：</strong>先使用默认方案，确认有一套被选中。需要更改分流时，再阅读<a href="network.html"
+      >接口、DNS 与路由</a
+    >。
+  </li>
+</ul>
+<div class="callout warning">
+  <strong>避免重复接管流量</strong>
+  <p>
+    验证 NaiLink 透明代理时，不要让 PassWall、OpenClash
+    等另一套透明代理同时接管相同流量。请保留你原来的设置和恢复方式，按需停用原接管后再测试。
+  </p>
+</div>
+<h2 id="apply">5. 应用配置并确认联网</h2>
+<ol>
+  <li>等待保存完成。顶部出现<strong>应用配置</strong>时点击它，将已保存的修改加载到代理。</li>
+  <li>若仍显示“代理已停止”，点击<strong>启动代理</strong>。应用配置本身也可能启动代理。</li>
+  <li>在连接这台路由器的电脑或手机上，访问一个应直连的网站和一个应走代理的网站。</li>
+  <li>回到“运行概况”，观察上传、下载、连接和累计流量；有异常时查看“运行日志”。</li>
+</ol>
+<p>
+  <strong>节点有延迟、代理显示运行中，并不等于局域网流量已经正确转发。</strong
+  >实际访问结果、接口绑定、分流规则和本次日志要结合判断。
+</p>
+<h2 id="next">接下来</h2>
+<p>
+  基本联网后，再尝试<a href="groups.html">多选与自动选择策略</a>、<a href="nodes.html#subscription-update"
+    >订阅自动更新</a
+  >，以及<a href="dashboard.html#mobile">手机管理</a>。遇到问题可直接<a href="troubleshooting.html">按现象排查</a>。
+</p>

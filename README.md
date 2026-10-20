@@ -1,58 +1,59 @@
-# NaiLink · 奶油互联
+<p align="center">
+  <img src="docs/site/assets/nailink-logo.png" width="112" height="112" alt="NaiLink Logo" />
+</p>
 
-一个适用于 **OpenWrt、ImmortalWrt、iStoreOS** 的代理管理插件。管理节点、订阅和群组，查看实时流量，测试节点延迟，配置 DNS 与路由。支持电脑、手机和多种主题，沿用路由器后台登录。
+<h1 align="center">NaiLink · 奶油互联</h1>
 
-基于 [daed](https://github.com/daeuniverse/daed) 二次开发，独立维护。当前为 [0.6.20 测试版](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.20)，提供 IPK / APK v3 安装包。
+<p align="center">适用于 OpenWrt、ImmortalWrt、iStoreOS 的代理管理插件。</p>
 
-| CPU 架构                            | 支持范围                                 |
-| ----------------------------------- | ---------------------------------------- |
-| x86_64、ARM64                       | 已提供安装包                             |
-| ARMv7 小端                          | 仅实验构建；已测常见内核无法运行透明代理 |
-| MIPS32r2、MIPSel32r2                | 仅实验构建；已测常见内核无法运行透明代理 |
-| ARMv5/v6、MIPS64、RISC-V、32 位 x86 | 暂不支持                                 |
+<p align="center">
+  <a href="https://slobys.github.io/NaiLink/">在线文档</a> ·
+  <a href="https://slobys.github.io/NaiLink/quick-start.html">首次设置</a> ·
+  <a href="https://github.com/slobys/NaiLink/releases">下载安装包</a> ·
+  <a href="https://slobys.github.io/NaiLink/troubleshooting.html">常见问题</a>
+</p>
 
-需要 **Linux 5.17+、所需 eBPF/JIT 功能、可用 BTF 和 LuCI**。脚本按 CPU、固件包架构和 IPK/APK 自动选择，并实际加载、关闭临时内核探针，不兼容时停止安装。**ARMv7 / MIPS 常见内核缺少当前核心必需的 BPF 回调能力，暂不推荐安装作为透明代理使用**；管理页面能打开不代表代理可用，详见[兼容性与架构说明](openwrt/README.md#兼容性与架构范围)。
+管理节点、订阅和群组，测试节点延迟，查看实时流量，配置 DNS 与路由。支持电脑、手机和多种主题，沿用路由器 LuCI 登录，无需另设账户。
+
+基于 [daed](https://github.com/daeuniverse/daed) 二次开发，独立维护。当前版本为 **[0.6.20 测试版](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.20)**，提供 IPK / APK v3 安装包。
+
+## 安装前
+
+- **优先选择 x86_64 / ARM64**，需要 Linux 5.17+、所需 eBPF/JIT 功能、可用 BTF 和现代 LuCI。
+- **ARMv7 / MIPS 大端、小端仅实验构建**，已测常见内核无法运行透明代理，暂不推荐安装；其他未列架构暂无安装包。
+- 运行程序本体约 **53–57 MiB**，另需依赖、规则库、下载与备份空间，16/32 MiB 闪存设备不宜直接安装。
+
+脚本会自动识别 CPU、固件 ABI 与包格式，并实际检查内核能力；不兼容时停止安装。[查看完整兼容性说明 →](https://slobys.github.io/NaiLink/installation.html)
 
 ## 安装、更新与卸载
 
-用 SSH 以 **root** 登录路由器，执行下面的命令打开中文菜单：
+以 **root** 登录路由器 SSH，执行下面一行，打开中文菜单：
 
 ```sh
 uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.20/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.20
 ```
 
-- **1 安装 / 更新**：获取最新发布版；已有安装会先备份，并保留节点、订阅、群组和配置。
-- **2 卸载**：确认后先备份，再删除插件及当前节点、配置。已有备份和共享依赖保留。
-- **3 检查环境**：只检查兼容性，不修改系统。
-- **0 退出**：不执行操作。
+选择 **1 安装 / 更新**。安装后运行 `nailink` 可再次打开菜单，也可选择 **2 卸载**、**3 检查环境** 或 **0 退出**。
 
-安装后，直接运行 `nailink` 即可再次打开菜单。卸载可离线执行；备份保存在 `/root/daed-backups`。
+更新先备份并保留节点、订阅、群组与配置。**卸载会备份后删除插件和当前数据，可离线执行**；备份保留在 `/root/daed-backups`。[更新与卸载教程 →](https://slobys.github.io/NaiLink/maintenance.html)
 
-菜单提示无法解析 `raw.githubusercontent.com` 时，可执行 `nailink --install --release openwrt-v0.6.20` 绕过该入口。如果 `github.com` 也无法解析，先检查路由器自身的 DNS，详见[更新故障处理](openwrt/README.md#安装和保留数据升级)。
-
-已安装旧版、只想直接卸载，也可以执行：
-
-```sh
-daed-router-setup --uninstall
-```
+旧版菜单遇到 Raw 下载失败时，可运行 `nailink --install --release openwrt-v0.6.20`。如果 GitHub 也无法解析，先检查路由器自身 DNS。[下载故障排查 →](https://slobys.github.io/NaiLink/troubleshooting.html#download)
 
 ## 开始使用
 
 打开路由器后台 **服务 → NaiLink**：
 
-1. 在 **节点和订阅** 导入节点或添加订阅，名称可留空自动识别。
-2. 在 **管理面板** 将节点或订阅加入群组，测试并选择节点。
-3. 按需调整 **高级设置** 中的接口、DNS 与路由，点击 **应用配置**。
+1. **节点和订阅**：导入节点或添加订阅，标签可留空自动识别。
+2. **管理面板**：把节点或订阅加入群组，测试并配置选择策略。
+3. **高级设置**：核对接口、DNS 和路由，点击 **应用配置**，再实际验证联网。
 
-运行异常时先查看 **运行日志**。升级后重新登录后台；0.6.13 及更早版本的菜单名为 Daed。
+[首次设置](https://slobys.github.io/NaiLink/quick-start.html) · [群组与多选](https://slobys.github.io/NaiLink/groups.html) · [DNS 与路由](https://slobys.github.io/NaiLink/network.html) · [故障排查](https://slobys.github.io/NaiLink/troubleshooting.html)
 
-## 下载与源码
+## 源码与交流
 
-[下载安装包](https://github.com/slobys/NaiLink/releases) · [完整源码包](https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.20/daed-openwrt-source.tar.gz) · [详细说明](openwrt/README.md) · [验证记录](openwrt/VALIDATION.md)
+[完整源码包](https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.20/daed-openwrt-source.tar.gz) · [构建说明](openwrt/README.md#开发) · [验证记录](openwrt/VALIDATION.md) · [Logo](docs/site/assets/nailink-logo.png)
 
-编译源码请使用完整源码包，或运行 `git clone --recurse-submodules https://github.com/slobys/NaiLink.git`。GitHub 的 **Download ZIP** 不包含后端子模块。
-
-## 交流与致谢
+编译请使用完整源码包，或 `git clone --recurse-submodules https://github.com/slobys/NaiLink.git`。GitHub 的 Download ZIP 不包含后端子模块。
 
 [YouTube 频道](https://www.youtube.com/@naiyou) · [Telegram 群组](https://t.me/naiyous) · [反馈问题](https://github.com/slobys/NaiLink/issues)
 

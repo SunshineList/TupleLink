@@ -1,0 +1,102 @@
+<section class="hero" aria-labelledby="welcome">
+  <div>
+    <span class="pill">OpenWrt 代理管理 · v$version 测试版</span>
+    <h2 id="welcome">连接有序，<br />设置有章可循。</h2>
+    <p>NaiLink · 奶油互联<br />从安装到配置，用一份文档把代理管理讲清楚。</p>
+    <div class="actions">
+      <a class="button primary" href="installation.html">开始安装 →</a
+      ><a class="button" href="quick-start.html">我已安装，开始设置</a>
+    </div>
+  </div>
+  <img src="assets/nailink-logo.png" width="180" height="180" alt="NaiLink：蓝色与青绿色链路组成的 N 标志" />
+</section>
+<div class="callout warning">
+  <strong>安装前，先确认兼容性</strong>
+  <p>
+    优先使用符合内核要求的 <strong>x86_64 / ARM64</strong> 设备。ARMv7、MIPS
+    大端/小端目前仅保留实验构建，已测常见内核无法运行透明代理，暂不推荐安装。<a href="installation.html#architectures"
+      >查看支持范围 →</a
+    >
+  </p>
+</div>
+<h2 id="start">你现在要做什么？</h2>
+<div class="link-grid">
+  <a class="link-card" href="installation.html"
+    ><small>01 / 部署</small><strong>把 NaiLink 装到路由器</strong>
+    <p>检查系统、CPU 与存储，使用中文安装菜单。</p></a
+  >
+  <a class="link-card" href="quick-start.html"
+    ><small>02 / 设置</small><strong>让第一个节点工作起来</strong>
+    <p>添加订阅、加入群组、应用配置，再验证联网。</p></a
+  >
+  <a class="link-card" href="groups.html"
+    ><small>03 / 管理</small><strong>快速挑选与管理节点</strong>
+    <p>来源筛选、多选、批量测试，了解群组策略。</p></a
+  >
+  <a class="link-card" href="troubleshooting.html"
+    ><small>04 / 排查</small><strong>按现象找到问题所在</strong>
+    <p>下载失败、测试超时、连接正常却没有流量。</p></a
+  >
+</div>
+<h2 id="workflow">从安装到使用</h2>
+<ol class="steps">
+  <li>
+    <strong>确认设备与内核</strong>
+    <p>CPU 符合只是第一步，eBPF、BTF、固件依赖和可写存储同样重要。</p>
+  </li>
+  <li>
+    <strong>安装并导入节点</strong>
+    <p>使用路由器 SSH 安装，在“服务 → NaiLink”添加你自己的节点或订阅。</p>
+  </li>
+  <li>
+    <strong>绑定群组和路由</strong>
+    <p>把节点加入 proxy 群组，核对 LAN 接口、DNS 与当前路由方案。</p>
+  </li>
+  <li>
+    <strong>应用配置，验证结果</strong>
+    <p>从局域网设备实际访问网站，再看运行概况和日志。</p>
+  </li>
+</ol>
+<h2 id="find">按功能查阅</h2>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>要做的事</th>
+        <th>对应教程</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>导入节点、更新订阅、看测试结果</td>
+        <td><a href="nodes.html">节点与订阅</a></td>
+      </tr>
+      <tr>
+        <td>筛选节点、批量加入、自动选择</td>
+        <td><a href="groups.html">群组与多选</a></td>
+      </tr>
+      <tr>
+        <td>接口绑定、DNS 分流、路由模式</td>
+        <td><a href="network.html">接口、DNS 与路由</a></td>
+      </tr>
+      <tr>
+        <td>流量、主题、手机操作</td>
+        <td><a href="dashboard.html">概况与日常使用</a></td>
+      </tr>
+      <tr>
+        <td>更新、备份、卸载</td>
+        <td><a href="maintenance.html">维护教程</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<h2 id="community">帮助与交流</h2>
+<p>
+  <a href="https://www.youtube.com/@naiyou">YouTube 视频频道 ↗</a> ·
+  <a href="https://t.me/naiyous">Telegram 交流群 ↗</a> ·
+  <a href="https://github.com/slobys/NaiLink/issues">GitHub 问题反馈 ↗</a>
+</p>
+<p>
+  NaiLink 基于 <a href="https://github.com/daeuniverse/daed">daed</a> 二次开发，独立维护。本教程面向 NaiLink 的 OpenWrt
+  插件；上游桌面版的安装方式不适用于这里。
+</p>

@@ -1,0 +1,105 @@
+<h2 id="before">修改前先了解</h2>
+<p>
+  “高级设置”包含<strong>配置、DNS、路由</strong>。每类可以保存多套方案，但实际运行使用当前被选中的那一套；编辑、选中后，仍需在顶部<strong>应用配置</strong>。
+</p>
+<p>
+  建议先复制当前方案再修改，并保留原值。首次联网前不要同时更改接口、DNS、路由、协议参数，否则很难判断哪一步出了问题。
+</p>
+<h2 id="interfaces">LAN / WAN 接口怎么选</h2>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>项目</th>
+        <th>用途与选择原则</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>LAN 接口</td>
+        <td>绑定需要代理的局域网设备。普通桥接网络常见为 <code>br-lan</code>，VLAN 或多网段按实际设备选择。</td>
+      </tr>
+      <tr>
+        <td>WAN 接口</td>
+        <td>用于出站侧及本机流量，默认提供 <code>auto</code>。PPPoE、多 WAN 或自定义上联需核对自动识别结果。</td>
+      </tr>
+      <tr>
+        <td>透明代理端口</td>
+        <td>默认 <code>12345</code>，供 eBPF 核心使用。它不是浏览器可填写的 HTTP / SOCKS 代理端口。</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+<p>
+  LuCI 的逻辑网络名和底层设备名可能不同。例如逻辑网络叫 <code>wan</code>，实际设备可能是
+  <code>pppoe-wan</code>。高级配置的接口绑定与热插拔恢复所监听的 UCI 网络名称也不是同一个概念。
+</p>
+<details>
+  <summary>自定义上联的恢复设置（进阶）</summary>
+  <p>
+    服务默认监听 <code>wan</code> / <code>wan6</code> 的重新上线事件。若固件使用其他逻辑网络名，可核对
+    <code>daed.main.wan_network</code> /
+    <code>wan6_network</code>。请先确认实际名称，不要照抄别人的设备名，也不需要为普通 LAN 地址变化反复重启代理。
+  </p>
+</details>
+<h2 id="dns">DNS 分流做什么</h2>
+<p>
+  DNS 负责把域名解析成地址；DNS
+  规则决定把查询交给哪个上游。连接路由负责决定实际流量直连还是使用某个群组，<strong>两者需要配合</strong>。
+</p>
+<p>当前默认 DNS 方案：</p>
+<pre><code class="language-text">upstream {
+  alidns: 'udp://223.5.5.5:53'
+  googledns: 'tcp+udp://8.8.8.8:53'
+}
+routing {
+  request {
+    qname(geosite:cn) -&gt; alidns
+    fallback: googledns
+  }
+}</code></pre>
+<p>
+  含义是：中国域名列表交给 <code>alidns</code>，其余查询交给
+  <code>googledns</code>。这段示例不代表所有网络均能访问这些上游，也不单独保证 DNS
+  请求从代理出口发出；还需结合当前连接路由和可用线路。
+</p>
+<p>
+  修改上游时保留上游名称与引用一致。先确认节点的服务器域名能解析，以及所选 DNS
+  上游可达，再排查应用网站域名；不要为了排查而一次替换路由器、客户端和插件三处 DNS。
+</p>
+<h2 id="resolvers">引导解析器和备用解析器</h2>
+<ul>
+  <li><strong>引导解析器：</strong>用于在其他解析器可用之前完成必要的域名解析；默认留空使用核心默认行为。</li>
+  <li><strong>备用解析器：</strong>系统解析不可用时的回退，当前默认 <code>8.8.8.8:53</code>。</li>
+  <li><strong>UDP 检测 DNS：</strong>用于健康检查，不等同于上述业务 DNS 分流方案。</li>
+</ul>
+<p>路由器自己的解析失败会影响安装、订阅更新和节点连接。手机能上网，不能证明路由器 SSH 中的 DNS 同样正常。</p>
+<h2 id="routing">路由模式与自定义群组</h2>
+<p>
+  路由规则决定流量交给 <code>direct</code>、<code>must_direct</code>
+  或某个群组。默认规则保留部分系统进程直连，并让私有地址、中国 IP / 域名列表直连，其余流量交给 <code>proxy</code>：
+</p>
+<pre><code class="language-text">pname(NetworkManager, systemd-resolved, dnsmasq) -&gt; must_direct
+dip(geoip:private) -&gt; direct
+dip(geoip:cn) -&gt; direct
+domain(geosite:cn) -&gt; direct
+fallback: proxy</code></pre>
+<p>
+  路由编辑提供 GFW
+  模式、中国列表以外等简单方案，亦可使用自定义规则。<strong>切换简单模式会覆盖当前规则</strong>，已有自定义分流时先复制或保存原文。
+</p>
+<p>例如已经创建并填入节点的 <code>AI</code> 群组，可以在自定义规则中让指定域名使用它；放在兜底之前：</p>
+<pre><code class="language-text">domain(example.com) -&gt; AI
+fallback: proxy</code></pre>
+<p>把示例域名换成你确实需要分流的域名，并核对群组名称。服务通常涉及多个域名，只写一个域名不代表覆盖该服务所有连接。</p>
+<h2 id="apply-check">修改后怎样确认生效</h2>
+<ol>
+  <li>保存修改，确认方案被选中。</li>
+  <li>点击<strong>应用配置</strong>，查看有无错误提示。</li>
+  <li>用目标局域网设备重新发起连接，测试应直连和应代理的网站。</li>
+  <li>结合“运行日志”、实际绑定和连接结果判断；需要时切回保留的旧方案再应用。</li>
+</ol>
+<p>
+  规则库来自固件的 <code>v2ray-geoip</code> /
+  <code>v2ray-geosite</code> 包。缺少规则文件时修复固件依赖，不要创建空文件来跳过检查。
+</p>
