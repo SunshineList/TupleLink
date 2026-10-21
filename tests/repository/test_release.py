@@ -64,7 +64,8 @@ class ReleaseSafetyTest(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0 if self.existing else 1,
                                                json.dumps(self.existing) if self.existing else "", "" if self.existing else "release not found")
         if args[1] == "api":
-            return subprocess.CompletedProcess(args, 0 if self.tag_sha else 1, self.tag_sha or "", "" if self.tag_sha else "HTTP 404")
+            missing = "No commit found for SHA (HTTP 422)" if "/commits/" in args[2] else "HTTP 404"
+            return subprocess.CompletedProcess(args, 0 if self.tag_sha else 1, self.tag_sha or "", "" if self.tag_sha else missing)
         return subprocess.CompletedProcess(args, 0, "", "")
 
     def publish(self):
@@ -160,6 +161,22 @@ class ReleaseSafetyTest(unittest.TestCase):
         self.assertIn("--prerelease", created)
         self.assertEqual(created[created.index("--target") + 1], SHA)
         self.assertEqual(set(uploaded[7:]), {str(p) for p in self.directory.iterdir()})
+
+    def test_new_release_checks_missing_ref_instead_of_invalid_commit_name(self):
+        self.publish()
+        queries = [call[2] for call in self.calls if call[1] == "api"]
+        self.assertEqual(queries, ["repos/slobys/NaiLink/git/ref/tags/openwrt-v" + VERSION])
+
+    def test_annotated_tag_is_compared_using_its_resolved_commit(self):
+        def responses(args, **kwargs):
+            if args[1] == "api":
+                self.calls.append(args)
+                value = SHA if "/commits/" in args[2] else "d" * 40
+                return subprocess.CompletedProcess(args, 0, value, "")
+            return self.fake_gh(args, **kwargs)
+        with patch.object(release.subprocess, "run", responses), contextlib.redirect_stdout(io.StringIO()):
+            release.publish(self.directory, VERSION, SHA, "slobys/NaiLink")
+        self.assertEqual(len(self.mutations()), 2)
 
     def test_retry_only_same_commit_draft(self):
         self.existing = {"isDraft": True, "targetCommitish": SHA}

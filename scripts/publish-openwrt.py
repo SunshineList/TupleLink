@@ -98,9 +98,15 @@ def publish(directory, version, sha, repository):
         release = json.loads(existing)
         if not release["isDraft"] or release["targetCommitish"] != sha:
             raise ValueError("Refusing to change an existing published or unrelated release")
-    remote_sha = gh("api", "repos/" + repository + "/commits/" + tag, "--jq", ".sha", missing_ok=True)
-    if remote_sha is not None and remote_sha.strip() != sha:
-        raise ValueError("Existing release tag points to another commit")
+    # A missing name passed to /commits returns HTTP 422, not 404. Query the
+    # exact Git ref first; only a genuine missing ref is safe to create.
+    remote_ref = gh("api", "repos/" + repository + "/git/ref/tags/" + tag, "--jq", ".object.sha", missing_ok=True)
+    if remote_ref is not None:
+        # /commits dereferences both lightweight and annotated tags. A ref
+        # which exists but cannot resolve must remain an error.
+        remote_sha = gh("api", "repos/" + repository + "/commits/" + tag, "--jq", ".sha")
+        if remote_sha.strip() != sha:
+            raise ValueError("Existing release tag points to another commit")
     if existing is None:
         with tempfile.TemporaryDirectory() as temporary:
             notes = Path(temporary) / "notes.md"
