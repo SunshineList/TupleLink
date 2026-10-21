@@ -1,182 +1,29 @@
-# Quick Start Guide
+# NaiLink 安装与使用
 
-> **Note:** `daed` bundles [dae-wing](https://github.com/daeuniverse/dae-wing) (backend API) and [dae](https://github.com/daeuniverse/dae) (eBPF core) into a single binary.
+## OpenWrt / ImmortalWrt / iStoreOS
 
----
+请使用 [README 中的安装菜单](../README.md#安装更新与卸载)，或阅读[在线安装文档](https://slobys.github.io/NaiLink/installation.html)。脚本检查 CPU、包格式和实际内核能力，更新保留节点与配置，卸载前备份。
 
-## ⚠️ Important Notice
+安装后打开后台 **服务 → NaiLink**，按[首次设置](https://slobys.github.io/NaiLink/quick-start.html)导入节点、加入群组、应用配置。
 
-> **Warning:** Network connectivity issues may occur if the system sleeps/hibernates or switches networks while the proxy is active.
->
-> Always **stop the proxy** before:
->
-> - Putting your computer to sleep or hibernate
-> - Switching between Wi-Fi networks
-> - Disconnecting from the network
->
-> If you experience network issues, a system reboot may be required to restore connectivity.
+不要在 OpenWrt 上运行 systemctl，也不要下载上游旧 DEB / RPM 替代 NaiLink 插件。ARMv7 / MIPS 的限制见[兼容性说明](https://slobys.github.io/NaiLink/installation.html)。
 
----
+## 普通 Linux / Docker
 
-## 📦 Installation
+这是独立部署入口，不带 LuCI 插件或路由器安装菜单。宿主机仍须具备所需 eBPF、JIT、BTF 和内核能力。
 
-### Download Pre-built Binaries
+Docker 构建支持 `linux/amd64` 和 `linux/arm64`。Windows / macOS 的 Docker Desktop 可用于构建、API 和页面检查，不代表宿主机透明代理可用。
 
-Download the latest release for your platform:
-
-**👉 [GitHub Releases](https://github.com/daeuniverse/daed/releases)**
-
-> 💡 **Tip:** Want to try new features? Check out [PR Builds](https://github.com/daeuniverse/daed/actions/workflows/pr-build.yml) for the latest development builds. Note that these may be unstable.
-
-### Quick Install (Manual)
-
-```bash
-# Make executable and install
-sudo chmod +x ./daed
-sudo install -Dm755 daed /usr/bin/
-
-# Run daed
-sudo daed run
-
-# Show help
-daed --help
-```
-
----
-
-## 🐧 Linux Distribution Packages
-
-### Debian / Ubuntu
-
-```bash
-# Download the latest .deb package
-wget -P /tmp https://github.com/daeuniverse/daed/releases/latest/download/installer-daed-linux-$(arch).deb
-
-# Install
-sudo dpkg -i /tmp/installer-daed-linux-$(arch).deb
-
-# Start and enable service
-sudo systemctl enable --now daed
-```
-
-### Fedora / Red Hat
-
-#### Option 1: Fedora Copr (Recommended)
-
-```bash
-sudo dnf copr enable zhullyb/v2rayA
-sudo dnf install daed
-```
-
-#### Option 2: RPM Package
-
-```bash
-# Download the latest .rpm package
-wget -P /tmp https://github.com/daeuniverse/daed/releases/latest/download/installer-daed-linux-$(arch).rpm
-
-# Install
-sudo rpm -ivh /tmp/installer-daed-linux-$(arch).rpm
-
-# Start and enable service
-sudo systemctl enable --now daed
-```
-
-### openSUSE
-
-```bash
-# Download the latest .rpm package
-wget -P /tmp https://github.com/daeuniverse/daed/releases/latest/download/installer-daed-linux-$(arch).rpm
-
-# Install
-sudo zypper install /tmp/installer-daed-linux-$(arch).rpm
-
-# Start and enable service
-sudo systemctl enable --now daed
-```
-
-### Arch Linux
-
-#### AUR
-
-| Package         | Description                       | Command                 |
-| --------------- | --------------------------------- | ----------------------- |
-| `daed`          | Latest release (x86-64 / aarch64) | `paru -S daed`          |
-| `daed-avx2-bin` | Optimized for x86-64 v3 / AVX2    | `paru -S daed-avx2-bin` |
-| `daed-git`      | Latest git version                | `paru -S daed-git`      |
-
-#### archlinuxcn
-
-```bash
-# Standard version
-sudo pacman -S daed
-
-# AVX2 optimized version
-sudo pacman -S daed-avx2-bin
-
-# Git version
-sudo pacman -S daed-git
-```
-
----
-
-## 🐳 Docker
-
-Pre-built images are available at:
-
-- `ghcr.io/daeuniverse/daed`
-- `quay.io/daeuniverse/daed`
-- `daeuniverse/daed`
-
-### Docker Run
-
-```bash
-docker run -d \
-    --privileged \
-    --network=host \
-    --pid=host \
-    --restart=unless-stopped \
-    -v /sys:/sys \
-    -v /etc/daed:/etc/daed \
-    --name=daed \
-    ghcr.io/daeuniverse/daed:latest
-```
-
-### Docker Compose
-
-```yaml
-# docker-compose.yml
-services:
-  daed:
-    image: ghcr.io/daeuniverse/daed:latest
-    container_name: daed
-    privileged: true
-    network_mode: host
-    pid: host
-    restart: unless-stopped
-    volumes:
-      - /sys:/sys
-      - /etc/daed:/etc/daed
-```
-
-```bash
+```sh
+git clone --recurse-submodules https://github.com/slobys/NaiLink.git
+cd NaiLink
+docker compose build
 docker compose up -d
+docker compose logs -f
 ```
 
-### Build from Source
+Linux 上打开 `http://服务器地址:2023`，完成初始化。Compose 使用主机网络和特权权限以访问宿主机网络；该端口不要直接暴露公网。配置沿用宿主机 `/etc/daed`，更新前先备份。构建需要访问 Docker Hub、包仓库和 GitHub。
 
-```bash
-git clone https://github.com/daeuniverse/daed --recursive
-docker build -t daed .
-```
+停止容器：`docker compose down`。它不会删除绑定目录 `/etc/daed`。容器卸载和 OpenWrt 插件卸载是不同操作。
 
-> **Note:** Docker support is currently available for i386, amd64, armv7, and arm64 architectures. See [discussion #291](https://github.com/daeuniverse/daed/discussions/291) for details.
-
----
-
-## 🎉 Access the Dashboard
-
-Once daed is running, open your browser and navigate to:
-
-**👉 http://localhost:2023**
-
-Happy Hacking! 🚀
+完整构建和普通 Linux 服务安装见[构建说明](build.md)，联网问题见[故障排查](https://slobys.github.io/NaiLink/troubleshooting.html)。

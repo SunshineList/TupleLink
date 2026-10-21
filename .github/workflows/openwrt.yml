@@ -13,9 +13,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Package version (X.Y.Z); build artifacts only, no publishing'
+        description: 'Package version (X.Y.Z), must match source'
         default: '0.6.29'
         required: true
+      publish:
+        description: 'After all checks, upload to a release draft (main only)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -29,11 +33,23 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - name: Check release version and publishing branch before building
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+        run: |
+          python3 scripts/publish-openwrt.py check-version "$VERSION"
+          if [ "$PUBLISH" = true ] && [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo 'Release drafts can only be uploaded from main' >&2
+            exit 1
+          fi
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
       - name: Shell, UI and isolated OpenWrt tests
         run: |
+          python3 -m unittest discover -s tests/repository -v
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends shellcheck
           shellcheck -s sh -e SC1091 openwrt/install.sh openwrt/files/nailink openwrt/files/daed-check openwrt/files/rpcd-daed openwrt/files/subscription-proxy openwrt/subscription-check.sh openwrt/network-check.sh
@@ -218,6 +234,7 @@ jobs:
           path: .build/packages/
 
   kernel-preflight:
+    needs: test
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -291,8 +308,27 @@ jobs:
           path: .build/source/
       - run: |
           cp .build/source/daed-openwrt-source.tar.gz .build/source/SOURCE_*.txt .build/release/
+          cp openwrt/README.md openwrt/VALIDATION.md .build/release/
           python3 openwrt/manifest.py .build/release --version "$VERSION"
       - uses: actions/upload-artifact@v7
         with:
           name: daed-openwrt-${{ inputs.version }}
           path: .build/release/
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: assemble
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: daed-openwrt-${{ inputs.version }}
+          path: .build/release/
+      - name: Verify checksums, matching source and immutable release before upload
+        run: python3 scripts/publish-openwrt.py publish .build/release --version "$VERSION" --sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY"

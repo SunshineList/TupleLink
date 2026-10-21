@@ -1,78 +1,68 @@
-# Build from Source
+# 构建 NaiLink
 
-This guide covers how to build daed from source code.
+## 环境与源码
 
----
+使用 Linux 或 WSL：Node.js 22、pnpm 10.24.0、Go 1.26.0、Python 3、Make、Clang / LLVM 15+、Git。
 
-## 📋 Prerequisites
-
-| Tool                                       | Version | Required |
-| ------------------------------------------ | ------- | -------- |
-| [Node.js](https://nodejs.org/)             | >= 20   | ✅       |
-| [pnpm](https://pnpm.io/)                   | >= 9    | ✅       |
-| [Go](https://go.dev/)                      | >= 1.22 | ✅       |
-| [Clang](https://clang.llvm.org/)           | >= 15   | ✅       |
-| [LLVM](https://llvm.org/)                  | >= 15   | ✅       |
-| [Make](https://www.gnu.org/software/make/) | Latest  | ✅       |
-
----
-
-## 🚀 Quick Build
-
-The following command bootstraps the full stack (`daed` + `dae-wing` + `dae`):
-
-```bash
-make
+```sh
+git clone --recurse-submodules https://github.com/slobys/NaiLink.git
+cd NaiLink
+corepack enable
+corepack prepare pnpm@10.24.0 --activate
+pnpm install --frozen-lockfile
 ```
 
-This will:
+GitHub 的 Download ZIP 不包含后端子模块。已有工作区运行 `git submodule update --init --recursive`，不要用强制重置脚本清除本地修改。
 
-1. Install frontend dependencies
-2. Build the frontend assets
-3. Compile the Go backend with embedded frontend
-4. Output the `daed` binary
+## OpenWrt 插件
 
----
+遵循 [OpenWrt 开发说明](../openwrt/README.md#开发)，构建 LuCI 专用前端、后端增量及原生 IPK / APK。MIPS 的 SQLite 需要 SDK 中的 CGO 静态工具链，不能套用纯 Go 构建。
 
-## 🛠️ Advanced: Custom GraphQL Schema
+## 普通 Linux 程序
 
-> ⚠️ **For Development Only** — Skip this if you're not modifying the GraphQL schema.
-
-By default, GraphQL type definitions and API bindings are generated automatically. To use a custom schema:
-
-```bash
-# From a GraphQL endpoint
-SCHEMA_PATH=https://example.com/graphql pnpm codegen
-
-# From a local schema file
-SCHEMA_PATH=/path/to/schema.graphql pnpm codegen
-
-# Watch mode for development
-SCHEMA_PATH=/path/to/schema.graphql pnpm codegen --watch
+```sh
+pnpm build --filter=daed
+python3 openwrt/prepare-wing.py wing
+make VERSION=0.6.29
+./daed --version
+sudo ./daed run --config /etc/daed
 ```
 
----
+普通 Linux 使用独立前端和初始化登录；LuCI 专用前端只适用于 OpenWrt 集成。准备步骤不可省略，否则会遗漏本仓库的后端修复。构建前核对版本；若工具使用版本后缀，设置 `CLANG=clang-15` 并保证 `llvm-strip` 可用。
 
-## ▶️ Run the Binary
+可选 systemd 服务（仅普通 Linux）：
 
-```bash
-# Make executable and install
-sudo chmod +x ./daed
-sudo install -Dm755 daed /usr/bin/
-
-# Run daed
-sudo daed run
-
-# Show help
-daed --help
+```sh
+sudo install -Dm755 daed /usr/bin/daed
+sudo install -Dm644 install/daed.service /etc/systemd/system/daed.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now daed
 ```
 
----
+运行需要 GeoIP / GeoSite 规则库，将可信版本放到 `/usr/share/daed/geoip.dat` 和 `/usr/share/daed/geosite.dat`。Docker 已固定规则快照和 SHA-256。保留 `/etc/daed`，不要让容器与 systemd 实例同时接管网络。
 
-## 🎉 Access the Dashboard
+## Docker
 
-Once running, open your browser:
+```sh
+docker build --build-arg DAED_VERSION=0.6.29 -t nailink:local .
+docker run --rm nailink:local daed --version
+docker compose up -d
+```
 
-**👉 http://localhost:2023**
+默认使用当前主机平台，支持 `linux/amd64` / `linux/arm64`。跨架构可用 `docker buildx build --platform linux/arm64 --load -t nailink:arm64 .`。运行镜像不包含开发依赖、仓库历史或本地配置。
 
-Happy Hacking! 🚀
+镜像用于独立 Linux 部署，透明代理仍要求宿主机内核能力和网络权限，见[安装说明](getting-started.md#普通-linux--docker)。
+
+## 检查与发布
+
+```sh
+pnpm test
+pnpm check-types
+python3 -m unittest discover -s tests/repository -v
+python3 -m unittest discover -s tests/docs -v
+python3 docs/site/build.py
+```
+
+发布入口见[贡献指南](../CONTRIBUTING.md#构建与发布)，验证边界见 [OpenWrt 验证记录](../openwrt/VALIDATION.md)。
+
+修改 GraphQL schema 可用 `SCHEMA_PATH=/path/to/schema.graphql pnpm codegen`；不要把生产凭据写进配置。

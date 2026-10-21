@@ -1,6 +1,8 @@
-version: '3'
 services:
   daed:
+    image: nailink:local
+    restart: unless-stopped
+    stop_grace_period: 30s
     privileged: true
     network_mode: host
     pid: host

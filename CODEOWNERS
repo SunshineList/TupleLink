@@ -1,5 +1,2 @@
-* @daeuniverse/governance
-/src/** @daeuniverse/daed
-/docs/** @daeuniverse/docs
-CHANGELOGS.md @daeuniverse/release
-/.github/** @daeuniverse/infra
+# NaiLink maintenance; upstream copyright and license notices remain in source.
+* @slobys

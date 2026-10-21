@@ -1,0 +1,92 @@
+name: Repository and Docker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      [
+        'Dockerfile',
+        '.dockerignore',
+        'docker-compose.yml',
+        'scripts/**',
+        'tests/repository/**',
+        '.github/**',
+        'CONTRIBUTING.md',
+        'CODEOWNERS',
+        'docs/*.md',
+        'README.md',
+        'package.json',
+        'pnpm-lock.yaml',
+        'pnpm-workspace.yaml',
+        'openwrt/prepare-wing.py',
+        'openwrt/wing/**',
+      ]
+  pull_request:
+    paths:
+      [
+        'Dockerfile',
+        '.dockerignore',
+        'docker-compose.yml',
+        'scripts/**',
+        'tests/repository/**',
+        '.github/**',
+        'CONTRIBUTING.md',
+        'CODEOWNERS',
+        'docs/*.md',
+        'README.md',
+        'package.json',
+        'pnpm-lock.yaml',
+        'pnpm-workspace.yaml',
+        'openwrt/prepare-wing.py',
+        'openwrt/wing/**',
+      ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Repository references and release safety
+        run: python3 -m unittest discover -s tests/repository -v
+      - name: Handbook links and generated site
+        run: |
+          python3 -m unittest discover -s tests/docs -v
+          python3 docs/site/build.py
+      - name: Validate Compose
+        run: docker compose config --quiet
+
+  docker:
+    needs: check
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          push: false
+          tags: nailink:ci
+          build-args: DAED_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=docker-${{ matrix.runner }}
+          cache-to: type=gha,mode=max,scope=docker-${{ matrix.runner }}
+      - name: API, authentication and persisted configuration (no host network changes)
+        run: python3 tests/repository/docker_smoke.py --image nailink:ci

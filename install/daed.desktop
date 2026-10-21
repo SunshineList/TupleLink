@@ -2,9 +2,9 @@
 Version=1.0
 Terminal=false
 Type=Application
-Name=daed Web Panel
-GenericName=A modern web dashboard for dae
-GenericName[zh_CN]=一款时尚的 dae 网络仪表盘
+Name=NaiLink
+GenericName=Proxy management dashboard
+GenericName[zh_CN]=代理管理面板
 Comment=A high-performance proxy tool based on eBPF
 Comment[zh_CN]=一款基于eBPF的高性能代理工具
 Categories=Network;

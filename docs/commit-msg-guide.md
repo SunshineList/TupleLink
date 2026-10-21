@@ -1,4 +1,4 @@
-# Commit Message Guide
+# NaiLink Commit Message Guide
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
@@ -6,9 +6,9 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 
 ## 🎯 Why Conventional Commits?
 
-- 📝 **Automatic changelog generation**
+- 📝 **Clear change descriptions**
 - 🔍 **Easy navigation** through git history
-- 🤖 **Automated versioning** with semantic release
+- 🤖 **Commit checks** through commitlint; releases use the OpenWrt workflow described in [CONTRIBUTING.md](../CONTRIBUTING.md#构建与发布)
 - 📊 **Better project understanding** for contributors
 
 ---
