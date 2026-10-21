@@ -60,6 +60,22 @@ service_snapshot() {
 
 service_snapshot before-probes
 
+printf '\n[Local NaiLink readiness and automatic selection candidates]\n'
+listen=$(/usr/libexec/daed/check --listen 2>/dev/null) || listen=''
+if [ -n "$listen" ] && command -v uclient-fetch >/dev/null 2>&1; then
+	status=$(uclient-fetch -q -T 3 -O - "http://$listen/health/ready?details=1" 2>/dev/null) || status='{}'
+	for field in phase configured listening initialized dns_ready routing_ready restart_dns restored_dns_entries; do
+		value=$(printf '%s' "$status" | jsonfilter -e "@.$field" 2>/dev/null)
+		printf '%s=%s\n' "$field" "${value:-unavailable}"
+	done
+	# The local endpoint only returns bounded labels, no node URLs or passwords.
+	printf '%s' "$status" | jsonfilter -e '@.groups[*]' 2>/dev/null | head -n 64
+else
+	echo 'readiness unavailable; older runtime or local API not running'
+fi
+echo 'Candidates describe the current automatic policy, not the public IP seen by a website.'
+echo 'An automatic group may select a different exit after restart; its configured policy was not changed.'
+
 printf '\n[Firewall text markers; counts only, no rules or addresses printed]\n'
 for firewall_tool in nft iptables-save ip6tables-save; do
 	if ! command -v "$firewall_tool" >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
@@ -122,8 +138,8 @@ fi
 
 printf '\n[Router HTTPS; transparent routing remains in effect]\n'
 if command -v curl >/dev/null 2>&1; then
-	for target in cn4 google4 google6; do
-		case "$target" in cn4) family=-4; url=https://www.baidu.com/ ;; google4) family=-4; url=https://www.google.com/ ;; google6) family=-6; url=https://www.google.com/ ;; esac
+	for target in cn4 google4 google6 chatgpt4 chatgpt6; do
+		case "$target" in cn4) family=-4; url=https://www.baidu.com/ ;; google4) family=-4; url=https://www.google.com/ ;; google6) family=-6; url=https://www.google.com/ ;; chatgpt4) family=-4; url=https://chatgpt.com/ ;; chatgpt6) family=-6; url=https://chatgpt.com/ ;; esac
 		printf '%s ' "$target"
 		curl "$family" --silent --show-error --head --noproxy '*' \
 			--connect-timeout 4 --max-time 8 --output /dev/null \
@@ -131,6 +147,7 @@ if command -v curl >/dev/null 2>&1; then
 			"$url" 2>&1
 		printf 'curl_exit=%s\n' "$?"
 	done
+	echo 'peer is the destination address, not your public exit IP. HTTP 403 may be a site policy or challenge, not a failed TLS connection.'
 else
 	echo 'curl unavailable; HTTPS probes skipped (nothing installed)'
 fi

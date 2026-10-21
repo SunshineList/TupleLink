@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/NaiLink
-release=openwrt-v0.6.29
+release=openwrt-v0.6.30
 asset_dir=''
 mode=install
 action=install
@@ -448,6 +448,29 @@ if [ "$was_running" = 1 ]; then
 		[ "$waited" -lt 20 ] || { /etc/init.d/daed stop; fail 'Management HTTP did not become ready. Check Services > NaiLink > Logs.'; }
 		sleep 1; waited=$((waited + 1))
 	done
+	# Management HTTP does not imply that restored domain routes, listeners and
+	# the DNS upstream are ready. Keep the new service running if WAN/DNS is
+	# still recovering: a readiness warning must not undo a successful upgrade.
+	stopped=0
+	waited=0
+	ready=0
+	phase=unavailable
+	while [ "$waited" -lt 20 ]; do
+		status=$(uclient-fetch -q -T 2 -O - "http://$listen/health/ready" 2>/dev/null) || status='{}'
+		phase=$(printf '%s' "$status" | jsonfilter -e '@.phase' 2>/dev/null) || phase=unavailable
+		if [ "$(printf '%s' "$status" | jsonfilter -e '@.ready' 2>/dev/null)" = true ]; then ready=1; break; fi
+		sleep 1; waited=$((waited + 1))
+	done
+	if [ "$ready" = 1 ]; then
+		if [ "$phase" = inactive ]; then
+			printf 'NaiLink: 管理界面已就绪；尚未启用代理配置。\n'
+		else
+			printf 'NaiLink: 透明代理监听、DNS 上游初始化及缓存路由恢复已就绪；这不代表每个节点或网站均可访问。\n'
+		fi
+	else
+		case "$phase" in ''|*[!a-z_]* ) phase=unavailable ;; esac
+		printf 'NaiLink: 更新已安装，代理仍在恢复（%s）。服务继续运行，节点和配置已保留；请查看运行日志或执行 nailink --check-network。\n' "$phase" >&2
+	fi
 fi
 stopped=0
 printf 'NaiLink: Installed. Refresh LuCI and open Services > NaiLink. Management readiness does not prove LAN proxy traffic.\n'

@@ -202,6 +202,7 @@ def main():
     package = sdk / "package" / "daed-router"
     package.mkdir(parents=True, exist_ok=True)
     shutil.copy2(HERE / "Makefile", package)
+    shutil.copy2(HERE / "network-check.sh", package)
     installer = (HERE / "install.sh").read_text()
     installer = re.sub(r"^release=openwrt-v\d+\.\d+\.\d+$", "release=openwrt-v" + args.version, installer, flags=re.MULTILINE)
     (package / "install.sh").write_text(installer)

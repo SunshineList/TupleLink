@@ -65,7 +65,10 @@ service) cat /tmp/services ;;
 *) exit 1 ;;
 esac''')
         self.script("/bin/pidof", '[ -e /tmp/daemon-running ]')
-        self.script("/bin/uclient-fetch", '[ ! -e /tmp/http-fail ]')
+        self.script("/bin/uclient-fetch", '''[ ! -e /tmp/http-fail ] || exit 1
+case "$*" in *'/health/ready'*)
+ if [ -e /tmp/readiness ]; then cat /tmp/readiness; else echo '{"ready":true,"phase":"inactive"}'; fi ;;
+esac''')
         self.script("/etc/init.d/rpcd", 'echo "rpcd $*" >> /tmp/service-calls')
         self.script("/fixtures/daed-init", '''echo "$*" >> /tmp/service-calls
 case "$1" in
@@ -381,6 +384,33 @@ esac''')
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((self.root / "tmp/daemon-running").exists())
         self.assertTrue(list((self.root / "root/daed-backups").glob("*.tar.gz")))
+
+    def test_upgrade_waits_for_proxy_readiness_after_management_http(self):
+        self.managed()
+        self.write("/etc/daed/wing.db", "preserve my nodes and group policy")
+        self.write("/tmp/readiness", '{"ready":false,"phase":"dns_starting"}')
+        self.script("/bin/sleep", '''echo waiting >> /tmp/readiness-waits
+echo '{"ready":true,"phase":"ready"}' > /tmp/readiness''')
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("缓存路由恢复已就绪", result.stdout)
+        self.assertTrue((self.root / "tmp/readiness-waits").exists())
+        self.assertEqual((self.root / "etc/daed/wing.db").read_text(), "preserve my nodes and group policy")
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+
+    def test_upgrade_dns_restore_failure_keeps_new_service_and_existing_data(self):
+        self.managed()
+        self.write("/etc/daed/wing.db", "unchanged database")
+        config = (self.root / "etc/config/daed").read_bytes()
+        self.write("/tmp/readiness", '{"ready":false,"phase":"dns_route_restore_failed"}')
+        self.script("/bin/sleep", "exit 0")
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("dns_route_restore_failed", result.stderr)
+        self.assertIn("服务继续运行", result.stderr)
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+        self.assertEqual((self.root / "etc/config/daed").read_bytes(), config)
+        self.assertEqual((self.root / "etc/daed/wing.db").read_text(), "unchanged database")
 
     def test_rpc_rejects_shell_injection_and_handles_no_newline(self):
         self.managed()

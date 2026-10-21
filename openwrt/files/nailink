@@ -1,5 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 # Keep uninstall available offline through the installed setup script.
+if [ "${1:-}" = --check-network ]; then
+	[ "$#" = 1 ] || { echo 'Usage: nailink --check-network' >&2; exit 1; }
+	exec /usr/libexec/daed/network-check
+fi
 [ "$#" -gt 0 ] || set -- --menu
 exec /usr/sbin/daed-router-setup "$@"

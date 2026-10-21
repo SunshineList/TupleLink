@@ -35,6 +35,8 @@ def router_auth(text):
             .replace('db.DB(context.TODO()).Model(&db.User{})', 'db.DB(r.Context()).Model(&db.User{})')
             .replace('err == nil && time.Now().Before(expireAt.Time)', 'err == nil && expireAt != nil && time.Now().Before(expireAt.Time)'))
     text = text.replace('\t\ttx2.Commit()', '\t\tif err2 := tx2.Commit().Error; err2 != nil { return fmt.Errorf("%w; %v", err, err2) }')
+    if 'mux.HandleFunc("/health/ready"' not in text:
+        text = text.replace('mux := http.NewServeMux()', 'mux := http.NewServeMux()\n\t\t\tmux.HandleFunc("/health/ready", routerReadinessHandler)', 1)
     return text.replace('\ttx.Commit()\n\treturn nil', '\treturn tx.Commit().Error')
 
 
@@ -52,7 +54,17 @@ def router_lifecycle(text):
     text = text.replace('\t}()\n\treloading := false', '\t}(c, log, conf.Global.TproxyPort)\n\treloading := false', 1)
     text = text.replace('go func() {\n\t\t\t\t\tif err := c.Serve', 'go func(c *control.ControlPlane, log *logrus.Logger) {\n\t\t\t\t\tif err := c.Serve', 1)
     text = text.replace('\t\t\t\t}()\n\t\t\t\t<-readyChan', '\t\t\t\t}(c, log)\n\t\t\t\t<-readyChan', 1)
-    text = text.replace('\t\t\tc = newC\n\t\t\tconf =', '\t\t\tc = newC\n\t\t\tcurrentControlPlane.Store(c)\n\t\t\tconf =')
+    if '\t\t\trouterPublishControlPlane(c, conf)' not in text:
+        text = text.replace('\t\t\tc = newC\n\t\t\tconf =', '\t\t\tc = newC\n\t\t\tcurrentControlPlane.Store(c)\n\t\t\tconf =')
+    text = text.replace('currentControlPlane.Store(c)', 'routerPublishControlPlane(c, conf)')
+    text = text.replace('routerPublishControlPlane(c, conf)\n\t\t\tconf = newConf', 'conf = newConf\n\t\t\trouterPublishControlPlane(c, conf)')
+    text = text.replace('oldC.Close()', 'routerCloseControlPlane(oldC)').replace('c.Close()', 'routerCloseControlPlane(c)')
+    if 'routerSaveRestartDNS(log, c, conf)' not in text:
+        text = text.replace('\tif e := routerCloseControlPlane(c);', '\trouterSaveRestartDNS(log, c, conf)\n\tif e := routerCloseControlPlane(c);')
+    if 'routerRestoreRestartDNS(log, conf, dnsCache)' not in text:
+        text = text.replace('\n\t// Print configuration.', '\n\tdnsCache = routerRestoreRestartDNS(log, conf, dnsCache)\n\t// Print configuration.', 1)
+    if 'routerMarkServing(c)' not in text:
+        text = text.replace('<-readyChan', '<-readyChan\n\t\t\trouterMarkServing(c)')
     return text.replace('\n\t\t\tWaitForNetwork(log)', '\n\t\t\trouterWaitForNetwork(log)')
 
 
@@ -65,6 +77,10 @@ def router_control_dial(text):
 
 
 def router_dns_recovery(text):
+    if 'routerReplayFailed atomic.Bool' not in text:
+        text = text.replace('type dnsControllerStore struct {', 'type dnsControllerStore struct {\n\trouterReplayFailed atomic.Bool')
+    text = text.replace('c.rememberDnsKnowledge(dnsCacheBaseKey(k), v.OriginalDeadline)\n\t\tc.triggerBpfUpdateIfNeeded(v, now)',
+                        'c.rememberDnsKnowledge(dnsCacheBaseKey(k), v.OriginalDeadline)\n\t\tc.routerRestoreRouting(v, now)')
     text = text.replace('primaryCtx, primaryCancel := context.WithTimeout(ctx, consts.DefaultDialTimeout)',
                         'primaryCtx, primaryCancel := context.WithTimeout(ctx, routerDNSPrimaryTimeout(ctx, upstream, primaryDialArg))', 1)
     if 'if ctx.Err() != nil { return nil, primaryDialArg, ctx.Err() }' not in text:
@@ -341,6 +357,12 @@ type Mutation {
         ("graphql/router_transactions_test.go", "transaction_test.go"),
         ("cmd/router_http_context_test.go", "http_context_test.go"),
         ("dae/router_network_ready.go", "network_ready.go"),
+        ("dae/router_restart_state.go", "restart_state.go"),
+        ("dae/router_restart_state_test.go", "restart_state_test.go"),
+        ("cmd/router_readiness_http.go", "readiness_http.go"),
+        ("cmd/router_readiness_http_test.go", "readiness_http_test.go"),
+        ("dae-core/control/router_restart_core.go", "restart_core.go"),
+        ("dae-core/control/router_restart_core_test.go", "restart_core_test.go"),
         ("dae/router_network_ready_test.go", "network_ready_test.go"),
         ("dae/router_httpclient_test.go", "httpclient_test.go"),
         ("graphql/service/node/router_latency_cache.go", "node_latency_cache.go"),

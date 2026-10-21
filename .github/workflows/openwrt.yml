@@ -14,7 +14,7 @@ on:
     inputs:
       version:
         description: 'Package version (X.Y.Z), must match source'
-        default: '0.6.29'
+        default: '0.6.30'
         required: true
       publish:
         description: 'After all checks, upload to a release draft (main only)'
@@ -33,6 +33,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       - name: Check release version and publishing branch before building
         if: github.event_name == 'workflow_dispatch'
         env:

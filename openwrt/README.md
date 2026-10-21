@@ -1,9 +1,17 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.29](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.29)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.30](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.30)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.30 升级后的 DNS 与分流恢复
+
+- 恢复 DNS 缓存时，等域名路由关联写入完成再报告就绪，避免异步队列积压使浏览器缓存 IP 暂时缺少分流关联。
+- 正常停止时在 `/var/run/daed` 保存最多 1024 条、2 MiB 的有效地址记录；相同配置重新启动且快照不超过 10 分钟时恢复。保留原 TTL，按当前规则重建路由，不保存节点密码，不写入永久配置。
+- 安装器分别检查管理 HTTP、代理监听、DNS 上游初始化和缓存路由恢复。网络仍在恢复时提示原因并保留新服务运行，不把页面可访问当作所有网站可用。
+- `nailink --check-network` 提供只读诊断：恢复状态、群组策略、双栈候选节点和 Google / ChatGPT 的 DNS、TCP、TLS 观察。候选节点不等于网站实际看到的公网 IP，HTTP 403 也不等于连接失败。
+- 保留现有节点、订阅、自动选路与 DNS 设置。旧版从未保存过快照，所以第一次从 0.6.29 或更早版本升级无法恢复旧进程没有导出的缓存；后续正常停止、重启和升级才可使用快照。断电清除 `/var/run`，崩溃未保存新快照时也不能保证恢复。
 
 ## 0.6.29 协议编辑与 UDP 诊断
 

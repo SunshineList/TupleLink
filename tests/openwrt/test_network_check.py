@@ -74,12 +74,25 @@ echo 'table inet fw4 { chain input { comment "fixture-private-secret"; } }' ''')
         self.assertTrue(calls and all(line.startswith("filter show dev ") for line in calls))
         self.assertFalse((self.root / "tmp/service-calls").exists())
         curl = (self.root / "tmp/curl-calls").read_text().splitlines()
-        self.assertEqual(len(curl), 3)
+        self.assertEqual(len(curl), 5)
+        self.assertEqual(sum('https://chatgpt.com/' in call for call in curl), 2)
         self.assertTrue(all('--max-time 8' in call and '--noproxy *' in call for call in curl))
         self.assertIn("curl_exit=7", result.stdout)
         calls = (self.root / "tmp/ubus-calls").read_text().splitlines()
         self.assertEqual(calls.count("call service list"), 2)
         self.assertEqual(calls.count("call daed-router logs"), 2)
+
+    def test_reports_local_readiness_and_group_candidates_without_changing_policy(self):
+        self.router.script("/usr/libexec/daed/check", 'echo 127.0.0.1:2023')
+        self.router.script("/bin/uclient-fetch", '''echo '{"phase":"ready","configured":true,"listening":true,"initialized":true,"dns_ready":true,"routing_ready":true,"restart_dns":"restored","restored_dns_entries":8,"groups":[{"name":"AI","policy":"min_moving_avg","candidate_ipv4":"US example","members":2}]}' ''')
+        before = (self.root / "etc/config/daed").read_bytes()
+        result = self.run_check()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("phase=ready", result.stdout)
+        self.assertIn("restored_dns_entries=8", result.stdout)
+        self.assertIn("min_moving_avg", result.stdout)
+        self.assertIn("not the public IP", result.stdout)
+        self.assertEqual(before, (self.root / "etc/config/daed").read_bytes())
 
     def test_logs_hide_credentials_and_injected_device_names_are_not_executed(self):
         self.router.script("/usr/sbin/ubus", '''case "$2" in

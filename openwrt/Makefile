@@ -2,7 +2,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=daed-router
-PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.6.29)
+PKG_VERSION:=$(if $(DAED_VERSION),$(DAED_VERSION),0.6.30)
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT AGPL-3.0-only
 PKG_MAINTAINER:=slobys
@@ -50,6 +50,8 @@ define Build/Compile
 endef
 
 define Package/daed-router/install
+	$(INSTALL_DIR) $(1)/usr/libexec/daed
+	$(INSTALL_BIN) ./network-check.sh $(1)/usr/libexec/daed/network-check
 	$(INSTALL_DIR) $(1)/usr/bin $(1)/etc/init.d $(1)/etc/config
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/daed $(1)/usr/bin/daed
 	$(INSTALL_DIR) $(1)/usr/sbin

@@ -60,6 +60,13 @@ class BackendPrepareTests(unittest.TestCase):
         self.assertIn("routerDNSPrimaryTimeout(ctx, upstream, primaryDialArg)", (self.root / "dae-core/control/dns_control.go").read_text(encoding="utf-8"))
         self.assertIn("c.routerResolveBootstrap(ctx, host, network, race, resolve)", (self.root / "dae-core/control/control_plane.go").read_text(encoding="utf-8"))
         self.assertIn("return pc.routerRoundTrip(ctx, data)", (self.root / "dae-core/control/dns.go").read_text(encoding="utf-8"))
+        lifecycle = (self.root / "dae/run.go").read_text(encoding="utf-8")
+        self.assertIn("routerSaveRestartDNS(log, c, conf)", lifecycle)
+        self.assertIn("dnsCache = routerRestoreRestartDNS(log, conf, dnsCache)", lifecycle)
+        self.assertEqual(lifecycle.count("routerMarkServing(c)"), 2)
+        self.assertEqual(lifecycle.count("routerPublishControlPlane(c, conf)"), 2)
+        self.assertIn("c.routerRestoreRouting(v, now)", (self.root / "dae-core/control/dns_control.go").read_text(encoding="utf-8"))
+        self.assertEqual((self.root / "cmd/run.go").read_text(encoding="utf-8").count('mux.HandleFunc("/health/ready"'), 1)
         before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         PREPARE.prepare(self.root)
         after = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
