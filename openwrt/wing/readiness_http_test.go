@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestRouterReadinessHTTPIsLocalAndNotCached(t *testing.T) {
@@ -24,13 +22,23 @@ func TestRouterReadinessHTTPIsLocalAndNotCached(t *testing.T) {
 		r.RemoteAddr = test.address
 		w := httptest.NewRecorder()
 		routerReadinessHandler(w, r)
-		require.Equal(t, test.code, w.Code)
-		require.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+		if w.Code != test.code {
+			t.Fatalf("%s %s: HTTP %d, want %d", test.method, test.address, w.Code, test.code)
+		}
+		if w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("readiness may be cached")
+		}
 		if test.code == 200 {
 			var result map[string]any
-			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &result))
-			require.Contains(t, result, "phase")
-			require.Contains(t, result, "ready")
+			if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := result["phase"]; !ok {
+				t.Fatal("phase missing")
+			}
+			if _, ok := result["ready"]; !ok {
+				t.Fatal("ready missing")
+			}
 		}
 	}
 }

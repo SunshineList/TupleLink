@@ -14,8 +14,21 @@ import (
 	"github.com/daeuniverse/dae/control"
 	dnsmessage "github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
 )
+
+func restartCheck(t *testing.T, condition bool, message string) {
+	t.Helper()
+	if !condition {
+		t.Fatal(message)
+	}
+}
+
+func restartNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func restartTestCache(now time.Time) *control.DnsCache {
 	return &control.DnsCache{RouteOwnerKey: "ai.example.1", DomainBitmap: []uint32{99}, Answer: []dnsmessage.RR{&dnsmessage.A{Hdr: dnsmessage.RR_Header{Name: "ai.example.", Rrtype: dnsmessage.TypeA, Class: dnsmessage.ClassINET, Ttl: 300}, A: net.IPv4(203, 0, 113, 9)}}, Deadline: now.Add(4 * time.Minute), OriginalDeadline: now.Add(3 * time.Minute)}
@@ -26,24 +39,24 @@ func TestRouterRestartRoundTripPreservesTTLAndRebuildsRoutes(t *testing.T) {
 	conf := &daeConfig.Config{}
 	cache := restartTestCache(now)
 	data, err := encodeRestartState(conf, map[string]*control.DnsCache{"ai.example.1": cache}, now)
-	require.NoError(t, err)
+	restartNoError(t, err)
 	got, err := decodeRestartState(data, conf, now.Add(time.Minute))
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	require.True(t, got["ai.example.1"].OriginalDeadline.Equal(cache.OriginalDeadline))
-	require.Equal(t, cache.RouteOwnerKey, got["ai.example.1"].RouteOwnerKey)
-	require.Nil(t, got["ai.example.1"].DomainBitmap, "routing bitmaps must be rebuilt by the current matcher")
-	require.Equal(t, cache.Answer[0].String(), got["ai.example.1"].Answer[0].String())
+	restartNoError(t, err)
+	restartCheck(t, len(got) == 1 && got["ai.example.1"] != nil, "address was not restored")
+	restartCheck(t, got["ai.example.1"].OriginalDeadline.Equal(cache.OriginalDeadline), "original TTL changed")
+	restartCheck(t, cache.RouteOwnerKey == got["ai.example.1"].RouteOwnerKey, "route owner changed")
+	restartCheck(t, got["ai.example.1"].DomainBitmap == nil, "routing bitmaps must be rebuilt by the current matcher")
+	restartCheck(t, cache.Answer[0].String() == got["ai.example.1"].Answer[0].String(), "DNS payload changed")
 	got, err = decodeRestartState(data, conf, now.Add(3*time.Minute))
-	require.NoError(t, err)
-	require.Empty(t, got, "the original DNS expiry must never be extended")
+	restartNoError(t, err)
+	restartCheck(t, len(got) == 0, "the original DNS expiry must never be extended")
 	changed := &daeConfig.Config{Node: []daeConfig.KeyableString{"vless://changed"}}
 	_, err = decodeRestartState(data, changed, now)
-	require.Error(t, err)
+	restartCheck(t, err != nil, "configuration mismatch was accepted")
 	_, err = decodeRestartState(data, conf, now.Add(11*time.Minute))
-	require.Error(t, err)
+	restartCheck(t, err != nil, "old snapshot was accepted")
 	_, err = decodeRestartState(data, conf, now.Add(-2*time.Second))
-	require.Error(t, err)
+	restartCheck(t, err != nil, "future snapshot was accepted")
 }
 
 func TestRouterRestartBoundedAndRejectsCorruptState(t *testing.T) {
@@ -54,22 +67,22 @@ func TestRouterRestartBoundedAndRejectsCorruptState(t *testing.T) {
 		entries[fmt.Sprintf("node-%d.example.1", i)] = restartTestCache(now)
 	}
 	data, err := encodeRestartState(conf, entries, now)
-	require.NoError(t, err)
-	require.LessOrEqual(t, len(data), routerRestartBytes)
+	restartNoError(t, err)
+	restartCheck(t, len(data) <= routerRestartBytes, "encoded state exceeds byte limit")
 	got, err := decodeRestartState(data, conf, now)
-	require.NoError(t, err)
-	require.Len(t, got, routerRestartLimit)
+	restartNoError(t, err)
+	restartCheck(t, len(got) == routerRestartLimit, "entry limit was not applied")
 	for _, bad := range [][]byte{[]byte("broken"), make([]byte, routerRestartBytes+1)} {
 		_, err = decodeRestartState(bad, conf, now)
-		require.Error(t, err)
+		restartCheck(t, err != nil, "corrupt or oversized state was accepted")
 	}
 	var state restartState
-	require.NoError(t, json.Unmarshal(data, &state))
+	restartNoError(t, json.Unmarshal(data, &state))
 	state.Entries = []restartDNSEntry{state.Entries[0], state.Entries[0]}
 	data, err = json.Marshal(state)
-	require.NoError(t, err)
+	restartNoError(t, err)
 	_, err = decodeRestartState(data, conf, now)
-	require.Error(t, err)
+	restartCheck(t, err != nil, "duplicate DNS key was accepted")
 }
 
 func TestRouterRestartPrivateFileAndConfigurationMatch(t *testing.T) {
@@ -78,19 +91,19 @@ func TestRouterRestartPrivateFileAndConfigurationMatch(t *testing.T) {
 	conf := &daeConfig.Config{}
 	now := time.Now()
 	data, err := encodeRestartState(conf, map[string]*control.DnsCache{"ai.example.1": restartTestCache(now)}, now)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(path, data, 0600))
+	restartNoError(t, err)
+	restartNoError(t, os.WriteFile(path, data, 0600))
 	log := logrus.New()
-	require.Len(t, routerRestoreRestartDNS(log, conf, nil), 1)
-	require.NoError(t, os.Chmod(path, 0644))
-	require.Empty(t, routerRestoreRestartDNS(log, conf, nil))
-	require.Equal(t, 0, routerRecoveryCount)
-	require.NoError(t, os.Remove(path))
-	require.NoError(t, os.Symlink(filepath.Join(filepath.Dir(path), "missing"), path))
-	require.Empty(t, routerRestoreRestartDNS(log, conf, nil))
+	restartCheck(t, len(routerRestoreRestartDNS(log, conf, nil)) == 1, "private file was not restored")
+	restartNoError(t, os.Chmod(path, 0644))
+	restartCheck(t, len(routerRestoreRestartDNS(log, conf, nil)) == 0, "public file was accepted")
+	restartCheck(t, routerRecoveryCount == 0, "recovery count is stale")
+	restartNoError(t, os.Remove(path))
+	restartNoError(t, os.Symlink(filepath.Join(filepath.Dir(path), "missing"), path))
+	restartCheck(t, len(routerRestoreRestartDNS(log, conf, nil)) == 0, "symbolic link was accepted")
 	// A hot reload must keep its newer in-memory state instead of loading disk.
 	existing := map[string]*control.DnsCache{"new.example.1": restartTestCache(now)}
-	require.Equal(t, existing, routerRestoreRestartDNS(log, conf, existing))
+	restartCheck(t, routerRestoreRestartDNS(log, conf, existing)["new.example.1"] == existing["new.example.1"], "hot reload state was replaced")
 }
 
 func TestRouterReadinessIgnoresRetiredGeneration(t *testing.T) {
@@ -98,15 +111,12 @@ func TestRouterReadinessIgnoresRetiredGeneration(t *testing.T) {
 	old, next := new(control.ControlPlane), new(control.ControlPlane)
 	routerPublishControlPlane(old, &daeConfig.Config{})
 	routerMarkServing(old)
-	require.True(t, ReadRouterReadiness(false).Listening)
+	restartCheck(t, ReadRouterReadiness(false).Listening, "serving generation was not recorded")
 	routerPublishControlPlane(next, &daeConfig.Config{})
 	routerMarkServing(old)
 	status := ReadRouterReadiness(false)
-	require.False(t, status.Listening)
-	require.False(t, status.Ready)
-	require.Equal(t, "dataplane_starting", status.Phase)
+	restartCheck(t, !status.Listening && !status.Ready && status.Phase == "dataplane_starting", "retired generation marked new plane ready")
 	routerPublishControlPlane(next, EmptyConfig)
 	status = ReadRouterReadiness(false)
-	require.True(t, status.Ready)
-	require.Equal(t, "inactive", status.Phase)
+	restartCheck(t, status.Ready && status.Phase == "inactive", "inactive management plane is not ready")
 }
