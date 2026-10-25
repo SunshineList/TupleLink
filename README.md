@@ -57,7 +57,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/relea
 
 ## 源码与交流
 
-[完整源码包](https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.31/daed-openwrt-source.tar.gz) · [构建说明](openwrt/README.md#开发) · [验证记录](openwrt/VALIDATION.md) · [Logo](docs/site/assets/nailink-logo.png)
+[完整源码包](https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.31/daed-openwrt-source.tar.gz) · [变更记录](CHANGELOG.md) · [构建说明](openwrt/README.md#开发) · [验证记录](openwrt/VALIDATION.md) · [Logo](docs/site/assets/nailink-logo.png)
 
 编译请使用完整源码包，或 `git clone --recurse-submodules https://github.com/slobys/NaiLink.git`。GitHub 的 Download ZIP 不包含后端子模块。
 
