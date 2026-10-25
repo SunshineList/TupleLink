@@ -6,9 +6,12 @@ on:
     paths: &web-paths
       - 'apps/web/**'
       - 'packages/**'
+      # apps/web/vite.config.ts reads the panel version from here.
+      - 'docs/site/site.json'
       - 'eslint.config.js'
       - '.lintstagedrc.yml'
       - '.prettierrc'
+      - '.nvmrc'
       - 'turbo.json'
       - 'tsconfig.json'
       - 'package.json'
@@ -34,7 +37,7 @@ jobs:
       - uses: pnpm/action-setup@v6.0.9
       - uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
