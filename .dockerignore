@@ -19,6 +19,8 @@
 .husky
 .github
 docs
+# vite.config.ts reads the panel version from here.
+!docs/site/site.json
 tests
 install
 scripts

@@ -6,6 +6,8 @@ ENV HUSKY=0 CI=true
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.json ./
 COPY apps ./apps
 COPY packages ./packages
+# apps/web/vite.config.ts imports the panel version from this file.
+COPY docs/site/site.json ./docs/site/site.json
 RUN corepack enable && corepack prepare pnpm@10.24.0 --activate
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile && pnpm build --filter=daed
