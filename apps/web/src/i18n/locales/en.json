@@ -541,6 +541,12 @@
     "noChecks": "This NaiLink version does not report diagnostics.",
     "unavailable": "Diagnostics are available from the LuCI panel.",
     "kernel": "kernel {{kernel}}",
+    "bootTitle": "Start after reboot",
+    "bootOnHint": "The proxy starts automatically when the router powers on.",
+    "bootOffHint": "The proxy stays stopped until someone starts it by hand.",
+    "bootUnknown": "This router does not report the boot setting.",
+    "bootEnabled": "The proxy will start after the next reboot.",
+    "bootDisabled": "The proxy will stay stopped after the next reboot.",
     "check": {
       "system": "Firmware family",
       "architecture": "CPU architecture",

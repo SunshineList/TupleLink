@@ -97,3 +97,22 @@ export function formatPlatform(status?: RouterStatus | null): string {
 export function shouldOfferStart(status?: RouterStatus | null): boolean {
   return !!status && status.running === false && status.compatible !== false
 }
+
+// `autostart` mirrors /etc/init.d/daed enable, which is the only thing that
+// survives a reboot. `enabled` only says the daemon may run now, so the two
+// disagree as soon as the user stops the proxy on a boot-enabled install —
+// inferring one from the other would show the wrong switch position.
+export type BootState = 'enabled' | 'disabled' | 'unknown'
+
+export function bootState(status?: RouterStatus | null): BootState {
+  if (typeof status?.autostart === 'boolean') return status.autostart ? 'enabled' : 'disabled'
+  return 'unknown'
+}
+
+// The action to send for the *opposite* of the current state, or null when the
+// router did not report one, so the switch stays disabled instead of guessing.
+export function bootAction(state: BootState): 'boot_enable' | 'boot_disable' | null {
+  if (state === 'enabled') return 'boot_disable'
+  if (state === 'disabled') return 'boot_enable'
+  return null
+}

@@ -2,6 +2,8 @@ import type { RouterStatus } from './router-health'
 import { describe, expect, it } from 'vitest'
 import {
   attentionChecks,
+  bootAction,
+  bootState,
   formatPlatform,
   formatVersion,
   readChecks,
@@ -144,5 +146,35 @@ describe('shouldOfferStart', () => {
     expect(shouldOfferStart({ ...healthy, running: true })).toBe(false)
     expect(shouldOfferStart({ ...healthy, compatible: false })).toBe(false)
     expect(shouldOfferStart(undefined)).toBe(false)
+  })
+})
+
+describe('bootState', () => {
+  it('reads the init-script state, not the current daemon state', () => {
+    // Stopping the proxy on a boot-enabled install leaves enabled=true and
+    // autostart=true; the switch must still read as on.
+    expect(bootState({ ...healthy, running: false, enabled: true, autostart: true })).toBe('enabled')
+    expect(bootState({ ...healthy, running: true, enabled: false, autostart: false })).toBe('disabled')
+  })
+
+  it('does not infer the boot state from `enabled`', () => {
+    expect(bootState({ enabled: true })).toBe('unknown')
+    expect(bootState({ enabled: false })).toBe('unknown')
+  })
+
+  it('reports unknown when the payload is missing', () => {
+    expect(bootState(undefined)).toBe('unknown')
+    expect(bootState(null)).toBe('unknown')
+  })
+})
+
+describe('bootAction', () => {
+  it('sends the opposite of the current state', () => {
+    expect(bootAction('enabled')).toBe('boot_disable')
+    expect(bootAction('disabled')).toBe('boot_enable')
+  })
+
+  it('offers no action when the state is unknown', () => {
+    expect(bootAction('unknown')).toBeNull()
   })
 })

@@ -541,6 +541,12 @@
     "noChecks": "当前 NaiLink 版本不上报自检信息。",
     "unavailable": "自检信息需在 LuCI 后台查看。",
     "kernel": "内核 {{kernel}}",
+    "bootTitle": "开机自动启动",
+    "bootOnHint": "路由器通电后代理会自动启动。",
+    "bootOffHint": "重启后代理保持停止，需要手动启动。",
+    "bootUnknown": "此路由器未上报开机启动状态。",
+    "bootEnabled": "下次重启后代理会自动启动。",
+    "bootDisabled": "下次重启后代理保持停止。",
     "check": {
       "system": "固件类型",
       "architecture": "处理器架构",

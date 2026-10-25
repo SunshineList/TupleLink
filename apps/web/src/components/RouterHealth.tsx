@@ -1,6 +1,7 @@
 import type { HealthLevel, RouterCheck, RouterStatus } from '~/utils/router-health'
 import { AlertTriangle, CheckCircle2, CircleHelp, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { RouterBootToggle } from '~/components/RouterBootToggle'
 import { Badge } from '~/components/ui/badge'
 import { cn } from '~/lib/utils'
 import { attentionChecks, formatPlatform, formatVersion, readChecks, summariseHealth } from '~/utils/router-health'
@@ -86,9 +87,10 @@ export function RouterHealth({ status, className }: { status?: RouterStatus | nu
 
   if (!checks.length) {
     return (
-      <p className={cn('text-xs text-muted-foreground', className)}>
-        {status ? t('health.noChecks') : t('health.unavailable')}
-      </p>
+      <div className={cn('flex flex-col gap-3', className)}>
+        <p className="text-xs text-muted-foreground">{status ? t('health.noChecks') : t('health.unavailable')}</p>
+        <RouterBootToggle status={status} />
+      </div>
     )
   }
 
@@ -105,6 +107,8 @@ export function RouterHealth({ status, className }: { status?: RouterStatus | nu
           </Badge>
         )}
       </div>
+
+      <RouterBootToggle status={status} />
 
       {attention.length > 0 ? (
         <ul className="flex flex-col gap-2">
