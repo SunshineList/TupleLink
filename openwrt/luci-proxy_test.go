@@ -10,12 +10,20 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/daeuniverse/dae-wing/db"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 const testSession = "1234567890abcdef1234567890abcdef"
+
+func fixtureAccess(active bool, session string) authResult {
+	if active && session == testSession {
+		return authResult{}
+	}
+	return authResult{401, "session_expired"}
+}
 
 func TestPreparePreservesExistingUserAndPreferences(t *testing.T) {
 	directory := t.TempDir()
@@ -83,7 +91,7 @@ func TestGatewaySessionProxyAndRevocation(t *testing.T) {
 	defer backend.Close()
 	target, _ := url.Parse(backend.URL)
 	active := true
-	handler := gateway(directory, target, func(_ context.Context, session string) bool { return active && session == testSession })
+	handler := gateway(directory, target, func(_ context.Context, session string) authResult { return fixtureAccess(active, session) })
 	request := func(method, path, body, origin, session string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, "https://router.test"+gatewayPath+path, strings.NewReader(body))
 		if origin != "" {
@@ -129,12 +137,80 @@ func TestSessionAccessRejectsAnonymousAndUsesLuCIWritePermission(t *testing.T) {
 	os.WriteFile(filepath.Join(directory, "ubus"), []byte(script), 0755)
 	t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
 	for _, value := range []string{"", "bad", strings.Repeat("0", 32), testSession + ";echo unsafe"} {
-		if sessionAccess(context.Background(), value) {
+		if sessionAccess(context.Background(), value).Status != 401 {
 			t.Fatal("invalid session accepted")
 		}
 	}
-	if !sessionAccess(context.Background(), testSession) {
+	if sessionAccess(context.Background(), testSession).Status != 0 {
 		t.Fatal("valid access check rejected")
+	}
+}
+
+func TestSessionFailuresAreClassifiedWithoutLeakingCredentials(t *testing.T) {
+	for _, item := range []struct {
+		name, script, code string
+		status             int
+	}{
+		{"denied", `if [ "$3" = access ]; then echo '{"access":false}'; else echo '{"values":{}}'; fi`, "permission_denied", 403},
+		{"expired", `if [ "$1" = list ]; then echo session; elif [ "$3" = access ]; then echo '{"access":false}'; else exit 4; fi`, "session_expired", 401},
+		{"expired_access", `if [ "$1" = list ]; then echo session; else exit 4; fi`, "session_expired", 401},
+		{"expired_negative", `if [ "$1" = list ]; then echo session; else exit 252; fi`, "session_expired", 401},
+		{"missing_rpcd", `exit 4`, "rpc_unavailable", 503},
+		{"unavailable", `echo 'sensitive stderr' >&2; exit 1`, "rpc_unavailable", 503},
+		{"malformed", `echo '{}'`, "rpc_unavailable", 503},
+		{"get_failed", `if [ "$3" = access ]; then echo '{"access":false}'; else exit 1; fi`, "rpc_unavailable", 503},
+		{"get_malformed", `if [ "$3" = access ]; then echo '{"access":false}'; else echo '{}'; fi`, "rpc_unavailable", 503},
+		{"timeout", `exec sleep 10`, "rpc_timeout", 504},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			directory := t.TempDir()
+			os.WriteFile(filepath.Join(directory, "ubus"), []byte("#!/bin/sh\n"+item.script+"\n"), 0755)
+			t.Setenv("PATH", directory+string(os.PathListSeparator)+os.Getenv("PATH"))
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			got := sessionAccess(ctx, testSession)
+			if got.Status != item.status || got.Code != item.code {
+				t.Fatalf("got %+v", got)
+			}
+			target, _ := url.Parse("http://127.0.0.1:1")
+			handler := gateway(t.TempDir(), target, func(context.Context, string) authResult { return got })
+			r := httptest.NewRequest("POST", "https://router.test"+gatewayPath+"session", strings.NewReader(`{"session":"`+testSession+`"}`))
+			r.Header.Set("Origin", "https://router.test")
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, r)
+			if w.Code != item.status || !strings.Contains(w.Body.String(), item.code) || strings.Contains(w.Body.String(), testSession) || strings.Contains(w.Body.String(), "sensitive") || len(w.Result().Cookies()) != 0 {
+				t.Fatalf("unsafe authorization failure: %d %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestOriginCanonicalizationKeepsCrossSiteProtection(t *testing.T) {
+	for _, item := range []struct {
+		target, origin string
+		allow          bool
+	}{
+		{"https://ROUTER.test:443", "https://router.test", true},
+		{"http://router.test:80", "http://router.test", true},
+		{"https://[::1]:443", "https://[::1]", true},
+		{"https://router.test:8443", "https://router.test:8443", true},
+		{"https://router.test:8443", "https://router.test", false},
+		{"http://router.test", "https://router.test", false},
+		{"https://router.test", "https://evil.test", false},
+		{"https://router.test", "https://router.test.evil.test", false},
+		{"https://router.test", "https://router.test/path", false},
+		{"https://router.test", "https://user@router.test", false},
+		{"https://router.test", "https://router.test?", false},
+		{"https://router.test", "null", false},
+		{"https://router.test", "", false},
+	} {
+		r := httptest.NewRequest("POST", item.target+gatewayPath+"session", nil)
+		r.Header.Set("Origin", item.origin)
+		r.Header.Set("X-Forwarded-Proto", "https")
+		r.Header.Set("X-Forwarded-Host", "evil.test")
+		if got := sameOrigin(r); got != item.allow {
+			t.Fatalf("%s / %s: %v", item.target, item.origin, got)
+		}
 	}
 }
 
@@ -168,7 +244,7 @@ func TestGatewayCachesOnlyAuthorizedFingerprintedStaticAssets(t *testing.T) {
 			defer backend.Close()
 			target, _ := url.Parse(backend.URL)
 			active := true
-			handler := gateway(directory, target, func(_ context.Context, session string) bool { return active && session == testSession })
+			handler := gateway(directory, target, func(_ context.Context, session string) authResult { return fixtureAccess(active, session) })
 			request := func() *httptest.ResponseRecorder {
 				method := "GET"
 				if item.name == "graphql" {

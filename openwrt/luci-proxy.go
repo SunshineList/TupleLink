@@ -131,18 +131,71 @@ func readCredentials(configDir string) (credentials, error) {
 	return value, err
 }
 
-func sessionAccess(ctx context.Context, session string) bool {
+type authResult struct {
+	Status int
+	Code   string
+}
+
+func authError(w http.ResponseWriter, result authResult) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(result.Status)
+	json.NewEncoder(w).Encode(map[string]string{"code": result.Code})
+}
+
+func sessionAccess(ctx context.Context, session string) authResult {
 	if !validSession.MatchString(session) || session == strings.Repeat("0", 32) {
-		return false
+		return authResult{401, "session_expired"}
 	}
 	input, _ := json.Marshal(map[string]string{"ubus_rpc_session": session, "scope": "access-group", "object": "luci-app-daed-router", "function": "write"})
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	data, err := exec.CommandContext(ctx, "ubus", "call", "session", "access", string(input)).Output()
-	var response struct {
-		Access bool `json:"access"`
+	if sessionMissing(ctx, err) {
+		return authResult{401, "session_expired"}
 	}
-	return err == nil && json.Unmarshal(data, &response) == nil && response.Access
+	var response struct {
+		Access *bool `json:"access"`
+	}
+	if err != nil || json.Unmarshal(data, &response) != nil || response.Access == nil {
+		return sessionFailure(ctx)
+	}
+	if *response.Access {
+		return authResult{}
+	}
+	// A denied ACL and an expired session both return access:false. Query only
+	// the empty values table to distinguish them without reading user data.
+	input, _ = json.Marshal(map[string]any{"ubus_rpc_session": session, "keys": []string{}})
+	data, err = exec.CommandContext(ctx, "ubus", "call", "session", "get", string(input)).Output()
+	if sessionMissing(ctx, err) {
+		return authResult{401, "session_expired"}
+	}
+	var value struct {
+		Values map[string]json.RawMessage `json:"values"`
+	}
+	if err != nil || json.Unmarshal(data, &value) != nil || value.Values == nil {
+		return sessionFailure(ctx)
+	}
+	return authResult{403, "permission_denied"}
+}
+
+func sessionMissing(ctx context.Context, err error) bool {
+	var exit *exec.ExitError
+	// ubus CLI versions may return 4 or -4 (252 in the process status)
+	// for NOT_FOUND. Never classify by stderr, which can contain the session.
+	if !errors.As(err, &exit) || (exit.ExitCode() != 4 && exit.ExitCode() != 252) || ctx.Err() != nil {
+		return false
+	}
+	// ubus uses NOT_FOUND for both a missing session and a missing rpcd
+	// object. Only report an expired login if the service still exists.
+	data, err := exec.CommandContext(ctx, "ubus", "list", "session").Output()
+	return err == nil && strings.TrimSpace(string(data)) == "session"
+}
+
+func sessionFailure(ctx context.Context) authResult {
+	if ctx.Err() != nil {
+		return authResult{504, "rpc_timeout"}
+	}
+	return authResult{503, "rpc_unavailable"}
 }
 
 func backendURL() (*url.URL, error) {
@@ -168,10 +221,31 @@ func sameOrigin(r *http.Request) bool {
 			scheme = "https"
 		}
 	}
-	return r.Header.Get("Origin") == scheme+"://"+r.Host
+	origin, err := url.Parse(r.Header.Get("Origin"))
+	if err != nil || origin.Scheme != scheme || origin.Host == "" || origin.User != nil || origin.Path != "" || origin.RawQuery != "" || origin.ForceQuery || origin.Fragment != "" {
+		return false
+	}
+	// Browsers omit default ports and normalize DNS host casing. CGI servers
+	// may keep an explicit :80/:443 in HTTP_HOST. Do not trust forwarded headers.
+	canonical := func(host string) string {
+		u, err := url.Parse(scheme + "://" + host)
+		if err != nil || u.Hostname() == "" || u.User != nil || u.Path != "" {
+			return ""
+		}
+		port := u.Port()
+		if port == "" {
+			if scheme == "https" {
+				port = "443"
+			} else {
+				port = "80"
+			}
+		}
+		return strings.ToLower(u.Hostname()) + ":" + port
+	}
+	return canonical(origin.Host) != "" && canonical(origin.Host) == canonical(r.Host)
 }
 
-func gateway(configDir string, target *url.URL, access func(context.Context, string) bool) http.Handler {
+func gateway(configDir string, target *url.URL, access func(context.Context, string) authResult) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -181,7 +255,7 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 			return
 		}
 		if r.Method == http.MethodPost && !sameOrigin(r) {
-			http.Error(w, "Origin rejected", 403)
+			authError(w, authResult{403, "origin_rejected"})
 			return
 		}
 		if r.URL.Path == strings.TrimSuffix(gatewayPath, "/") {
@@ -201,8 +275,12 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 			var input struct {
 				Session string `json:"session"`
 			}
-			if json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&input) != nil || !access(r.Context(), input.Session) {
-				http.Error(w, "LuCI session expired or access denied", 401)
+			if json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&input) != nil {
+				authError(w, authResult{400, "invalid_request"})
+				return
+			}
+			if result := access(r.Context(), input.Session); result.Status != 0 {
+				authError(w, result)
 				return
 			}
 			http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: input.Session, Path: gatewayPath, HttpOnly: true, Secure: r.URL.Scheme == "https" || r.TLS != nil, SameSite: http.SameSiteStrictMode})
@@ -210,8 +288,12 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 			return
 		}
 		cookie, err := r.Cookie(sessionCookie)
-		if err != nil || !access(r.Context(), cookie.Value) {
-			http.Error(w, "LuCI 登录已失效，请刷新路由器后台。", 401)
+		if err != nil {
+			authError(w, authResult{401, "session_expired"})
+			return
+		}
+		if result := access(r.Context(), cookie.Value); result.Status != 0 {
+			authError(w, result)
 			return
 		}
 		if path == "graphql" && r.Method != http.MethodPost {
