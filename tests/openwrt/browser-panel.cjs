@@ -1,4 +1,5 @@
 /* Run with native_panel.py. API-only; proxy start is fault-injected, never loads eBPF. */
+/* global L -- provided by the LuCI page inside page.evaluate bodies. */
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -454,7 +455,7 @@ async function login(page, url = base) {
     await search.fill('');
     const large = await gql('mutation {importSubscription(rollbackError:true,arg:{tag:"Workspace 1000",link:"http://127.0.0.1:18081/sub-large"}){sub{id} nodeImportResult{node{id}}}}');
     assert.equal(large.importSubscription.nodeImportResult.length, 1000);
-    const largeId = large.importSubscription.sub.id;
+    assert.ok(large.importSubscription.sub.id, 'importing 1000 nodes must return the subscription id');
     await page.reload({ waitUntil: 'domcontentloaded' });
     await nodes.locator('[data-node-scroll]').waitFor();
     assert.equal(await nodes.locator('[data-node-id]').count(), 7, '1000 subscription nodes must not enter the manual list');
@@ -677,7 +678,8 @@ async function login(page, url = base) {
     assert.equal(new Set(pageOrderAfter).size, 20);
     console.log('PASS: manual continuous list keyboard sorting uses full-library indices and retains hidden ordering');
     // Fault injection tests control states only. Run is NEVER forwarded to the daemon.
-    let runRequests = [], fakeRunning = false, fakeModified = true, failRun = true;
+    const runRequests = [];
+    let fakeRunning = false, fakeModified = true, failRun = true;
     await page.route('**/cgi-bin/daed-router/graphql', async route => {
       const payload = route.request().postDataJSON();
       if (/mutation Run\b/.test(payload.query)) {

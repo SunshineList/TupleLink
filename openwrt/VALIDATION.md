@@ -1,4 +1,8 @@
-# 0.6.30 升级后的 DNS 与分流恢复
+# 验证记录
+
+每个发行版本的验证范围、可复现问题与发布门禁。新版本记录追加在最前面。
+
+## 0.6.30 升级后的 DNS 与分流恢复
 
 日期：2026-10-21；分支：`codex/upgrade-recovery`。
 测试发行：[openwrt-v0.6.30](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.30)。
@@ -13,7 +17,7 @@
 
 ---
 
-# 0.6.29 协议编辑与 UDP 诊断
+## 0.6.29 协议编辑与 UDP 诊断
 
 日期：2026-10-21；分支：`codex/protocol-editor-compat`。
 测试发行：[openwrt-v0.6.29](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.29)。
@@ -33,7 +37,7 @@
 
 ---
 
-# 0.6.28 DNS 查询隔离与连接诊断
+## 0.6.28 DNS 查询隔离与连接诊断
 
 日期：2026-10-21；分支：`codex/dns-query-isolation`。
 测试发行：[openwrt-v0.6.28](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.28)。
@@ -52,7 +56,7 @@
 
 ---
 
-# 0.6.27 DNS 连接与取消恢复
+## 0.6.27 DNS 连接与取消恢复
 
 日期：2026-10-21；分支：`codex/core-first-open-stability`。
 测试发行：[openwrt-v0.6.27](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.27)。
@@ -69,7 +73,7 @@
 
 ---
 
-# 0.6.26 运行日志实时跟随
+## 0.6.26 运行日志实时跟随
 
 日期：2026-10-20；分支：`codex/live-log-follow`。
 测试发行：[openwrt-v0.6.26](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.26)。
@@ -86,7 +90,7 @@
 
 ---
 
-# 0.6.25 首次连接恢复
+## 0.6.25 首次连接恢复
 
 日期：2026-10-20；分支：`codex/first-connection-recovery`。
 测试发行：[openwrt-v0.6.25](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.25)。
@@ -103,7 +107,7 @@
 
 ---
 
-# 0.6.24 紧凑节点卡片
+## 0.6.24 紧凑节点卡片
 
 日期：2026-10-20；分支：`codex/compact-node-cards`。
 测试发行：[openwrt-v0.6.24](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.24)。
@@ -118,7 +122,7 @@
 
 ---
 
-# 0.6.23 节点卡片布局调整
+## 0.6.23 节点卡片布局调整
 
 日期：2026-10-20；分支：`codex/node-card-layout`。
 测试发行：[openwrt-v0.6.23](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.23)。
@@ -134,7 +138,7 @@
 
 ---
 
-# 0.6.22 基础驻留内存优化
+## 0.6.22 基础驻留内存优化
 
 日期：2026-10-20；分支：`codex/memory-footprint`。
 测试发行：[openwrt-v0.6.22](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.22)。
@@ -152,7 +156,7 @@
 
 ---
 
-# 0.6.21 菜单切换性能与加载可靠性
+## 0.6.21 菜单切换性能与加载可靠性
 
 日期：2026-10-20；分支：`codex/menu-navigation-performance`。
 测试发行：[openwrt-v0.6.21](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.21)。
@@ -169,7 +173,7 @@
 
 ---
 
-# 0.6.20 32 位内核与断线恢复复核
+## 0.6.20 32 位内核与断线恢复复核
 
 日期：2026-10-20；分支：`codex/32bit-dataplane-audit`。
 测试发行：[openwrt-v0.6.20](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.20)。
@@ -189,7 +193,7 @@
 
 ---
 
-# 0.6.19 多架构试验支持
+## 0.6.19 多架构试验支持
 
 日期：2026-10-20；分支：`codex/multiarch-support`。
 测试发行：[openwrt-v0.6.19](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.19)。
@@ -207,7 +211,7 @@
 
 ---
 
-# 0.6.18 更新下载恢复
+## 0.6.18 更新下载恢复
 
 日期：2026-10-20；分支：`codex/update-download-recovery`。
 测试发行：[openwrt-v0.6.18](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.18)。
@@ -227,7 +231,7 @@
 
 ---
 
-# 0.6.17 第二轮稳定性检查
+## 0.6.17 第二轮稳定性检查
 
 日期：2026-10-20；分支：`codex/stability-second-pass`。
 测试发行：[openwrt-v0.6.17](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.17)。
@@ -247,7 +251,7 @@
 
 ---
 
-# 0.6.16 连接稳定性检查
+## 0.6.16 连接稳定性检查
 
 日期：2026-10-20；分支：`codex/connection-stability`。
 测试发行：[openwrt-v0.6.16](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.16)。
@@ -266,7 +270,7 @@
 
 ---
 
-# 0.6.15 安装管理菜单验证
+## 0.6.15 安装管理菜单验证
 
 日期：2026-10-20；分支：`codex/installer-menu`。
 测试发行：[openwrt-v0.6.15](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.15)。
@@ -283,7 +287,7 @@
 
 ---
 
-# 0.6.14 NaiLink 改名验证
+## 0.6.14 NaiLink 改名验证
 
 日期：2026-10-20；分支：`codex/nailink-brand`。
 测试发行：[openwrt-v0.6.14](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.14)。
@@ -299,7 +303,7 @@
 
 ---
 
-# 0.6.13 稳定性检查与优化
+## 0.6.13 稳定性检查与优化
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.13](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.13)。
@@ -336,7 +340,7 @@
 
 ---
 
-# 0.6.12 无响应 SS 测试取消验证
+## 0.6.12 无响应 SS 测试取消验证
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.12](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.12)。
@@ -365,7 +369,7 @@
 
 ---
 
-# 0.6.11 协议兼容验证
+## 0.6.11 协议兼容验证
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.11](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.11)。
@@ -401,7 +405,7 @@ python3 tests/openwrt/protocol_interop.py --wing /path/to/wing --sing-box /path/
 
 ---
 
-# 0.6.10 验证记录
+## 0.6.10 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.10](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.10)。
@@ -432,7 +436,7 @@ python3 tests/openwrt/protocol_interop.py --wing /path/to/wing --sing-box /path/
 
 ---
 
-# 0.6.9 验证记录
+## 0.6.9 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.9](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.9)。
@@ -459,7 +463,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.8 验证记录
+## 0.6.8 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.8](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.8)。
@@ -488,7 +492,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.7 验证记录
+## 0.6.7 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.7](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.7)。
@@ -513,7 +517,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.6 验证记录
+## 0.6.6 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.6](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.6)。
@@ -539,7 +543,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.5 验证记录
+## 0.6.5 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.5](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.5)。
@@ -568,7 +572,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.4 验证记录
+## 0.6.4 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.4](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.4)。
@@ -609,7 +613,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.3 验证记录
+## 0.6.3 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.3](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.3)。
@@ -643,7 +647,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.2 验证记录
+## 0.6.2 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.2)。
@@ -673,7 +677,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.1 验证记录
+## 0.6.1 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.1)。
@@ -703,7 +707,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.6.0 验证记录
+## 0.6.0 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.6.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.6.0)。
@@ -739,7 +743,7 @@ API-only 隔离验证，未在宿主加载 eBPF，代理启停使用故障注入
 
 ---
 
-# 0.5.1 验证记录
+## 0.5.1 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.5.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.5.1)。
@@ -771,7 +775,7 @@ R4S 实机安装或修改现有配置。
 
 ---
 
-# 0.5.0 验证记录
+## 0.5.0 验证记录
 
 日期：2026-10-19；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.5.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.5.0)。
@@ -820,7 +824,7 @@ R4S 实机安装或修改现有配置。
 
 ---
 
-# 0.4.0 验证记录
+## 0.4.0 验证记录
 
 日期：2026-10-18；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.4.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.4.0)。
@@ -865,7 +869,7 @@ eBPF 或修改用户路由器。手机验证是浏览器设备模拟，ARM64 运
 
 ---
 
-# 0.3.2 验证记录
+## 0.3.2 验证记录
 
 日期：2026-10-18；分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.3.2](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.2)。
@@ -902,7 +906,7 @@ R4S 上的真实 eBPF、DNS、LAN 流量及长期运行仍待升级后实机验�
 
 ---
 
-# 0.3.1 验证记录
+## 0.3.1 验证记录
 
 日期：2026-10-18。工作分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.3.1](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.1)。
@@ -945,7 +949,7 @@ R4S 上真实订阅的最终导入、真实 eBPF / LAN IPv4/IPv6 / DNS 流量、
 
 ---
 
-# 0.3.0 验证记录
+## 0.3.0 验证记录
 
 日期：2026-10-18。工作分支：`codex/openwrt-plugin`。
 测试发行：[openwrt-v0.3.0](https://github.com/slobys/daed/releases/tag/openwrt-v0.3.0)。

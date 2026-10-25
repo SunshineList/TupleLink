@@ -43,4 +43,31 @@ export default antfu(
       'perfectionist/sort-imports': 'off',
     },
   },
+  {
+    // Playwright fixtures. These drive a live LuCI panel and report to an
+    // operator, so several defaults fight the file's purpose:
+    //
+    // - `console.log` is how a fixture prints its PASS line.
+    // - `process.env` is the documented configuration surface
+    //   (`DAED_PANEL_URL`, `DAED_PANEL_CONTROL`, `DAED_GROUP_OUTPUT`, ...).
+    // - `innerText` is deliberate: `textContent` also returns `display:none`
+    //   copy, so assertions would pass on text the user cannot see.
+    // - `prefer-template`, `one-var` and import sorting are pure formatting;
+    //   these files are long, hand-tuned selectors and rewriting them would
+    //   bury real changes in noise.
+    // - `ui.test.cjs` loads each LuCI view module the only way it can: it
+    //   wraps the file in a function and evaluates it against a fake `L`,
+    //   which requires the Function constructor.
+    files: ['tests/openwrt/*.cjs'],
+    rules: {
+      'no-console': 'off',
+      'no-new': 'off',
+      'no-new-func': 'off',
+      'node/prefer-global/process': 'off',
+      'one-var': 'off',
+      'perfectionist/sort-imports': 'off',
+      'prefer-template': 'off',
+      'unicorn/prefer-dom-node-text-content': 'off',
+    },
+  },
 )
