@@ -5,11 +5,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DaeEditor } from '~/components/DaeEditor'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
+import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { generateDNSConfig, parseDNSConfig } from './parser'
+import { DNS_UPSTREAM_PRESETS } from './presets'
 import { RoutingList } from './RoutingList'
 import { UpstreamList } from './UpstreamList'
 
@@ -81,6 +83,28 @@ export function DNSForm({ initialName = '', initialConfig = '', bindGetValues }:
         </TabsList>
 
         <TabsContent value="simple" className="space-y-8 pt-2">
+          <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
+            <p className="text-xs font-medium">{t('dnsConfig.presetTitle')}</p>
+            <div className="flex flex-wrap gap-2">
+              {DNS_UPSTREAM_PRESETS.map((item) => (
+                <Button
+                  key={item.id}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-9"
+                  title={t(item.hintKey)}
+                  onClick={() =>
+                    setParsedConfig({ ...parsedConfig, upstreams: item.upstreams.map((upstream) => ({ ...upstream })) })
+                  }
+                >
+                  {t(item.labelKey)}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">{t('dnsConfig.presetHint')}</p>
+          </div>
+
           <UpstreamList
             upstreams={parsedConfig.upstreams}
             onChange={(upstreams) => setParsedConfig({ ...parsedConfig, upstreams })}

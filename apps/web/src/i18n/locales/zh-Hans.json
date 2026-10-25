@@ -420,7 +420,27 @@
     "matcherPlaceholder": "匹配规则 (如 qname(geosite:cn))",
     "targetPlaceholder": "目标",
     "upstreamNamePlaceholder": "名称 (如 alidns)",
-    "upstreamLinkPlaceholder": "链接 (如 udp://223.5.5.5:53)"
+    "upstreamLinkPlaceholder": "链接 (如 udp://223.5.5.5:53)",
+    "presetTitle": "用预设填好上游",
+    "presetHint": "预设只填写上游列表，确认后仍要你自己保存；分流规则不会被改动。",
+    "presets": {
+      "cn-direct": {
+        "label": "国内直连",
+        "hint": "国内域名走阿里 UDP DNS，境外走 Google DNS 兜底，最不容易出错。"
+      },
+      "plain": {
+        "label": "Cloudflare",
+        "hint": "Cloudflare UDP 解析，Google DNS 兜底。"
+      },
+      "doh": {
+        "label": "DoH 加密解析",
+        "hint": "运营商封 53 端口或公共 WiFi 劫持 DNS 时用这个。"
+      },
+      "ipv6": {
+        "label": "纯 IPv6",
+        "hint": "只有 v6 出口的机器，避免 EAI_AGAIN 报错。"
+      }
+    }
   },
   "panel": {
     "title": "代理管理",
