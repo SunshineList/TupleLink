@@ -606,5 +606,17 @@
     "editorFailed": "The code editor failed to load. You can keep editing as plain text, or refresh the page to retry.",
     "editorLabel": "Configuration code",
     "editorLoading": "Loading the code editor…"
+  },
+  "network": {
+    "title": "Network check",
+    "description": "Read-only probes of the current datapath. Nothing is installed or reconfigured.",
+    "run": "Run check",
+    "running": "Running…",
+    "empty": "Run the check to see interfaces, routes, service state and HTTPS results.",
+    "failed": "The router did not return a report.",
+    "truncated": "The report was longer than 32 KiB; only the end is shown.",
+    "copy": "Copy report",
+    "copied": "Report copied",
+    "open": "Open network check"
   }
 }

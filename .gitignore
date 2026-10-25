@@ -33,5 +33,5 @@ __pycache__/
 # local verification harness (not part of the package)
 harness.mjs
 shot*.mjs
-probe.mjs
+probe*.mjs
 .firecrawl/

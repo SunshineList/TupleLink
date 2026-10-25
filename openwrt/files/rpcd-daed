@@ -5,11 +5,45 @@ set -e
 
 case "${1:-}" in
 list)
-	printf '%s\n' '{"status":{},"logs":{},"action":{"action":""}}'
+	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"action":{"action":""}}'
 	;;
 call)
 	case "${2:-}" in
 	status) /usr/libexec/daed/check ;;
+	network)
+		# The panel can only reach this script, so the diagnostic that explains a
+		# broken datapath used to be SSH-only. It is read-only by design: it never
+		# touches UCI, the database, routes, firewall or services. Cap the wall clock
+		# so a hung probe cannot pin an rpcd worker, and cap the bytes so a huge
+		# ruleset cannot blow up the JSON reply.
+		json_init
+		tmp=$(mktemp /tmp/daed-network.XXXXXX) || { json_add_string output ''; json_add_boolean truncated 0; json_dump; exit 0; }
+		/usr/libexec/daed/network-check >"$tmp" 2>&1 &
+		pid=$!
+		# Poll instead of sleeping once: killing a watchdog that sits in a long
+		# sleep leaves that sleeper behind, and a short sleep bounds the orphan.
+		(
+			remaining=45
+			while [ "$remaining" -gt 0 ]; do
+				kill -0 "$pid" 2>/dev/null || exit 0
+				sleep 1
+				remaining=$((remaining - 1))
+			done
+			kill -TERM "$pid" 2>/dev/null || :
+		) >/dev/null 2>&1 &
+		watchdog=$!
+		status=0
+		wait "$pid" 2>/dev/null || status=$?
+		kill -TERM "$watchdog" 2>/dev/null || :
+		wait "$watchdog" 2>/dev/null || :
+		size=$(wc -c <"$tmp" 2>/dev/null || echo 0)
+		output=$(tail -c 32768 "$tmp" 2>/dev/null) || output=''
+		rm -f "$tmp"
+		json_add_string output "$output"
+		json_add_boolean truncated "$([ "${size:-0}" -gt 32768 ] && echo 1 || echo 0)"
+		[ "$status" = 0 ] || json_add_string note 'The check exited early; the output above may be incomplete.'
+		json_dump
+		;;
 	logs)
 		json_init
 		logs=$(tail -c 32768 /var/log/daed/daed.log 2>/dev/null | tail -n 120 | \

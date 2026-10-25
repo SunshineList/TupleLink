@@ -1,11 +1,12 @@
 import { useIsMutating } from '@tanstack/react-query'
-import { Activity, Power, Stethoscope } from 'lucide-react'
+import { Activity, Network, Power, Stethoscope } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useGeneralQuery, useRunMutation } from '~/apis'
 import { CommunityLinks } from '~/components/CommunityLinks'
+import { NetworkCheckDialog } from '~/components/NetworkCheckDialog'
 import { HealthChip, RouterHealth } from '~/components/RouterHealth'
 import { ThemePicker } from '~/components/ThemePicker'
 import { Button } from '~/components/ui/button'
@@ -28,6 +29,7 @@ export function RouterHeader() {
   const status = useRouterStatus()
   const health = summariseHealth(status.data)
   const [healthOpen, setHealthOpen] = useState(false)
+  const [networkOpen, setNetworkOpen] = useState(false)
   const run = useRunMutation()
   const saving =
     useIsMutating({ predicate: (mutation) => mutation.options.mutationKey?.[0] !== 'node-latency-test' }) > 0
@@ -149,9 +151,24 @@ export function RouterHeader() {
                 {t('health.blockedHint')}
               </p>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => {
+                // Both are Radix modals; closing the sheet first keeps a single
+                // focus trap instead of stacking two and losing pointer events.
+                setHealthOpen(false)
+                setNetworkOpen(true)
+              }}
+            >
+              <Network aria-hidden="true" />
+              {t('network.open')}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
+      <NetworkCheckDialog open={networkOpen} onOpenChange={setNetworkOpen} />
     </header>
   )
 }

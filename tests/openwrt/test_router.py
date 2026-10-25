@@ -423,6 +423,49 @@ echo '{"ready":true,"phase":"ready"}' > /tmp/readiness''')
         self.assertTrue(json.loads(result.stdout)["success"])
         self.assertFalse((self.root / "tmp/daemon-running").exists())
 
+    def test_rpc_network_reports_the_check_without_touching_the_router(self):
+        self.managed()
+        self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
+        self.script("/usr/libexec/daed/network-check", '''echo 'NaiLink network check v2 (configuration read-only)'
+echo '[Default routes]'
+echo 'default via 192.168.5.1 dev br-lan proto static'
+echo 'marker reached' >> /tmp/network-check-calls''')
+        config = (self.root / "etc/config/daed").read_bytes()
+        result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "network")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("default via 192.168.5.1 dev br-lan proto static", payload["output"])
+        self.assertFalse(payload["truncated"])
+        self.assertNotIn("note", payload)
+        # Read-only: the check must not be able to change service state.
+        self.assertEqual((self.root / "etc/config/daed").read_bytes(), config)
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+
+    def test_rpc_network_bounds_a_report_that_never_ends(self):
+        self.managed()
+        self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
+        # A probe that keeps printing without ever exiting must be cut off, and the
+        # reply must stay inside the RPC size cap. Stub sleep so the 45s watchdog
+        # burns its budget instantly instead of stalling the suite.
+        self.script("/bin/sleep", "exit 0")
+        self.script(
+            "/usr/libexec/daed/network-check",
+            'i=0\nwhile [ "$i" -lt 3000 ]; do echo "filler line that keeps the pipe busy"; i=$((i+1)); done\nwhile :; do sleep 1; done',
+        )
+        result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "network")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["truncated"], "a runaway report must be reported as truncated")
+        self.assertLessEqual(len(payload["output"]), 32768)
+
+    def test_rpc_network_notes_an_early_exit(self):
+        self.managed()
+        self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
+        self.script("/usr/libexec/daed/network-check", "echo 'partial report'; exit 3")
+        payload = json.loads(self.run_router("/usr/libexec/rpcd/daed-router", "call", "network").stdout)
+        self.assertIn("partial report", payload["output"])
+        self.assertIn("exited early", payload["note"])
+
     def test_rpc_toggles_the_boot_symlink_and_reports_it(self):
         self.managed()
         self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)

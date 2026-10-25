@@ -606,5 +606,17 @@
     "editorFailed": "代码编辑器加载失败，可继续使用文本模式编辑，或刷新页面后重试。",
     "editorLabel": "配置代码",
     "editorLoading": "正在加载代码编辑器…"
+  },
+  "network": {
+    "title": "网络检查",
+    "description": "对当前数据通路做只读探测，不安装也不修改任何配置。",
+    "run": "开始检查",
+    "running": "检查中…",
+    "empty": "运行检查后可查看接口、路由、服务状态和 HTTPS 结果。",
+    "failed": "路由器未返回报告。",
+    "truncated": "报告超过 32 KiB，仅显示末尾部分。",
+    "copy": "复制报告",
+    "copied": "报告已复制",
+    "open": "打开网络检查"
   }
 }
