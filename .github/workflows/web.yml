@@ -1,0 +1,60 @@
+name: Web
+
+on:
+  push:
+    branches: [main]
+    paths: &web-paths
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'eslint.config.js'
+      - '.lintstagedrc.yml'
+      - '.prettierrc'
+      - 'turbo.json'
+      - 'tsconfig.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/web.yml'
+  pull_request:
+    paths: *web-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6.0.9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # `pnpm lint` runs eslint with --fix, which would make CI rewrite the
+      # checkout and hide the diff. `lint:check` is the read-only variant.
+      - name: Lint
+        run: pnpm lint:check
+
+      # The unit tests live in packages/* as well as apps/web, so this runs the
+      # whole workspace rather than only the app. `turbo run test` builds
+      # dependencies first, which is what the package tests import.
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Types
+        run: pnpm check-types
+
+      # `build:openwrt` is the artifact the router actually installs, so the
+      # bundle is built here too: a change that breaks the openwrt entry point
+      # (a top-level await, an incompatible dynamic import) fails in CI instead
+      # of during a release.
+      - name: Router bundle
+        run: pnpm --dir apps/web build:openwrt

@@ -12,6 +12,7 @@ PREPARE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PREPARE)
 SOURCES = (
     "webrender/webrender.go",
+    "graphql/service/general/interface_resolver.go",
     "graphql/service/config/mutation_utils.go",
     "graphql/service/dns/mutation_utils.go",
     "graphql/service/routing/mutation_utils.go",
