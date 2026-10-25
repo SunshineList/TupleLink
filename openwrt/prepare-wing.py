@@ -174,6 +174,33 @@ def router_udp_pool_test(text):
     return text[:begin] + test + text[end:]
 
 
+def router_default_routes(text):
+    # netlink only leaves Route.Dst nil when the kernel omits RTA_DST. The kernel
+    # normally sends an explicit 0.0.0.0/0 (or ::/0) attribute for a default
+    # route, so the upstream `route.Dst != nil` test discarded every default
+    # route on a stock OpenWrt router. The panel builds its WAN interface list
+    # from this field, so the list came back empty and only "auto" was offered.
+    text = text.replace('\t\tfor _, route := range rs {\n\t\t\tif route.Dst != nil {\n\t\t\t\tcontinue\n\t\t\t}',
+                        '\t\tfor _, route := range rs {\n\t\t\tif !isDefaultRoute(route) {\n\t\t\t\tcontinue\n\t\t\t}', 1)
+    if 'func isDefaultRoute(' in text:
+        return text
+    return text + '''
+// isDefaultRoute reports whether the route has no destination prefix. The kernel
+// may either omit RTA_DST or send an explicit all-zero prefix, so both an
+// unspecified destination and a zero-length mask count as default.
+func isDefaultRoute(route netlink.Route) bool {
+\tif route.Dst == nil {
+\t\treturn true
+\t}
+\tif route.Dst.IP == nil || route.Dst.Mask == nil {
+\t\treturn false
+\t}
+\tones, bits := route.Dst.Mask.Size()
+\treturn bits > 0 && ones == 0
+}
+'''
+
+
 def _prepare_in_place(root):
     target = root / "graphql/service/subscription"
     source = target / "mutation_utils.go"
@@ -273,6 +300,7 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
     # Keep latency fixes in the release source, without changing submodule pins.
     patches = {
         "webrender/webrender.go": ("24edc6844f7683ef8cfc6f3e9f8a4345cd9527c9725cbfe4b0f0898a455f5dc9", lambda value: value.replace('statigz.FileServer(webFS.', 'routerFileServer(webFS.', 1)),
+        "graphql/service/general/interface_resolver.go": ("5c226718ba6130926b3a42c77089b37ee389caeb9e481d59aecfc8a25c39ab3d", router_default_routes),
         "graphql/service/config/mutation_utils.go": ("f57a5aa16fec110ff2906046aed26897d7ca22308200a45d85394602ab8113c3", router_transactions),
         "graphql/service/dns/mutation_utils.go": ("229f064ba7f4004f1bbdf2c0494f0cffc7cfd57c4c692c0e0f00b704351a1e89", router_transactions),
         "graphql/service/routing/mutation_utils.go": ("651bbbccbf1288da50dfffce15f70ae02434ac1b84be423574f54a382798c2a7", router_transactions),
@@ -378,6 +406,7 @@ type Mutation {
         ("dae-core/common/subscription/router_sip008.go", "sip008.go"),
         ("dae-core/common/subscription/router_sip008_test.go", "sip008_test.go"),
         ("graphql/service/node/router_protocol_interop_test.go", "protocol_interop_test.go"),
+        ("graphql/service/general/router_default_route_test.go", "router_default_route_test.go"),
     ):
         destination = root / relative
         data = (HERE / "wing" / source).read_bytes()
@@ -426,6 +455,7 @@ def prepare(root):
     # unknown edit in a late file must not leave earlier sources half updated.
     inputs = (
         "webrender/webrender.go",
+        "graphql/service/general/interface_resolver.go",
         "cmd/run.go", "dae/run.go", "dae/httpclient.go", "dae/runtime.go",
         "graphql/mutation.go", "graphql/root_schema.go", "graphql/service/config/mutation_utils.go",
         "graphql/service/dns/mutation_utils.go", "graphql/service/routing/mutation_utils.go",
