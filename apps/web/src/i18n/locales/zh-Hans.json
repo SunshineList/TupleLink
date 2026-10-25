@@ -757,5 +757,50 @@
     "geodataUpdate": "一键更新规则库",
     "latestVersion": "最新版本",
     "checkAria": "NaiLink 版本 {{version}}，检查更新"
+  },
+  "routingPresets": {
+    "open": "快捷添加",
+    "hint": "把规则加进当前选中的分流配置，位置在 fallback 之前。",
+    "alreadyAdded": "这条规则已经在当前分流里了。",
+    "added": "已添加 {{count}} 条规则。",
+    "needsGroup": "请先创建一个代理群组。",
+    "items": {
+      "ad-block": {
+        "label": "广告拦截",
+        "hint": "category-ads-all 走直连"
+      },
+      "netflix": {
+        "label": "Netflix",
+        "hint": "走代理群组"
+      },
+      "disney": {
+        "label": "Disney+",
+        "hint": "走代理群组"
+      },
+      "youtube": {
+        "label": "YouTube",
+        "hint": "走代理群组"
+      },
+      "telegram": {
+        "label": "Telegram",
+        "hint": "按 Telegram IP 段分流"
+      },
+      "ai": {
+        "label": "AI 服务",
+        "hint": "OpenAI 与 Anthropic 域名"
+      },
+      "cn-direct": {
+        "label": "国内直连",
+        "hint": "geosite:cn 走直连"
+      },
+      "lan-direct": {
+        "label": "内网直连",
+        "hint": "私有地址走直连"
+      },
+      "game-udp": {
+        "label": "游戏 UDP 直连",
+        "hint": "1000 以上 UDP 直连，避免掉线"
+      }
+    }
   }
 }

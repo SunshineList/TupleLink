@@ -757,5 +757,50 @@
     "geodataUpdate": "Update the rule set",
     "latestVersion": "latest",
     "checkAria": "NaiLink version {{version}}, check for updates"
+  },
+  "routingPresets": {
+    "open": "Quick add",
+    "hint": "Adds the rule to the selected routing set, just above the fallback line.",
+    "alreadyAdded": "That rule is already in this routing set.",
+    "added": "Added {{count}} rule(s).",
+    "needsGroup": "Create a proxy group first.",
+    "items": {
+      "ad-block": {
+        "label": "Block ads",
+        "hint": "geosite:category-ads-all goes direct"
+      },
+      "netflix": {
+        "label": "Netflix",
+        "hint": "Stream through the proxy group"
+      },
+      "disney": {
+        "label": "Disney+",
+        "hint": "Stream through the proxy group"
+      },
+      "youtube": {
+        "label": "YouTube",
+        "hint": "Stream through the proxy group"
+      },
+      "telegram": {
+        "label": "Telegram",
+        "hint": "Route by Telegram IP ranges"
+      },
+      "ai": {
+        "label": "AI services",
+        "hint": "OpenAI and Anthropic domains"
+      },
+      "cn-direct": {
+        "label": "China direct",
+        "hint": "geosite:cn goes direct"
+      },
+      "lan-direct": {
+        "label": "LAN direct",
+        "hint": "Private addresses go direct"
+      },
+      "game-udp": {
+        "label": "Game UDP direct",
+        "hint": "UDP above port 1000 goes direct, avoids disconnects"
+      }
+    }
   }
 }
