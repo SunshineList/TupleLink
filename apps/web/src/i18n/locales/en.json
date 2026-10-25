@@ -561,7 +561,8 @@
     "trafficTrend": "Traffic trend",
     "timeRange": "Time range",
     "totalTrafficShort": "Session traffic",
-    "statsUnavailable": "Updates unavailable"
+    "statsUnavailable": "Updates unavailable",
+    "logs": "Runtime log"
   },
   "importResource": {
     "optionalTag": "Label (optional)",
@@ -574,5 +575,50 @@
     "result": "UDP DNS",
     "target": "Target: {{target}}",
     "error": "UDP test request failed. Retry later or check the runtime log."
+  },
+  "health": {
+    "title": "System diagnostics",
+    "allGood": "Firmware ready",
+    "blocked": "{{count}} blocking issue(s)",
+    "warnings": "{{count}} warning(s)",
+    "allPassed": "All {{count}} checks passed. This firmware can load the proxy datapath.",
+    "passed": "{{count}} other checks passed.",
+    "noChecks": "This NaiLink version does not report diagnostics.",
+    "unavailable": "Diagnostics are available from the LuCI panel.",
+    "kernel": "kernel {{kernel}}",
+    "check": {
+      "system": "Firmware family",
+      "architecture": "CPU architecture",
+      "kernel": "Kernel version",
+      "btf": "BPF type information",
+      "kernel_datapath": "Kernel datapath",
+      "kernel_options": "Kernel BPF options",
+      "listen": "Management address",
+      "geosite.dat": "Domain rule data",
+      "geoip.dat": "IP rule data",
+      "other_dae": "Conflicting service: dae",
+      "other_passwall": "Conflicting service: Passwall",
+      "other_passwall2": "Conflicting service: Passwall2",
+      "other_openclash": "Conflicting service: OpenClash",
+      "other_mihomo": "Conflicting service: mihomo",
+      "other_sing-box": "Conflicting service: sing-box"
+    },
+    "open": "Open system diagnostics",
+    "description": "Read-only checks run by the router before the proxy starts.",
+    "blockedHint": "A blocking check must be resolved before the proxy can start. Fix the firmware or package listed above, then reopen this panel."
+  },
+  "logs": {
+    "title": "NaiLink runtime log",
+    "hintLive": "Refreshes every 2 seconds · following the latest entries",
+    "hintHistoryNew": "Viewing history · new entries available, jump to latest",
+    "hintHistory": "Viewing history · following paused",
+    "hintError": "Update failed · showing the last received log",
+    "pause": "Pause following",
+    "resume": "Jump to latest",
+    "readFailed": "Could not read the log. Check that you are still signed in to LuCI.",
+    "content": "Runtime log content",
+    "loading": "Reading log…",
+    "empty": "No log entries yet.",
+    "hostOnly": "Open the runtime log from the LuCI panel."
   }
 }

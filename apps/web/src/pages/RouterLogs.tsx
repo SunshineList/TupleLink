@@ -10,7 +10,7 @@ async function readRouterLogs() {
   const host = window.parent as Window & {
     L?: { require: (name: string) => Promise<{ declare: (spec: object) => () => Promise<{ logs?: string }> }> }
   }
-  if (host === window || !host.L?.require) throw new Error('请从路由器后台进入运行日志。')
+  if (host === window || !host.L?.require) throw new Error('LuCI host unavailable')
   const rpc = await host.L.require('rpc')
   return rpc.declare({ object: 'daed-router', method: 'logs', expect: {} })()
 }
@@ -64,18 +64,18 @@ export function RouterLogs() {
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-5" aria-label="运行日志">
+    <section className="rounded-2xl border bg-card p-5" aria-label={t('logs.title')}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold">NaiLink 运行日志</h2>
+          <h2 className="text-lg font-semibold">{t('logs.title')}</h2>
           <p id="router-log-hint" className="mt-1 text-xs text-muted-foreground" role="status">
             {query.isError
-              ? '更新失败，保留上次日志'
+              ? t('logs.hintError')
               : isFollowing
-                ? '每 2 秒刷新 · 自动跟随最新日志'
+                ? t('logs.hintLive')
                 : history !== liveLogs
-                  ? '正在查看历史 · 有新日志，点击回到最新'
-                  : '正在查看历史 · 已暂停跟随'}
+                  ? t('logs.hintHistoryNew')
+                  : t('logs.hintHistory')}
           </p>
         </div>
         <Button
@@ -86,12 +86,12 @@ export function RouterLogs() {
           onClick={isFollowing ? pauseFollowing : followLatest}
         >
           {isFollowing ? <Pause aria-hidden="true" /> : <ArrowDown aria-hidden="true" />}
-          {isFollowing ? '暂停跟随' : '回到最新'}
+          {t(isFollowing ? 'logs.pause' : 'logs.resume')}
         </Button>
       </div>
       {query.isError && (
         <p role="alert" className="mb-3 text-sm text-destructive">
-          日志读取失败，请检查后台登录状态。
+          {t('logs.readFailed')}
           <button className="ml-2 min-h-11 px-2 underline" onClick={() => query.refetch()}>
             {t('panel.retry')}
           </button>
@@ -101,7 +101,7 @@ export function RouterLogs() {
         id="router-log-output"
         ref={output}
         role="region"
-        aria-label="运行日志内容"
+        aria-label={t('logs.content')}
         aria-describedby="router-log-hint"
         tabIndex={0}
         onScroll={handleScroll}
@@ -116,7 +116,7 @@ export function RouterLogs() {
         className="max-h-[65dvh] overflow-auto whitespace-pre-wrap break-words text-sm outline-none [overflow-anchor:none] focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span ref={content} className="block">
-          {logs || (query.isPending ? '正在读取日志…' : '暂无日志。')}
+          {logs || t(query.isPending ? 'logs.loading' : 'logs.empty')}
         </span>
       </pre>
     </section>

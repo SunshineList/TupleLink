@@ -1,26 +1,33 @@
 import { useIsMutating } from '@tanstack/react-query'
-import { Activity, Power } from 'lucide-react'
+import { Activity, Power, Stethoscope } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useGeneralQuery, useRunMutation } from '~/apis'
 import { CommunityLinks } from '~/components/CommunityLinks'
+import { HealthChip, RouterHealth } from '~/components/RouterHealth'
 import { ThemePicker } from '~/components/ThemePicker'
 import { Button } from '~/components/ui/button'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '~/components/ui/sheet'
+import { useRouterStatus } from '~/hooks/useRouterStatus'
+import { summariseHealth } from '~/utils/router-health'
+
+const TITLES = {
+  dashboard: 'panel.dashboard',
+  logs: 'panel.logs',
+  resources: 'panel.resources',
+  advanced: 'panel.advanced',
+} as const
 
 export function RouterHeader() {
   const { t } = useTranslation()
   const { pathname } = useLocation()
-  const title =
-    pathname === '/logs'
-      ? '运行日志'
-      : pathname === '/resources'
-        ? t('panel.resources')
-        : pathname === '/advanced'
-          ? t('panel.advanced')
-          : t('panel.dashboard')
+  const title = TITLES[pathname.replace('/', '') as keyof typeof TITLES] ?? TITLES.dashboard
   const query = useGeneralQuery()
+  const status = useRouterStatus()
+  const health = summariseHealth(status.data)
+  const [healthOpen, setHealthOpen] = useState(false)
   const run = useRunMutation()
   const saving =
     useIsMutating({ predicate: (mutation) => mutation.options.mutationKey?.[0] !== 'node-latency-test' }) > 0
@@ -35,6 +42,9 @@ export function RouterHeader() {
     try {
       await run.mutateAsync(action === 'apply' ? false : running)
       toast.success(action === 'apply' ? t('panel.applied') : running ? t('panel.stopped') : t('panel.running'))
+      // Service state and diagnostics change together; refresh the checks so the
+      // header chip never reports a stale verdict after start/stop/apply.
+      void status.refetch()
     } catch {
       setFailed(true)
     }
@@ -44,10 +54,22 @@ export function RouterHeader() {
       <div className="router-toolbar mx-auto grid max-w-[1400px] items-center gap-3 px-4 py-3 lg:px-8">
         <div className="flex min-w-0 items-center gap-2.5">
           <Activity className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h1 className="text-base font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-base font-semibold tracking-tight">{t(title)}</h1>
         </div>
         <CommunityLinks />
         <div className="router-toolbar-actions flex flex-wrap items-center gap-2">
+          {health.level !== 'unknown' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="router-health-trigger h-auto min-h-0 px-1"
+              aria-label={t('health.open')}
+              aria-haspopup="dialog"
+              onClick={() => setHealthOpen(true)}
+            >
+              <HealthChip status={status.data} />
+            </Button>
+          )}
           <ThemePicker variant="compact" />
           <span
             role="status"
@@ -105,6 +127,26 @@ export function RouterHeader() {
           </div>
         )}
       </div>
+      <Sheet open={healthOpen} onOpenChange={setHealthOpen}>
+        <SheetContent side="right" size="lg" className="gap-0">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Stethoscope aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
+              {t('health.title')}
+            </SheetTitle>
+            <SheetDescription>{t('health.description')}</SheetDescription>
+          </SheetHeader>
+          <div className="overflow-y-auto px-4 pb-4">
+            <RouterHealth status={status.data} />
+            {status.isError && <p className="mt-3 text-xs text-muted-foreground">{t('health.unavailable')}</p>}
+            {health.level === 'error' && (
+              <p className="mt-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-xs text-destructive">
+                {t('health.blockedHint')}
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </header>
   )
 }
