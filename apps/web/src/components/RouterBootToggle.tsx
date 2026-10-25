@@ -7,10 +7,10 @@ import { useBootAction } from '~/hooks/useBootAction'
 import { cn } from '~/lib/utils'
 import { bootAction, bootState } from '~/utils/router-health'
 
-// Starting the proxy by hand only lasts until the next reboot. The router has
-// always exposed `boot_enable`/`boot_disable` through the same RPC object the
-// panel already reads, but nothing called them, so the only way to make the
-// proxy come back after a power cut was the LuCI init script page.
+// 手动启动的代理只能活到下次重启。路由器侧一直通过面板已经在用的
+// 同一套 RPC 对象暴露 `boot_enable`/`boot_disable`，
+// 但从来没人调用过，所以想让断电后代理自动回来，
+// 唯一的办法是去 LuCI 的 init 脚本页。
 export function RouterBootToggle({ status, className }: { status?: RouterStatus | null; className?: string }) {
   const { t } = useTranslation()
   const state = bootState(status)

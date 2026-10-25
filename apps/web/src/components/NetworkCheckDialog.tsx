@@ -8,9 +8,9 @@ import { ScrollableDialogBody, ScrollableDialogContent, ScrollableDialogHeader }
 import { useNetworkReport } from '~/hooks/useNetworkReport'
 import { parseNetworkReport } from '~/utils/network-report'
 
-// The report is the router's own text; only the section headers are lifted out so
-// a long run stays navigable. Rows keep their original spacing, including the tabs
-// in a resolver answer, which is why the body uses whitespace-pre-wrap.
+// 报告本身就是路由器自己输出的文本；这里只把段标题抽出来让长报告好导航。
+// 行与行的原始间距全部保留（包括 DNS 解析结果里的制表符），
+// 所以正文用 whitespace-pre-wrap。
 export function NetworkCheckDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { t } = useTranslation()
   const report = useNetworkReport()

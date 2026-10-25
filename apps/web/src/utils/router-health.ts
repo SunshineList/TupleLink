@@ -1,8 +1,8 @@
-// The router ships a read-only diagnostic payload from /usr/libexec/daed/check
-// (exposed as the `daed-router status` RPC). The panel used to ignore it, so a
-// firmware that cannot load eBPF looked identical to a healthy one until the
-// user pressed Start and read the log. These helpers keep the summarising logic
-// pure so it can be unit tested without a router.
+// 路由器侧会从 /usr/libexec/daed/check 产出一份只读诊断载荷
+// （通过 `daed-router status` RPC 暴露给面板）。以前面板完全忽略它，
+// 导致一个无法加载 eBPF 的固件看起来和健康固件一模一样，
+// 直到用户按下「启动」再看日志才发现。这里把这些辅助函数保持纯函数，
+// 这样不需要真机也可以跑单元测试。
 
 export type RouterCheckStatus = 'ok' | 'warning' | 'error'
 
@@ -33,7 +33,7 @@ export interface HealthSummary {
   ok: number
   warning: number
   error: number
-  // Checks that block starting the proxy, ordered as the router reported them.
+  // 会阻断代理启动的检查项，按路由器报告的顺序排列。
   blocking: RouterCheck[]
 }
 
@@ -63,8 +63,8 @@ export function summariseHealth(status?: RouterStatus | null): HealthSummary {
   return { level, ok, warning, error, blocking: checks.filter((check) => check.status === 'error') }
 }
 
-// A router-reported error means the proxy cannot start even though the service
-// itself may be installed, so it outranks the runtime state in the header chip.
+// 只要路由器报了 error，即使服务已经装好也无法启动代理，
+// 所以在头部胶囊里 error 的优先级高于运行时状态。
 export function serviceLevel(status?: RouterStatus | null): HealthLevel {
   const health = summariseHealth(status)
   if (health.level === 'error') return 'error'
@@ -81,8 +81,8 @@ export function attentionChecks(status?: RouterStatus | null): RouterCheck[] {
     .sort((a, b) => RANK[b.status] - RANK[a.status])
 }
 
-// `uninstalled` is what daed-check prints when /usr/share/daed-router/version is
-// missing, which happens on a half-removed install rather than a real release.
+// 当 /usr/share/daed-router/version 文件缺失时 daed-check 会输出字面量 `uninstalled`，
+// 这通常出现在卸载未彻底的场景，不是真正的版本号。
 export function formatVersion(status?: RouterStatus | null): string {
   const version = status?.version?.trim()
   if (!version || version === 'uninstalled') return ''
@@ -98,10 +98,10 @@ export function shouldOfferStart(status?: RouterStatus | null): boolean {
   return !!status && status.running === false && status.compatible !== false
 }
 
-// `autostart` mirrors /etc/init.d/daed enable, which is the only thing that
-// survives a reboot. `enabled` only says the daemon may run now, so the two
-// disagree as soon as the user stops the proxy on a boot-enabled install —
-// inferring one from the other would show the wrong switch position.
+// `autostart` 对应 /etc/init.d/daed enable，是唯一能跨重启保留的状态；
+// `enabled` 只表示守护进程当前允许运行。
+// 一旦在已开机自启的安装上手动停掉代理，两者就会不一致，
+// 相互推导会让开关位置显示错误。
 export type BootState = 'enabled' | 'disabled' | 'unknown'
 
 export function bootState(status?: RouterStatus | null): BootState {
@@ -109,8 +109,8 @@ export function bootState(status?: RouterStatus | null): BootState {
   return 'unknown'
 }
 
-// The action to send for the *opposite* of the current state, or null when the
-// router did not report one, so the switch stays disabled instead of guessing.
+// 发送与当前状态**相反**的动作；如果路由器没有上报状态则返回 null，
+// 让开关保持禁用而不是去猜。
 export function bootAction(state: BootState): 'boot_enable' | 'boot_disable' | null {
   if (state === 'enabled') return 'boot_disable'
   if (state === 'disabled') return 'boot_enable'

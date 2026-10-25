@@ -44,8 +44,8 @@ export function RouterHeader() {
     try {
       await run.mutateAsync(action === 'apply' ? false : running)
       toast.success(action === 'apply' ? t('panel.applied') : running ? t('panel.stopped') : t('panel.running'))
-      // Service state and diagnostics change together; refresh the checks so the
-      // header chip never reports a stale verdict after start/stop/apply.
+      // 服务状态和诊断是一起变的；重新拉一次检查项，
+      // 让头部胶囊在启动/停止/应用之后不会报过时的结论。
       void status.refetch()
     } catch {
       setFailed(true)
@@ -156,8 +156,8 @@ export function RouterHeader() {
               size="sm"
               className="mt-3"
               onClick={() => {
-                // Both are Radix modals; closing the sheet first keeps a single
-                // focus trap instead of stacking two and losing pointer events.
+                // 两个都是 Radix modal；先关掉抽屉再开对话框，
+                // 这样只会有一个 focus trap，不会因为叠两个而丢 pointer events。
                 setHealthOpen(false)
                 setNetworkOpen(true)
               }}

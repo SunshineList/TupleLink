@@ -5,9 +5,10 @@ interface LuCIRpc {
   declare: (spec: object) => (params?: object) => Promise<unknown>
 }
 
-// `daed-router action` is the only write the panel ACL grants. The shell helper
-// whitelists start|restart|stop|boot_enable|boot_disable and always answers
-// {"success": boolean}, so a rejected action resolves instead of throwing.
+// `daed-router action` 是面板 ACL 授予的唯一写权限。
+// 脚本侧白名单 start|restart|stop|boot_enable|boot_disable，
+// 并且始终返回 {"success": boolean}，
+// 所以被拒绝的动作会 resolve 而不是 throw。
 export type BootAction = 'boot_enable' | 'boot_disable'
 
 interface ActionResult {
@@ -30,8 +31,8 @@ export function useBootAction() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: callAction,
-    // The switch position is read from the status payload, so re-read it instead
-    // of assuming the write landed the way it was asked to.
+    // 开关位置读自 status 载荷，所以写完之后重新拉取，
+    // 不去假设写入已经按请求生效。
     onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY_ROUTER_STATUS }),
   })
 }

@@ -31,8 +31,8 @@ export function HealthDot({ level, className }: { level: HealthLevel; className?
   return <Icon aria-hidden="true" className={cn('h-3.5 w-3.5 shrink-0', LEVEL_TONE[level], className)} />
 }
 
-// Compact header summary: one chip that answers "will the proxy start, and is
-// anything wrong with this firmware" without opening the diagnostics panel.
+// 头部紧凑摘要：一个胶囊同时回答「代理能不能启动」和「这个固件有没有问题」，
+// 不用打开诊断抽屉。
 export function HealthChip({ status }: { status?: RouterStatus | null }) {
   const { t } = useTranslation()
   const health = summariseHealth(status)
@@ -74,9 +74,9 @@ function CheckRow({ check }: { check: RouterCheck }) {
   )
 }
 
-// The router already returns a full diagnostic payload; the panel used to drop it
-// on the floor, so an incompatible firmware looked identical to a healthy one
-// until the user pressed Start and read the log.
+// 路由器本来就会返回一份完整的诊断载荷；面板之前直接把它扔掉了，
+// 所以不兼容的固件看起来和健康固件一模一样，
+// 直到用户按下「启动」再去看日志。
 export function RouterHealth({ status, className }: { status?: RouterStatus | null; className?: string }) {
   const { t } = useTranslation()
   const checks = readChecks(status)

@@ -1,15 +1,14 @@
 /**
- * Reshape the router's network check into scannable rows.
+ * 把路由器侧的网络检查输出整理成便于浏览的行段。
  *
- * The script prints flat text: a few `key=value` lines, then `[Section]`
- * headers each followed by their own rows. Rendering it as one blob makes a
- * long report hard to navigate, so only the header lines are lifted out as
- * markers. Every other line is kept exactly as written — the report is evidence,
- * and reformatting a row would risk changing what it says.
+ * 脚本本身输出的是扁平文本：若干 `key=value` 行，然后每个 `[Section]` 标题后跟自己的行。
+ * 整坨渲染会让长报告很难导航，所以这里只把标题行抽出来当标记。
+ * 其他每一行都按原样保留 —— 这份报告是证据，
+ * 重排一行就有改语义的风险。
  */
 
 export interface NetworkSection {
-  /** Section title without the surrounding brackets, empty before the first one. */
+  /** 不含方括号的段标题；在遇到第一个段之前为空字符串。 */
   title: string
   lines: string[]
 }
@@ -27,7 +26,7 @@ export function parseNetworkReport(output: string): NetworkSection[] {
     current.lines.push(line)
   }
   if (current.lines.length || current.title) sections.push(current)
-  // Blank lines separate sections in the source; the header already does that.
+  // 源文本里空行分隔各段；这里标题已经做了分段，所以前后空行直接剪掉。
   for (const section of sections) {
     while (section.lines.length && !section.lines[0].trim()) section.lines.shift()
     while (section.lines.length && !section.lines.at(-1)?.trim()) section.lines.pop()

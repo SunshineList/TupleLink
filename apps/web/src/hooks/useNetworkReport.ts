@@ -10,9 +10,9 @@ export interface NetworkReport {
   note?: string
 }
 
-// The check runs on demand only: it opens HTTPS connections through whatever
-// datapath is active, so polling it would generate traffic the user never asked
-// for. The router caps the run at 45s and the reply at 32 KiB.
+// 检查只按需运行：它会通过当前活跃的数据通路开 HTTPS 连接，
+// 所以轮询它会产生用户没有要求的流量。
+// 路由器侧把单次运行上限设为 45s，响应上限设为 32 KiB。
 async function readNetworkReport(): Promise<NetworkReport> {
   const host = window.parent as Window & { L?: { require: (name: string) => Promise<LuCIRpc> } }
   if (host === window || !host.L?.require) throw new Error('LuCI host unavailable')
