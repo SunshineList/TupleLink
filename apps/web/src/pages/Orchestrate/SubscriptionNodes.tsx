@@ -267,7 +267,7 @@ export function SubscriptionNodes({
             ))}
             {!filtered.length && (
               <p className="col-span-full p-6 text-center text-sm text-muted-foreground">
-                {library.length ? t('panel.noMatches') : failure ? t('panel.subscriptionFailed', { reason: failure }) : t('panel.noNodes')}
+                {library.length ? t('panel.noMatches') : failure ? t('panel.noNodesAfterFailure') : t('panel.noNodes')}
               </p>
             )}
           </div>

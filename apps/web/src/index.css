@@ -1263,13 +1263,17 @@ form {
 .subscription-update-ok {
   color: var(--muted-foreground);
 }
-/* 后端把订阅失败原因写进 Status；这是用户唯一能看到的地方，别用灰色埋掉。 */
+/* 后端把订阅失败原因写进 Status；这是用户唯一能看到的地方，别用灰色埋掉。
+   卡片这一行太窄，截断到 22ch 只剩 "dial tcp: lookup example…" 这种没用的前缀，
+   所以放成两行的省略号，让 DNS 失败、超时、证书错误各自能读出来。 */
 .subscription-update-failed {
-  max-width: 22ch;
+  display: -webkit-box;
+  max-width: 46ch;
   overflow: hidden;
   color: oklch(0.68 0.14 62);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 .subscription-card-footer {
   display: flex;
