@@ -423,6 +423,22 @@ echo '{"ready":true,"phase":"ready"}' > /tmp/readiness''')
         self.assertTrue(json.loads(result.stdout)["success"])
         self.assertFalse((self.root / "tmp/daemon-running").exists())
 
+    def test_rpc_toggles_the_boot_symlink_and_reports_it(self):
+        self.managed()
+        self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
+        (self.root / "tmp/autostart").unlink(missing_ok=True)
+        result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "action", input='{"action":"boot_enable"}')
+        self.assertTrue(json.loads(result.stdout)["success"], result.stdout)
+        self.assertTrue((self.root / "tmp/autostart").exists())
+        self.assertTrue(json.loads(self.check().stdout)["autostart"])
+        result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "action", input='{"action":"boot_disable"}')
+        self.assertTrue(json.loads(result.stdout)["success"], result.stdout)
+        self.assertFalse((self.root / "tmp/autostart").exists())
+        self.assertFalse(json.loads(self.check().stdout)["autostart"])
+        # Boot actions only move the init symlink; they must not start or stop the daemon.
+        self.assertTrue((self.root / "tmp/daemon-running").exists())
+        self.assertIn("option enabled '1'", (self.root / "etc/config/daed").read_text())
+
     def test_sensitive_log_links_are_masked(self):
         self.managed(False)
         self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
