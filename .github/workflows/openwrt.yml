@@ -6,6 +6,7 @@ on:
       [
         'openwrt/**',
         'tests/openwrt/**',
+        'wing',
         'apps/web/src/utils/endpoint*',
         'apps/web/src/constants/default.ts',
         '.github/workflows/openwrt.yml',
