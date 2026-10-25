@@ -37,7 +37,9 @@
   },
   "dependencies": {
     "@daeuniverse/dae-lang-core": "workspace:*",
-    "@shikijs/monaco": "catalog:"
+    "@shikijs/engine-javascript": "catalog:",
+    "@shikijs/monaco": "catalog:",
+    "@shikijs/themes": "catalog:"
   },
   "devDependencies": {
     "@monaco-editor/react": "catalog:",

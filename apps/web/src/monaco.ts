@@ -16,28 +16,19 @@ import {
 // Import the browser LSP server worker
 import DaeLspWorker from '@daeuniverse/dae-lsp/server/browser?worker'
 import { loader } from '@monaco-editor/react'
-import * as monaco from 'monaco-editor'
+// editor.api.js carries the editor core without the bundled language
+// contributions (html/json/typescript + 130 basic-languages grammars). The
+// panel only ever opens the two grammars registered below, so the full
+// `monaco-editor` entry costs ~11 MB of dead assets in the router bundle.
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-import HtmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker'
-import JsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
-import TsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker'
 import { subscribeEditorCompletions } from '~/utils/editor-completions'
 
-// Configure Monaco workers for Vite
+// Configure Monaco workers for Vite. Only the editor worker is reachable: the
+// `routingA` and `dnsA` grammars are plain Monarch tokenizers with no worker,
+// and no html/json/typescript model is ever created.
 globalThis.MonacoEnvironment = {
-  getWorker(_, label) {
-    if (label === 'json') {
-      return new JsonWorker()
-    }
-
-    if (label === 'html') {
-      return new HtmlWorker()
-    }
-
-    if (label === 'typescript' || label === 'javascript') {
-      return new TsWorker()
-    }
-
+  getWorker() {
     return new EditorWorker()
   },
 }

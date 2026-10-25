@@ -138,7 +138,13 @@ catalogs:
     '@radix-ui/react-tooltip':
       specifier: ^1.2.11
       version: 1.2.11
+    '@shikijs/engine-javascript':
+      specifier: ^4.3.1
+      version: 4.3.1
     '@shikijs/monaco':
+      specifier: ^4.3.1
+      version: 4.3.1
+    '@shikijs/themes':
       specifier: ^4.3.1
       version: 4.3.1
     '@tailwindcss/vite':
@@ -734,7 +740,13 @@ importers:
       '@daeuniverse/dae-lang-core':
         specifier: workspace:*
         version: link:../dae-lang-core
+      '@shikijs/engine-javascript':
+        specifier: 'catalog:'
+        version: 4.3.1
       '@shikijs/monaco':
+        specifier: 'catalog:'
+        version: 4.3.1
+      '@shikijs/themes':
         specifier: 'catalog:'
         version: 4.3.1
     devDependencies:

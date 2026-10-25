@@ -2,13 +2,18 @@ import type { Monaco } from '@monaco-editor/react'
 import type * as monaco from 'monaco-editor'
 import type { RoutingACompletionItem } from './constants'
 import { shikiToMonaco } from '@shikijs/monaco'
+import vitesseDark from '@shikijs/themes/vitesse-dark'
+import vitesseLight from '@shikijs/themes/vitesse-light'
+import githubDark from '@shikijs/themes/github-dark'
+import githubLight from '@shikijs/themes/github-light'
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
+import { createHighlighterCore } from 'shiki/core'
 
-import { createHighlighter } from 'shiki'
 import { EDITOR_LANGUAGE_ROUTINGA, ROUTINGA_COMPLETION_ITEMS } from './constants'
 import { formatRoutingA } from './formatter'
 
 // Shiki highlighter instance
-let shikiHighlighter: Awaited<ReturnType<typeof createHighlighter>> | null = null
+let shikiHighlighter: Awaited<ReturnType<typeof createHighlighterCore>> | null = null
 
 // Track if Shiki themes have been applied to Monaco globally
 let shikiThemesApplied = false
@@ -32,9 +37,13 @@ export function isShikiReady(): boolean {
 export async function initShikiHighlighter() {
   if (shikiHighlighter) return shikiHighlighter
 
-  shikiHighlighter = await createHighlighter({
-    themes: ['vitesse-dark', 'vitesse-light', 'github-dark', 'github-light'],
-    langs: ['json', 'javascript', 'typescript', 'html', 'css', 'yaml', 'markdown', 'shell'],
+  // Shiki supplies TextMate themes only: routingA and dnsA are Monarch grammars
+  // registered by hand below. Loading the bundled highlighter would also pull
+  // every Shiki grammar plus the Oniguruma WASM engine into the router bundle.
+  shikiHighlighter = await createHighlighterCore({
+    themes: [vitesseDark, vitesseLight, githubDark, githubLight],
+    langs: [],
+    engine: createJavaScriptRegexEngine(),
   })
 
   return shikiHighlighter
