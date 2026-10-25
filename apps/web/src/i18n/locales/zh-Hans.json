@@ -605,7 +605,11 @@
     "communityTelegram": "Telegram 群组（在新标签页打开）",
     "editorFailed": "代码编辑器加载失败，可继续使用文本模式编辑，或刷新页面后重试。",
     "editorLabel": "配置代码",
-    "editorLoading": "正在加载代码编辑器…"
+    "editorLoading": "正在加载代码编辑器…",
+    "crashed": "面板遇到意外错误",
+    "crashedHint": "路由器上的配置没有被改动。可以重试该页面，或重新加载。如果反复出现，请从路由器菜单打开运行日志。",
+    "crashedRetry": "重试",
+    "crashedReload": "重新加载页面"
   },
   "network": {
     "title": "网络检查",

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { HeaderWithActions } from '~/components/Header'
+import { PanelErrorBoundary } from '~/components/PanelErrorBoundary'
 import { RouterHeader } from '~/components/RouterHeader'
 import { QUERY_KEY_GENERAL } from '~/constants'
 import { useInitialize } from '~/initialize'
@@ -71,7 +72,9 @@ export function MainLayout() {
         <div
           className={`container mx-auto max-w-[1400px] px-4 lg:px-8 ${routerMode ? 'py-4 lg:py-5' : 'py-6 lg:py-7'}`}
         >
-          <Outlet />
+          <PanelErrorBoundary>
+            <Outlet />
+          </PanelErrorBoundary>
         </div>
       </main>
       {!routerMode && (

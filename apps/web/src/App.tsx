@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { PanelErrorBoundary } from '~/components/PanelErrorBoundary'
 import { Toaster } from '~/components/ui/sonner'
 import { TooltipProvider } from '~/components/ui/tooltip'
 import { getThemeById, themeColorsToCSSVars } from '~/constants'
@@ -88,7 +89,9 @@ export function App() {
               </button>
             </div>
           ) : (
-            <Router />
+            <PanelErrorBoundary>
+              <Router />
+            </PanelErrorBoundary>
           )}
         </div>
       </TooltipProvider>
