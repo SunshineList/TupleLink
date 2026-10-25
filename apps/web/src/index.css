@@ -786,6 +786,21 @@ form {
 .subscription-browser select {
   font-size: 16px;
 }
+/* 订阅拉取失败时，用户在这里看到的唯一线索就是这段话，别用灰字埋掉。 */
+.subscription-browser-alert {
+  padding: 8px 12px;
+  border: 1px solid oklch(0.68 0.14 62 / 0.35);
+  border-radius: 12px;
+  background: oklch(0.68 0.14 62 / 0.08);
+  color: oklch(0.5 0.12 62);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+@media (prefers-color-scheme: dark) {
+  .subscription-browser-alert {
+    color: oklch(0.82 0.11 68);
+  }
+}
 
 /* LuCI owns page navigation; each embedded page has a single task. */
 .panel-workspace[data-workspace='dashboard'] {

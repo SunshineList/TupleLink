@@ -141,6 +141,8 @@ export function SubscriptionNodes({
   const gridRef = useRef<HTMLDivElement>(null)
   const library = useMemo(() => buildNodeLibrary([], [subscription]), [subscription])
   const detail = library.find(({ node }) => node.id === detailId)?.node
+  // 后端只在拉取失败时往 status 写原因，所以空库带着非空 status 就是上次失败的现场。
+  const failure = !library.length ? subscription.status : ''
   const nestedOpen = !!detail || qrOpen || !!adding
   const filtered = useMemo(
     () => filterNodeLibrary(library, { ...defaultNodeFilters, search, sort }, latencies),
@@ -237,6 +239,11 @@ export function SubscriptionNodes({
               {t('panel.filteredNodes', { count: filtered.length, total: library.length })}
             </span>
           </div>
+          {failure && (
+            <p role="alert" className="subscription-browser-alert" title={failure}>
+              {t('panel.subscriptionFailed', { reason: failure })}
+            </p>
+          )}
           <LatencyStatus tests={tests} scope={scope} />
           <div
             className="subscription-node-grid"
@@ -260,7 +267,7 @@ export function SubscriptionNodes({
             ))}
             {!filtered.length && (
               <p className="col-span-full p-6 text-center text-sm text-muted-foreground">
-                {library.length ? t('panel.noMatches') : t('panel.noNodes')}
+                {library.length ? t('panel.noMatches') : failure ? t('panel.subscriptionFailed', { reason: failure }) : t('panel.noNodes')}
               </p>
             )}
           </div>

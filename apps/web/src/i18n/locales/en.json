@@ -518,7 +518,8 @@
     "totalTrafficShort": "Session traffic",
     "statsUnavailable": "Updates unavailable",
     "logs": "Runtime log",
-    "neverUpdated": "Never updated"
+    "neverUpdated": "Never updated",
+    "subscriptionFailed": "The last update failed: {{reason}}"
   },
   "importResource": {
     "optionalTag": "Label (optional)",
