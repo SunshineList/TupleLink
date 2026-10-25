@@ -619,7 +619,19 @@
     "content": "运行日志内容",
     "loading": "正在读取日志…",
     "empty": "暂无日志。",
-    "hostOnly": "请从路由器后台进入运行日志。"
+    "hostOnly": "请从路由器后台进入运行日志。",
+    "view": "日志视图",
+    "viewStructured": "结构化",
+    "viewRaw": "原始",
+    "level": {
+      "trace": "跟踪",
+      "debug": "调试",
+      "info": "信息",
+      "warning": "警告",
+      "error": "错误",
+      "fatal": "致命",
+      "unknown": "原文"
+    }
   },
   "shell": {
     "sessionExpired": "路由器登录已失效，请刷新后台页面重新登录。",

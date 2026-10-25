@@ -84,6 +84,7 @@ export function SubscriptionResource({
       title={t('subscription')}
       count={sortedSubscriptions.length}
       createLabel={t('panel.addSubscription')}
+      hideCreate={!subscriptionsRequest.isPending && !subscriptionsRequest.isError && !sortedSubscriptions.length}
       primary
       loading={subscriptionsRequest.isPending}
       error={subscriptionsRequest.isError}

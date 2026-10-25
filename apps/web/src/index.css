@@ -1383,6 +1383,36 @@ form {
     gap: 6px;
   }
 }
+/* A phone header used to stack into three rows; icons keep it on one. */
+@media (max-width: 640px) {
+  .community-link {
+    min-width: 44px;
+    padding-inline: 8px;
+  }
+  .community-link-label {
+    display: none;
+  }
+  .router-toolbar {
+    padding-block: 8px;
+  }
+  .router-toolbar h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Four controls do not fit 358px with labels; the pill keeps its dot and the
+     theme button keeps its swatch, and both keep an accessible name. */
+  .router-status-pill {
+    padding-inline: 8px;
+  }
+  .router-status-text,
+  .theme-picker-label {
+    display: none;
+  }
+  .router-toolbar-actions {
+    gap: 6px;
+  }
+}
 @media (max-width: 370px) {
   .router-toolbar > .community-links {
     grid-column: 1 / -1;

@@ -181,7 +181,7 @@ export function ThemePicker({ variant = 'icon' }: ThemePickerProps) {
       <Fragment>
         <Button variant="outline" size="sm" onClick={() => setOpen(true)} aria-label={t('theme.title')}>
           <Palette className="h-4 w-4" style={{ color: currentColors.primary }} />
-          <span>{t('theme.title')}</span>
+          <span className="theme-picker-label">{t('theme.title')}</span>
         </Button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl" data-theme-picker>

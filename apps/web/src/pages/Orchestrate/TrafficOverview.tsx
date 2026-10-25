@@ -386,12 +386,19 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
                     stroke={`var(--color-${key})`}
                     strokeWidth={2}
                     fill={`url(#traffic-${key}-fill)`}
+                    // A window that holds a single sample made recharts draw one
+                    // lone dot at the series end: its dot logic falls back to
+                    // "render" whenever there is exactly one point, whatever the
+                    // `dot` prop says. A zero radius keeps that fallback invisible
+                    // while hover still shows the active dot.
+                    dot={{ r: 0, strokeWidth: 0 }}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
                     isAnimationActive={false}
                   />
                 ))}
               </AreaChart>
             </ChartContainer>
-            <dl className="grid grid-cols-3 gap-2 border-t pt-3">
+            <dl className="grid grid-cols-1 gap-2 border-t pt-3 sm:grid-cols-3">
               {[
                 [
                   t('trafficOverview.totalUpload'),

@@ -263,6 +263,9 @@ export function NodeResource({
         title={t('node')}
         count={totalCount}
         createLabel={t('panel.importNode')}
+        // The empty state already offers the same action, so the header button
+        // would just be a second "Import nodes" on an otherwise blank card.
+        hideCreate={!loading && !error && !totalCount}
         icon={<Cloud className="h-5 w-5" />}
         iconPlus={<CloudUpload className="h-4 w-4" />}
         onCreate={() => setOpenedImportNodeFormModal(true)}
@@ -367,80 +370,82 @@ export function NodeResource({
           }
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg outline-offset-2"
         >
-          <div
-            className="manual-node-columns"
-            data-columns={columnCount}
-            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
-          >
-            {columns.map((entries, column) => {
-              const offset = column * split
-              const range = nodeWindow(entries.length, scrollTop, viewportHeight, rowHeight)
-              const indices = Array.from({ length: range.end - range.start }, (_, index) => range.start + index)
-              const focusedIndex = entries.findIndex(({ node }) => node.id === focusedId)
-              if (focusedIndex >= 0 && !indices.includes(focusedIndex)) indices.push(focusedIndex)
-              indices.sort((a, b) => a - b)
-              return (
-                <Droppable
-                  key={column}
-                  droppableId={column ? `${NODE_DROPPABLE_ID}-column-1` : NODE_DROPPABLE_ID}
-                  type="NODE"
-                  mode="virtual"
-                  renderClone={(provided, snapshot, rubric) => (
-                    <NodeRow
-                      entry={entries[rubric.source.index]}
-                      provided={provided}
-                      snapshot={snapshot}
-                      latency={nodeLatencies?.[entries[rubric.source.index].node.id]}
-                      onAction={onAction}
-                      tests={latencyTests}
-                    />
-                  )}
-                >
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      data-group-column-offset={offset}
-                      role="list"
-                      aria-label={t('panel.nodeList')}
-                      className={cn('relative min-w-0', snapshot.isDraggingOver && 'bg-primary/5')}
-                      style={{
-                        height: Math.max(1, entries.length + (snapshot.isUsingPlaceholder ? 1 : 0)) * rowHeight,
-                      }}
-                    >
-                      {indices.map((index) => (
-                        <div
-                          key={entries[index].node.id}
-                          className="absolute inset-x-0"
-                          style={{ top: index * rowHeight, height: rowHeight }}
-                        >
-                          <Draggable draggableId={`node-${entries[index].node.id}`} index={index}>
-                            {(rowProvided, rowSnapshot) => (
-                              <NodeRow
-                                entry={entries[index]}
-                                provided={rowProvided}
-                                snapshot={rowSnapshot}
-                                latency={nodeLatencies?.[entries[index].node.id]}
-                                onAction={onAction}
-                                tests={latencyTests}
-                              />
-                            )}
-                          </Draggable>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Droppable>
-              )
-            })}
-          </div>
-          {!loading && !error && !totalCount && (
+          {!loading && !error && !totalCount ? (
             <ResourceEmpty
+              className="mt-2"
               title={t('panel.noNodes')}
               description={t('panel.noNodesDescription')}
               action={t('panel.importNode')}
               onAction={() => setOpenedImportNodeFormModal(true)}
             />
+          ) : (
+            <div
+              className="manual-node-columns"
+              data-columns={columnCount}
+              style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+            >
+              {columns.map((entries, column) => {
+                const offset = column * split
+                const range = nodeWindow(entries.length, scrollTop, viewportHeight, rowHeight)
+                const indices = Array.from({ length: range.end - range.start }, (_, index) => range.start + index)
+                const focusedIndex = entries.findIndex(({ node }) => node.id === focusedId)
+                if (focusedIndex >= 0 && !indices.includes(focusedIndex)) indices.push(focusedIndex)
+                indices.sort((a, b) => a - b)
+                return (
+                  <Droppable
+                    key={column}
+                    droppableId={column ? `${NODE_DROPPABLE_ID}-column-1` : NODE_DROPPABLE_ID}
+                    type="NODE"
+                    mode="virtual"
+                    renderClone={(provided, snapshot, rubric) => (
+                      <NodeRow
+                        entry={entries[rubric.source.index]}
+                        provided={provided}
+                        snapshot={snapshot}
+                        latency={nodeLatencies?.[entries[rubric.source.index].node.id]}
+                        onAction={onAction}
+                        tests={latencyTests}
+                      />
+                    )}
+                  >
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        data-group-column-offset={offset}
+                        role="list"
+                        aria-label={t('panel.nodeList')}
+                        className={cn('relative min-w-0', snapshot.isDraggingOver && 'bg-primary/5')}
+                        style={{
+                          height: Math.max(1, entries.length + (snapshot.isUsingPlaceholder ? 1 : 0)) * rowHeight,
+                        }}
+                      >
+                        {indices.map((index) => (
+                          <div
+                            key={entries[index].node.id}
+                            className="absolute inset-x-0"
+                            style={{ top: index * rowHeight, height: rowHeight }}
+                          >
+                            <Draggable draggableId={`node-${entries[index].node.id}`} index={index}>
+                              {(rowProvided, rowSnapshot) => (
+                                <NodeRow
+                                  entry={entries[index]}
+                                  provided={rowProvided}
+                                  snapshot={rowSnapshot}
+                                  latency={nodeLatencies?.[entries[index].node.id]}
+                                  onAction={onAction}
+                                  tests={latencyTests}
+                                />
+                              )}
+                            </Draggable>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Droppable>
+                )
+              })}
+            </div>
           )}
           {!loading && !error && totalCount > 0 && !nodes.length && (
             <ResourceEmpty

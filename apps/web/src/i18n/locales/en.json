@@ -619,7 +619,19 @@
     "content": "Runtime log content",
     "loading": "Reading log…",
     "empty": "No log entries yet.",
-    "hostOnly": "Open the runtime log from the LuCI panel."
+    "hostOnly": "Open the runtime log from the LuCI panel.",
+    "view": "Log view",
+    "viewStructured": "Structured",
+    "viewRaw": "Raw",
+    "level": {
+      "trace": "trace",
+      "debug": "debug",
+      "info": "info",
+      "warning": "warning",
+      "error": "error",
+      "fatal": "fatal",
+      "unknown": "raw"
+    }
   },
   "shell": {
     "sessionExpired": "The router session expired. Reload the LuCI page to sign in again.",

@@ -73,10 +73,15 @@ export function RouterHeader() {
           <ThemePicker variant="compact" />
           <span
             role="status"
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${running ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}
+            aria-label={
+              query.isPending || query.isError ? t('panel.checking') : running ? t('panel.running') : t('panel.stopped')
+            }
+            className={`router-status-pill inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${running ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}`}
           >
             <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-            {query.isPending || query.isError ? t('panel.checking') : running ? t('panel.running') : t('panel.stopped')}
+            <span className="router-status-text">
+              {query.isPending || query.isError ? t('panel.checking') : running ? t('panel.running') : t('panel.stopped')}
+            </span>
           </span>
           {(modified || (saving && !run.isPending)) && (
             <span role="status" className="text-xs text-muted-foreground">

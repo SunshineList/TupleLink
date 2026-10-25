@@ -15,6 +15,7 @@ export function Section({
   highlight,
   count,
   createLabel,
+  hideCreate,
   primary,
   loading,
   error,
@@ -32,6 +33,7 @@ export function Section({
   highlight?: boolean
   count?: number
   createLabel?: string
+  hideCreate?: boolean
   primary?: boolean
   loading?: boolean
   error?: boolean
@@ -65,17 +67,19 @@ export function Section({
 
         <div className="flex items-center gap-2">
           {actions}
-          <SimpleTooltip label={createLabel || `${t('actions.add')} ${title}`}>
-            <Button
-              variant={primary ? 'default' : 'outline'}
-              size="sm"
-              onClick={onCreate}
-              aria-label={createLabel || `${t('actions.add')} ${title}`}
-            >
-              <span aria-hidden="true">{iconPlus || <Plus className="h-4 w-4" />}</span>
-              {createLabel || t('actions.add')}
-            </Button>
-          </SimpleTooltip>
+          {!hideCreate && (
+            <SimpleTooltip label={createLabel || `${t('actions.add')} ${title}`}>
+              <Button
+                variant={primary ? 'default' : 'outline'}
+                size="sm"
+                onClick={onCreate}
+                aria-label={createLabel || `${t('actions.add')} ${title}`}
+              >
+                <span aria-hidden="true">{iconPlus || <Plus className="h-4 w-4" />}</span>
+                {createLabel || t('actions.add')}
+              </Button>
+            </SimpleTooltip>
+          )}
         </div>
       </div>
 
