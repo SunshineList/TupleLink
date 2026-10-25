@@ -187,11 +187,25 @@ echo 'chain PSW2_OUTPUT { }' ''')
         self.assertIn("log_continuity=unknown", result.stdout)
         self.assertNotIn("new_log_lines=", result.stdout)
 
-    def test_without_timeout_skips_firewall_and_dns_queries(self):
+    def test_without_timeout_the_probes_still_run_under_a_watchdog(self):
         (self.root / "usr/sbin/timeout").unlink()
         result = self.run_check()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("marker inspection skipped", result.stdout)
-        self.assertIn("DNS probe skipped", result.stdout)
-        for calls in ("nft-calls", "iptables-calls", "dns-calls"):
-            self.assertFalse((self.root / "tmp" / calls).exists())
+        self.assertIn("nft passwall_marker_lines=0", result.stdout)
+        self.assertNotIn("marker inspection skipped", result.stdout)
+        self.assertNotIn("DNS probe skipped", result.stdout)
+        self.assertEqual((self.root / "tmp/nft-calls").read_text().splitlines(), ["list ruleset"])
+        self.assertEqual((self.root / "tmp/iptables-calls").read_text().splitlines(), ["read", "read"])
+        self.assertTrue((self.root / "tmp/dns-calls").read_text().strip())
+
+    def test_watchdog_terminates_a_hung_tool_when_timeout_is_missing(self):
+        (self.root / "usr/sbin/timeout").unlink()
+        # An instant `sleep` makes the watchdog fire at once, so the test does not
+        # wait out the real six-second deadline. The stub still ends on its own so a
+        # regression that ignores the signal fails the assertion instead of hanging.
+        self.router.script("/bin/sleep", "exit 0")
+        self.router.script("/usr/sbin/nft", "i=0; while [ $i -lt 400000 ]; do i=$((i + 1)); done; echo 'chain PSW_RULE { }'")
+        result = self.run_check()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("nft query=unavailable (failed or timed out)", result.stdout)
+        self.assertNotIn("nft passwall_marker_lines", result.stdout)

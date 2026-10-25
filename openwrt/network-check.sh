@@ -7,6 +7,27 @@ set +x
 for tool in ubus jsonfilter; do
 	command -v "$tool" >/dev/null 2>&1 || { echo "Missing command: $tool"; exit 1; }
 done
+
+# iStoreOS ships no `timeout` applet, and the probes used to be skipped entirely
+# because of it even though nft and nslookup were right there. Fall back to a
+# background watchdog so the deadline is kept without the extra package.
+bounded() {
+	if command -v timeout >/dev/null 2>&1; then timeout "$@"; return; fi
+	seconds=$1
+	shift
+	"$@" &
+	bounded_pid=$!
+	# The watchdog must not inherit stdout: the callers pipe into awk, and an
+	# orphaned `sleep` holding the write end would delay the reader by seconds.
+	( sleep "$seconds"; kill -TERM "$bounded_pid" 2>/dev/null ) >/dev/null 2>&1 &
+	bounded_watchdog=$!
+	wait "$bounded_pid" 2>/dev/null
+	bounded_status=$?
+	kill -TERM "$bounded_watchdog" 2>/dev/null
+	wait "$bounded_watchdog" 2>/dev/null
+	return "$bounded_status"
+}
+
 printf 'NaiLink network check v2 (configuration read-only)\n'
 echo 'traffic_owner=unknown; HTTPS success tests the current path, not NaiLink specifically.'
 echo 'Service records, processes and firewall markers are observations, not proof of traffic ownership.'
@@ -78,15 +99,15 @@ echo 'An automatic group may select a different exit after restart; its configur
 
 printf '\n[Firewall text markers; counts only, no rules or addresses printed]\n'
 for firewall_tool in nft iptables-save ip6tables-save; do
-	if ! command -v "$firewall_tool" >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
+	if ! command -v "$firewall_tool" >/dev/null 2>&1; then
 		printf '%s unavailable; marker inspection skipped\n' "$firewall_tool"
 		continue
 	fi
 	{
 		if [ "$firewall_tool" = nft ]; then
-			timeout 6 nft list ruleset
+			bounded 6 nft list ruleset
 		else
-			timeout 6 "$firewall_tool"
+			bounded 6 "$firewall_tool"
 		fi && printf '\nDAED_CHECK_RULES_READ_OK\n'
 	} 2>/dev/null | awk -v tool="$firewall_tool" '
 		$0 == "DAED_CHECK_RULES_READ_OK" { ok=1; next }
@@ -130,10 +151,10 @@ else
 fi
 printf '\nprobe_start='; date -Iseconds
 printf '\n[Google DNS through the local resolver; 6 seconds maximum]\n'
-if command -v nslookup >/dev/null 2>&1 && command -v timeout >/dev/null 2>&1; then
-	timeout 6 nslookup www.google.com 127.0.0.1 2>&1 | head -n 24
+if command -v nslookup >/dev/null 2>&1; then
+	bounded 6 nslookup www.google.com 127.0.0.1 2>&1 | head -n 24
 else
-	echo 'nslookup/timeout unavailable; DNS probe skipped'
+	echo 'nslookup unavailable; DNS probe skipped'
 fi
 
 printf '\n[Router HTTPS; transparent routing remains in effect]\n'
