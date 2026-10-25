@@ -106,7 +106,13 @@
     "publicKey": "Public Key",
     "fingerprint": "Fingerprint",
     "shortId": "Short ID",
-    "spiderX": "Spider X"
+    "spiderX": "Spider X",
+    "portHopping": "Port hopping",
+    "portHoppingHint": "Comma separated, ranges with a hyphen: 10000-20000,443",
+    "portHoppingInvalid": "Use half-width commas, a hyphen inside a range, and ports 1-65535.",
+    "auth": "Auth",
+    "sni": "SNI",
+    "pinSHA256": "Pin SHA-256"
   },
   "confirmModal": {
     "cancel": "Cancel",

@@ -106,7 +106,13 @@
     "publicKey": "公钥",
     "fingerprint": "指纹",
     "shortId": "短 ID",
-    "spiderX": "Spider X"
+    "spiderX": "Spider X",
+    "portHopping": "端口跳跃",
+    "portHoppingHint": "半角逗号分隔，区间用减号：10000-20000,443",
+    "portHoppingInvalid": "只能用半角逗号，区间用减号，端口范围 1-65535。",
+    "auth": "认证",
+    "sni": "SNI",
+    "pinSHA256": "证书指纹 SHA-256"
   },
   "confirmModal": {
     "cancel": "取消",

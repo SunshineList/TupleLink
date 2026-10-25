@@ -9,6 +9,7 @@ import { Input } from '~/components/ui/input'
 import { NumberInput } from '~/components/ui/number-input'
 import { DEFAULT_HYSTERIA2_FORM_VALUES, hysteria2Schema } from '~/constants'
 import { useNodeForm } from '~/hooks'
+import { portsIssue } from './ports'
 
 export type Hysteria2FormValues = z.infer<typeof hysteria2Schema>
 
@@ -43,6 +44,10 @@ export function Hysteria2Form({ onLinkGeneration, initialValues, actionsPortal }
     parseLink: parseHysteria2Url,
   })
 
+  // 端口跳跃是这一页最容易填错的一格：逗号必须是半角、区间用减号、每段 1-65535。
+  // 这里只做提示，不拦住保存——后端仍按自己的规则解析，用户可能有意写别的形式。
+  const portsProblem = portsIssue(formValues.ports || '')
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">
       <Input
@@ -65,12 +70,14 @@ export function Hysteria2Form({ onLinkGeneration, initialValues, actionsPortal }
         onChange={(val) => setValue('port', Number(val))}
       />
       <Input
-        label="Ports (Hopping)"
+        label={t('configureNode.portHopping')}
         placeholder="10000-20000,443"
         value={formValues.ports || ''}
         onChange={(e) => setValue('ports', e.target.value)}
+        description={portsProblem ? t('configureNode.portHoppingInvalid') : t('configureNode.portHoppingHint')}
+        aria-invalid={portsProblem ? true : undefined}
       />
-      <Input label="Auth" withAsterisk value={formValues.auth} onChange={(e) => setValue('auth', e.target.value)} />
+      <Input label={t('configureNode.auth')} withAsterisk value={formValues.auth} onChange={(e) => setValue('auth', e.target.value)} />
       <Input
         label={t('configureNode.obfs')}
         placeholder="salamander"
@@ -83,8 +90,12 @@ export function Hysteria2Form({ onLinkGeneration, initialValues, actionsPortal }
         value={formValues.obfsPassword}
         onChange={(e) => setValue('obfsPassword', e.target.value)}
       />
-      <Input label="SNI" value={formValues.sni} onChange={(e) => setValue('sni', e.target.value)} />
-      <Input label="Pin SHA256" value={formValues.pinSHA256} onChange={(e) => setValue('pinSHA256', e.target.value)} />
+      <Input label={t('configureNode.sni')} value={formValues.sni} onChange={(e) => setValue('sni', e.target.value)} />
+      <Input
+        label={t('configureNode.pinSHA256')}
+        value={formValues.pinSHA256}
+        onChange={(e) => setValue('pinSHA256', e.target.value)}
+      />
       <Checkbox
         label={t('allowInsecure')}
         checked={formValues.allowInsecure}
