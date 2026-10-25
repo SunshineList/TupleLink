@@ -97,6 +97,30 @@ fallback: proxy</code></pre>
 <pre><code class="language-text">domain(example.com) -&gt; AI
 fallback: proxy</code></pre>
 <p>把示例域名换成你确实需要分流的域名，并核对群组名称。服务通常涉及多个域名，只写一个域名不代表覆盖该服务所有连接。</p>
+<h2 id="quick-rules">快捷添加常见分流</h2>
+<p>
+  手写路由规则要记住三件事：匹配器写成 <code>qname</code> / <code>domain</code> / <code>dip</code>，
+  目标要么是群组名要么是 <code>direct</code> / <code>must_direct</code>，
+  并且 <code>fallback</code> 必须在最后一行——写在它后面的规则不会被执行。
+  高级设置的分流卡片右上角有<strong>快捷添加</strong>，把常见规则一次写好，插到兜底行之前：
+</p>
+<ul>
+  <li><strong>广告拦截：</strong><code>domain(geosite:category-ads-all) -&gt; must_direct</code>。</li>
+  <li><strong>流媒体：</strong>Netflix / Disney+ / YouTube 按 <code>geosite</code> 分类走代理群组。</li>
+  <li><strong>Telegram：</strong>按 <code>geoip:telegram</code> 的 IP 段分流，域名匹配对它无效。</li>
+  <li><strong>AI 服务：</strong>OpenAI 与 Anthropic 的域名走代理群组。</li>
+  <li><strong>国内直连 / 内网直连：</strong>与默认规则一致，用于你自己重写过分流之后补回来。</li>
+  <li><strong>游戏 UDP 直连：</strong><code>l4proto(udp) &amp;&amp; dport(1000-65535) -&gt; direct</code>，避免联机走代理掉线。</li>
+</ul>
+<p>
+  快捷添加只写入<strong>当前选中的</strong>分流方案，不改动其他方案，也不重排你已有的行。
+  重复点同一条不会写两遍：已经存在的规则会显示成勾选态并禁用。
+  群组名取自当前默认群组，所以先建好群组再点。
+</p>
+<p>
+  规则生效仍需要<strong>应用配置</strong>。判断是否真的生效，用目标设备重新发起连接后看运行日志，
+  而不是只看规则写对了。
+</p>
 <h2 id="apply-check">修改后怎样确认生效</h2>
 <ol>
   <li>保存修改，确认方案被选中。</li>
