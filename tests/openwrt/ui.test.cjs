@@ -14,14 +14,18 @@ function load(name, protocol = 'http:', page = 'dashboard') {
   const fetchCalls = [];
   let authorized = true;
   let rpcFailure = false;
+  let session = '1234567890abcdef1234567890abcdef';
+  let response = null;
+  let networkFailure = false;
   let result = { running: true, listen: '127.0.0.1:2023', checks: [] };
   const context = vm.createContext({
     window: { location: { protocol, pathname: '/cgi-bin/luci/admin/services/daed/' + page } },
     L: { env: { sessionid: '1234567890abcdef1234567890abcdef' } },
-    fetch: async (url, options) => { fetchCalls.push([url, options]); return {ok: authorized}; },
+    AbortController, setTimeout, clearTimeout,
+    fetch: async (url, options) => { fetchCalls.push([url, options]); if (networkFailure) throw new Error('offline'); return response || {ok: authorized, status: authorized ? 204 : 401, headers: new Headers()}; },
     view: { extend: value => value },
     baseclass: { extend: value => value },
-    rpc: { declare: spec => async (...args) => { calls.push([spec.method, ...args]); if (rpcFailure) throw new Error('read failed'); return result; } },
+    rpc: { getSessionID: () => session, declare: spec => async (...args) => { calls.push([spec.method, ...args]); if (rpcFailure) throw new Error('read failed'); return result; } },
     poll: { add: (fn, interval) => { fn.interval = interval; polls.push(fn); } },
     ui: { createHandlerFn: (self, fn) => fn.bind(self), addNotification: () => {} },
     dom: { content: (node, content) => { node.children = content; } },
@@ -36,8 +40,9 @@ function load(name, protocol = 'http:', page = 'dashboard') {
   });
   vm.runInContext("String.prototype.format = function(...args) { let i=0; return this.replace(/%s/g, () => args[i++]); };", context);
   context.community = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'community.js'), 'utf8') + '\n})()', context);
+  context.access = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'access.js'), 'utf8') + '\n})()', context);
   const view = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, name + '.js'), 'utf8') + '\n})()', context);
-  return { view, polls, calls, fetchCalls, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; }, setFailure: value => { rpcFailure = value; } };
+  return { view, polls, calls, fetchCalls, setSession: value => {session = value;}, legacySession: () => {delete context.rpc.getSessionID;}, setResponse: value => {response = value;}, setNetworkFailure: () => {networkFailure = true;}, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; }, setFailure: value => { rpcFailure = value; } };
 }
 
 function elements(node, tag) {
@@ -109,6 +114,62 @@ test('rejected bootstrap cannot render the management iframe', async () => {
   const data = await module.view.load();
   assert.equal(elements(module.view.render(data), 'iframe').length, 0);
 });
+
+for (const name of [panelModule, 'panel']) {
+  test(name + ' follows the active RPC session, with legacy LuCI fallback', async () => {
+    const module = load(name);
+    const current = 'abcdef1234567890abcdef1234567890';
+    module.setSession(current);
+    assert.equal((await module.view.load()).authorized, true);
+    assert.equal(JSON.parse(module.fetchCalls[0][1].body).session, current);
+    assert.equal(module.fetchCalls[0][1].redirect, 'error');
+    module.legacySession();
+    await module.view.load();
+    assert.equal(JSON.parse(module.fetchCalls[1][1].body).session, '1234567890abcdef1234567890abcdef');
+  });
+
+  test(name + ' refuses absent/anonymous RPC sessions without reverting to stale environment', async () => {
+    for (const value of [undefined, '', 'bad', '0'.repeat(32)]) {
+      const module = load(name);
+      module.setSession(value);
+      const data = await module.view.load();
+      assert.equal(data.issue.code, 'session_missing');
+      assert.equal(module.fetchCalls.length, 0);
+      assert.equal(elements(module.view.render(data), 'iframe').length, 0);
+    }
+  });
+
+  test(name + ' distinguishes authorization, firmware gateway and transport failures safely', async () => {
+    for (const [status, code] of [[401,'session_expired'],[403,'gateway_denied'],[404,'gateway_missing'],[405,'gateway_missing'],[500,'gateway_unavailable'],[502,'gateway_unavailable'],[503,'gateway_unavailable'],[504,'rpc_timeout'],[200,'invalid_response']]) {
+      const module = load(name);
+      module.setResponse(new Response('login HTML, not an error to display', {status}));
+      const data = await module.view.load();
+      assert.equal(data.issue.code, code);
+      const tree = module.view.render(data);
+      assert.equal(elements(tree, 'iframe').length, 0);
+      assert.match(tree.textContent, new RegExp(code));
+      assert.doesNotMatch(tree.textContent, /login HTML/);
+      assert.equal(elements(tree, 'button')[0].textContent, '重新加载');
+    }
+    for (const code of ['rpc_unavailable','origin_rejected','permission_denied','rpc_timeout']) {
+      const module = load(name);
+      module.setResponse(new Response(JSON.stringify({code}), {status:403,headers:{'Content-Type':'application/json'}}));
+      assert.equal((await module.view.load()).issue.code, code);
+    }
+    const module = load(name);
+    module.setNetworkFailure();
+    assert.equal((await module.view.load()).issue.code, 'network_error');
+    module.setFailure(true);
+    assert.equal((await module.view.load()).issue.code, 'rpc_error');
+    module.setFailure(false);
+    for (const value of [6,{},null]) {
+      module.setResult(value);
+      const data = await module.view.load();
+      assert.equal(data.issue.code, 'rpc_error');
+      assert.equal(elements(module.view.render(data),'iframe').length,0);
+    }
+  });
+}
 
 test('logs are rendered as text instead of executable HTML', async () => {
   const module = load('logs');

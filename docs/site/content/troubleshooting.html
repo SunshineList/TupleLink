@@ -28,6 +28,36 @@ nslookup raw.githubusercontent.com</code></pre>
   <li>确认使用具有管理权限的 LuCI 账户。只读权限不等于可以修改代理。</li>
   <li>页面提示管理服务未启动时，使用页面提供的启动入口；仍失败再看运行日志。</li>
 </ul>
+<h2 id="luci-access">root 登录后仍提示授权失败</h2>
+<p>
+  先更新到 $version，再重新加载路由器后台。新版优先读取 LuCI 当前 RPC
+  会话，兼容没有该接口的旧版；授权失败时会显示诊断代码，不必执行 SSH 命令。
+</p>
+<ul>
+  <li><code>session_expired</code>：会话已过期，请退出后台后重新登录。</li>
+  <li><code>session_missing</code>：没有取得有效会话，请重新加载；仍失败时可能是固件的 LuCI 会话接口不兼容。</li>
+  <li>
+    <code>permission_denied</code>：会话有效，但缺少插件管理权限。使用 root
+    重新登录；仍失败时，通过安装菜单更新插件，重新部署权限文件。
+  </li>
+  <li><code>origin_rejected</code>：网页来源不匹配。使用路由器原始后台地址，核对反向代理的域名、端口与 HTTPS 配置。</li>
+  <li>
+    <code>rpc_unavailable</code> /
+    <code>rpc_timeout</code>：授权服务不可用或超时，不代表密码错误。稍后重试；持续失败时检查固件的 ubus/rpcd
+    与插件安装。
+  </li>
+  <li><code>gateway_missing</code>：CGI 网关不存在或请求方法被网页服务阻止，检查固件是否启用 CGI，并更新插件。</li>
+  <li>
+    <code>gateway_unavailable</code> / <code>invalid_response</code> /
+    <code>network_error</code>：网页服务异常、被其他页面接管或浏览器无法连接，请使用原始后台地址重新加载。
+  </li>
+  <li><code>gateway_denied</code>：网页服务返回了没有具体原因的拒绝响应，检查固件网页服务、反向代理或后台访问限制。</li>
+  <li><code>rpc_error</code>：读取服务状态失败，检查 LuCI 权限和插件是否完整安装。</li>
+</ul>
+<p>
+  反馈时提供诊断代码、HTTP 状态和固件名称即可，不需要密码或节点链接。OpenWrt、ImmortalWrt、iStoreOS
+  的定制网页服务可能不同；本插件仍要求现代 LuCI、rpcd 与 CGI 支持，不会绕过登录或把只读账户提升为管理员。
+</p>
 <h2 id="memory">内存占用为什么看起来很高</h2>
 <p>
   先区分整机内存和 NaiLink 进程。部分进程列表显示的 <code>VSZ</code> 或

@@ -15,7 +15,7 @@
 
 管理节点、订阅和群组，测试节点延迟，查看实时流量，配置 DNS 与路由。支持电脑、手机和多种主题，沿用路由器 LuCI 登录，无需另设账户。
 
-基于 [daed](https://github.com/daeuniverse/daed) 二次开发，独立维护。当前版本为 **[0.6.30 测试版](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.30)**，提供 IPK / APK v3 安装包。
+基于 [daed](https://github.com/daeuniverse/daed) 二次开发，独立维护。当前版本为 **[0.6.31 测试版](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.31)**，提供 IPK / APK v3 安装包。
 
 ## 安装前
 
@@ -32,16 +32,18 @@
 以 **root** 登录路由器 SSH，执行下面一行，打开中文菜单：
 
 ```sh
-uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.30/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.30
+uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.31/install.sh && sh /tmp/nailink-install.sh --menu --release openwrt-v0.6.31
 ```
 
 选择 **1 安装 / 更新**。安装后运行 `nailink` 可再次打开菜单，也可选择 **2 卸载**、**3 检查环境** 或 **0 退出**。
 
 更新先备份并保留节点、订阅、群组与配置。**卸载会备份后删除插件和当前数据，可离线执行**；备份保留在 `/root/daed-backups`。[更新与卸载教程 →](https://slobys.github.io/NaiLink/maintenance.html)
 
-0.6.30 增加代理就绪检查与有效 DNS 分流关联恢复；可用 `nailink --check-network` 查看诊断。首次从旧版升级没有旧缓存快照，网站的 VPN 提示也可能与出口 IP 有关。[恢复机制与限制 →](https://slobys.github.io/NaiLink/maintenance.html#restart-recovery)
+0.6.31 修复 LuCI 当前会话与页面会话不一致的兼容问题，区分登录过期、权限不足、CGI 网关和授权服务故障；页面直接显示诊断代码，无需执行命令。[后台打不开 →](https://slobys.github.io/NaiLink/troubleshooting.html#luci-access)
 
-旧版菜单遇到 Raw 下载失败时，可运行 `nailink --install --release openwrt-v0.6.30`。如果 GitHub 也无法解析，先检查路由器自身 DNS。[下载故障排查 →](https://slobys.github.io/NaiLink/troubleshooting.html#download)
+保留 0.6.30 的代理就绪检查与有效 DNS 分流关联恢复，可用 `nailink --check-network` 查看诊断。[恢复机制与限制 →](https://slobys.github.io/NaiLink/maintenance.html#restart-recovery)
+
+旧版菜单遇到 Raw 下载失败时，可运行 `nailink --install --release openwrt-v0.6.31`。如果 GitHub 也无法解析，先检查路由器自身 DNS。[下载故障排查 →](https://slobys.github.io/NaiLink/troubleshooting.html#download)
 
 ## 开始使用
 
@@ -55,7 +57,7 @@ uclient-fetch -O /tmp/nailink-install.sh https://github.com/slobys/NaiLink/relea
 
 ## 源码与交流
 
-[完整源码包](https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.30/daed-openwrt-source.tar.gz) · [构建说明](openwrt/README.md#开发) · [验证记录](openwrt/VALIDATION.md) · [Logo](docs/site/assets/nailink-logo.png)
+[完整源码包](https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.31/daed-openwrt-source.tar.gz) · [构建说明](openwrt/README.md#开发) · [验证记录](openwrt/VALIDATION.md) · [Logo](docs/site/assets/nailink-logo.png)
 
 编译请使用完整源码包，或 `git clone --recurse-submodules https://github.com/slobys/NaiLink.git`。GitHub 的 Download ZIP 不包含后端子模块。
 

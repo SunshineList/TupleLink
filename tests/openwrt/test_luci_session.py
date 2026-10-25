@@ -49,18 +49,40 @@ class LuCISessionTests(unittest.TestCase):
                 if "session" in result.stdout: break
                 time.sleep(0.05)
 
-            def bootstrap(session):
+            def bootstrap(session, overrides=None):
                 body = json.dumps({"session": session})
                 environment = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "REQUEST_METHOD": "POST", "SCRIPT_NAME": "/cgi-bin/daed-router", "PATH_INFO": "/session", "REQUEST_URI": "/cgi-bin/daed-router/session", "SERVER_PROTOCOL": "HTTP/1.1", "GATEWAY_INTERFACE": "CGI/1.1", "SERVER_NAME": "router.test", "SERVER_PORT": "443", "HTTP_HOST": "router.test", "HTTPS": "on", "HTTP_ORIGIN": "https://router.test", "CONTENT_TYPE": "application/json", "CONTENT_LENGTH": str(len(body))}
+                environment.update(overrides or {})
                 return subprocess.run(["chroot", str(case.root), "/usr/libexec/daed/luci-proxy"], input=body, text=True, capture_output=True, env=environment, timeout=10).stdout
 
             admin = ubus("login", {"username": "fixture-admin", "password": "fixture-password"})["ubus_rpc_session"]
             self.assertIn("Status: 204", bootstrap(admin))
             self.assertIn("Secure", bootstrap(admin))
+            for overrides in [
+                {"HTTP_HOST": "ROUTER.test:443"},
+                {"HTTPS": "1"},
+                {"REQUEST_URI": ""},
+                {"HTTPS": "", "SERVER_PORT": "80", "HTTP_HOST": "router.test:80", "HTTP_ORIGIN": "http://router.test"},
+                {"SERVER_PORT": "8443", "HTTP_HOST": "router.test:8443", "HTTP_ORIGIN": "https://router.test:8443"},
+                {"SERVER_NAME": "::1", "HTTP_HOST": "[::1]:443", "HTTP_ORIGIN": "https://[::1]"},
+            ]:
+                with self.subTest(cgi=overrides):
+                    self.assertIn("Status: 204", bootstrap(admin, overrides))
+            for origin in ["https://evil.test", "http://router.test", "null", ""]:
+                denied = bootstrap(admin, {"HTTP_ORIGIN": origin})
+                self.assertIn("Status: 403", denied)
+                self.assertIn("origin_rejected", denied)
             reader = ubus("login", {"username": "fixture-reader", "password": "fixture-password"})["ubus_rpc_session"]
-            self.assertIn("Status: 401", bootstrap(reader))
+            self.assertIn("Status: 403", bootstrap(reader))
+            self.assertIn("permission_denied", bootstrap(reader))
             ubus("destroy", {"ubus_rpc_session": admin})
             self.assertIn("Status: 401", bootstrap(admin))
+            self.assertIn("session_expired", bootstrap(admin))
+            processes[-1].terminate()
+            processes[-1].wait(timeout=5)
+            unavailable = bootstrap(reader)
+            self.assertIn("Status: 503", unavailable)
+            self.assertIn("rpc_unavailable", unavailable)
         finally:
             for process in reversed(processes): process.terminate()
             for process in reversed(processes): process.wait(timeout=5)

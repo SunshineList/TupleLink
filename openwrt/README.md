@@ -1,9 +1,16 @@
 # NaiLink · 奶油互联
 
 支持 OpenWrt、ImmortalWrt、iStoreOS 的现代 LuCI，提供 x86_64 / ARM64 及试验性 ARMv7 / MIPS32 / MIPSel32 的
-IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.30](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.30)。
+IPK 和 APK v3 安装包。当前测试版：[openwrt-v0.6.31](https://github.com/slobys/NaiLink/releases/tag/openwrt-v0.6.31)。
 
 本项目从 0.6.14 起更名为 NaiLink（奶油互联），侧边栏显示 **NaiLink**。0.6.13 及更早版本显示 **Daed**。沿用原有包名、服务、路径和配置，可继续保留数据升级。
+
+## 0.6.31 LuCI 授权兼容与诊断
+
+- 优先使用 LuCI 当前 RPC 会话，旧接口缺失时才读取页面会话；拒绝空会话和匿名会话，不回退到失效的旧凭据。
+- 授权失败细分为会话过期、缺少管理权限、来源不匹配、ubus/rpcd 故障或超时、CGI 缺失和异常网页响应。页面提供诊断代码与重新加载按钮，无需 SSH 收集信息。
+- 兼容 HTTP/HTTPS 默认端口与域名大小写，保持端口隔离、同源校验、HttpOnly Cookie 和每次请求的管理权限检查；不信任任意转发头，不绕过只读账户限制。
+- 保留节点、订阅、群组、DNS、路由及数据库结构，无新依赖。定制固件仍须支持现代 LuCI、rpcd 与 CGI；未知固件的现场原因不能仅凭旧提示确定。
 
 ## 0.6.30 升级后的 DNS 与分流恢复
 
