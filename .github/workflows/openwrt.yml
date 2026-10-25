@@ -115,6 +115,15 @@ jobs:
           sudo apt-get install -y --no-install-recommends clang llvm zstd
           mkdir -p .build/runtime
           python3 openwrt/runtime.py --cpu '${{ matrix.cpu }}' --wing wing --web dist --version "$VERSION" --work /tmp/daed-runtime-sdk --output .build/runtime
+      - name: go vet
+        if: matrix.cpu == 'x86_64'
+        run: |
+          # vet the real packages in the backend module, then the two helpers
+          # that are compiled as single files by runtime.py. Running them
+          # together fails because both are package main.
+          (cd wing && GOOS=linux GOARCH=amd64 go vet -tags daed_stub_ebpf ./...)
+          (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/btf-probe.go)
+          (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/luci-proxy.go)
       - name: BTF parser tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
