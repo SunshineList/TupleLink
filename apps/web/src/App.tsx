@@ -1,6 +1,7 @@
 import type { ThemeMode } from '~/store'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Toaster } from '~/components/ui/sonner'
 import { TooltipProvider } from '~/components/ui/tooltip'
@@ -33,6 +34,7 @@ function useSystemColorScheme(): ColorScheme {
 }
 
 export function App() {
+  const { t } = useTranslation()
   const appState = useStore(appStateAtom)
   const sessionExpired = useStore(routerSessionExpiredAtom)
   const systemColorScheme = useSystemColorScheme()
@@ -80,9 +82,9 @@ export function App() {
           <Toaster />
           {routerMode && sessionExpired ? (
             <div className="p-8 text-center">
-              <p>路由器登录已失效，请刷新后台页面。</p>
+              <p>{t('shell.sessionExpired')}</p>
               <button className="mt-4 underline" onClick={() => window.parent.location.reload()}>
-                刷新后台
+                {t('shell.reload')}
               </button>
             </div>
           ) : (

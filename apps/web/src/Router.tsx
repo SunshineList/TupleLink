@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BrowserRouter, HashRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 
 import { MainLayout, OrchestratePage, SetupPage } from '~/pages'
@@ -15,6 +16,7 @@ function RouterWorkspace() {
 }
 
 export function Router() {
+  const { t } = useTranslation()
   const endpointURL = useStore(endpointURLAtom)
   const token = useStore(tokenAtom)
   const RouterType = import.meta.env.DEV ? BrowserRouter : HashRouter
@@ -36,7 +38,7 @@ export function Router() {
           <Route
             path="/graphiql"
             element={
-              <Suspense fallback={<div className="p-6">正在加载调试工具…</div>}>
+              <Suspense fallback={<div className="p-6">{t('shell.loadingDebug')}</div>}>
                 <GraphQLPage endpointURL={endpointURL} token={token} />
               </Suspense>
             }

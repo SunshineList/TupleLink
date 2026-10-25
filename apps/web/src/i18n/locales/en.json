@@ -620,5 +620,19 @@
     "loading": "Reading log…",
     "empty": "No log entries yet.",
     "hostOnly": "Open the runtime log from the LuCI panel."
+  },
+  "shell": {
+    "sessionExpired": "The router session expired. Reload the LuCI page to sign in again.",
+    "reload": "Reload LuCI",
+    "loadingDebug": "Loading the debug console…",
+    "initializing": "Preparing the panel…",
+    "initFailed": "The panel could not start. Refresh the page or check the runtime log.",
+    "requestTimeout": "The request timed out. Please retry.",
+    "communityLabel": "Community channels",
+    "communityYoutube": "YouTube channel (opens in a new tab)",
+    "communityTelegram": "Telegram group (opens in a new tab)",
+    "editorFailed": "The code editor failed to load. You can keep editing as plain text, or refresh the page to retry.",
+    "editorLabel": "Configuration code",
+    "editorLoading": "Loading the code editor…"
   }
 }

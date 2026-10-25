@@ -620,5 +620,19 @@
     "loading": "正在读取日志…",
     "empty": "暂无日志。",
     "hostOnly": "请从路由器后台进入运行日志。"
+  },
+  "shell": {
+    "sessionExpired": "路由器登录已失效，请刷新后台页面重新登录。",
+    "reload": "刷新后台",
+    "loadingDebug": "正在加载调试工具…",
+    "initializing": "正在准备面板…",
+    "initFailed": "面板初始化失败，请刷新页面或查看运行日志。",
+    "requestTimeout": "请求超时，请重试。",
+    "communityLabel": "社区频道",
+    "communityYoutube": "YouTube 频道（在新标签页打开）",
+    "communityTelegram": "Telegram 群组（在新标签页打开）",
+    "editorFailed": "代码编辑器加载失败，可继续使用文本模式编辑，或刷新页面后重试。",
+    "editorLabel": "配置代码",
+    "editorLoading": "正在加载代码编辑器…"
   }
 }

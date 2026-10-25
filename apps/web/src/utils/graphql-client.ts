@@ -1,6 +1,8 @@
 import type { TypedDocumentNode } from '@graphql-typed-document-node/core'
 import type { GraphQLClient, RequestDocument, Variables } from 'graphql-request'
 
+import { i18n } from '~/i18n'
+
 export interface GQLClientInterface {
   request: <T, V extends Variables = Variables>(
     document: RequestDocument | TypedDocumentNode<T, V>,
@@ -24,7 +26,10 @@ export function cancellableGraphQLClient(client: GraphQLClient, timeoutMs = 30_0
       if (signal?.aborted) abort()
       signal?.addEventListener('abort', abort, { once: true })
       const timer = controller
-        ? setTimeout(() => controller.abort(new DOMException('请求超时，请重试', 'TimeoutError')), timeoutMs)
+        ? setTimeout(
+            () => controller.abort(new DOMException(i18n.t('shell.requestTimeout'), 'TimeoutError')),
+            timeoutMs,
+          )
         : undefined
       try {
         return await client.request<T, Variables>({ document, variables, signal: controller?.signal })

@@ -1,8 +1,10 @@
+import { i18n } from '~/i18n'
+
 const pages = {
-  dashboard: { route: '/', title: '管理面板' },
-  resources: { route: '/resources', title: '节点和订阅' },
-  advanced: { route: '/advanced', title: '高级设置' },
-  logs: { route: '/logs', title: '运行日志' },
+  dashboard: { route: '/', title: 'panel.dashboard' },
+  resources: { route: '/resources', title: 'panel.resources' },
+  advanced: { route: '/advanced', title: 'panel.advanced' },
+  logs: { route: '/logs', title: 'panel.logs' },
 } as const
 
 export function routerMenuPage(value: string, current: string) {
@@ -18,7 +20,8 @@ export function routerMenuPage(value: string, current: string) {
     const prefix = `${root}/`
     const page = isRoot ? 'dashboard' : target.pathname.slice(prefix.length).replace(/\/$/, '')
     if ((!isRoot && !target.pathname.startsWith(prefix)) || !Object.hasOwn(pages, page)) return
-    return { ...pages[page as keyof typeof pages], page, isRoot, url: target.href }
+    const entry = pages[page as keyof typeof pages]
+    return { route: entry.route, title: i18n.t(entry.title), page, isRoot, url: target.href }
   } catch {
     return undefined
   }

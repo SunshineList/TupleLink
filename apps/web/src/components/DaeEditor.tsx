@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
 import { Component, lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { i18n } from '~/i18n'
 
 export type DaeConfigType = 'routing' | 'dns'
 export interface DaeEditorProps {
@@ -22,10 +25,10 @@ class EditorBoundary extends Component<DaeEditorProps & { children: ReactNode },
     return (
       <div className="space-y-2">
         <p role="alert" className="text-sm text-muted-foreground">
-          代码编辑器加载失败，可继续使用文本模式编辑，或刷新页面后重试。
+          {i18n.t('shell.editorFailed')}
         </p>
         <textarea
-          aria-label="配置代码"
+          aria-label={i18n.t('shell.editorLabel')}
           className="min-h-64 w-full rounded border bg-background p-3 font-mono text-sm"
           value={this.props.value}
           disabled={this.props.disabled}
@@ -37,12 +40,13 @@ class EditorBoundary extends Component<DaeEditorProps & { children: ReactNode },
 }
 
 export function DaeEditor(props: DaeEditorProps) {
+  const { t } = useTranslation()
   return (
     <EditorBoundary {...props}>
       <Suspense
         fallback={
           <div role="status" className="p-4 text-sm text-muted-foreground">
-            正在加载代码编辑器…
+            {t('shell.editorLoading')}
           </div>
         }
       >

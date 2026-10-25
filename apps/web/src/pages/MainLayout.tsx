@@ -2,7 +2,7 @@ import type { RouterMenuHost } from '~/utils/router-menu'
 import { useStore } from '@nanostores/react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-
+import { useTranslation } from 'react-i18next'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { HeaderWithActions } from '~/components/Header'
 import { RouterHeader } from '~/components/RouterHeader'
@@ -15,6 +15,7 @@ import { routerMode } from '~/utils/router-mode'
 import { bindRouterNavigation } from '~/utils/router-navigation'
 
 export function MainLayout() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const token = useStore(tokenAtom)
   const endpointURL = useStore(endpointURLAtom)
@@ -34,7 +35,7 @@ export function MainLayout() {
       await initialize()
       setReady(true)
     }
-    prepare().catch(() => setError('面板初始化失败，请刷新页面或查看运行日志。'))
+    prepare().catch(() => setError(t('shell.initFailed')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -61,7 +62,7 @@ export function MainLayout() {
     }
   }, [navigate, queries, ready])
 
-  if (routerMode && !ready) return <div className="p-6">{error || '正在准备面板…'}</div>
+  if (routerMode && !ready) return <div className="p-6">{error || t('shell.initializing')}</div>
 
   return (
     <div className={`flex min-h-dvh flex-col ${routerMode ? 'router-panel bg-background' : 'bg-pattern'}`}>
