@@ -3,6 +3,17 @@ import type { ConfigBackup } from '~/utils/config-backup'
 import { graphql } from '~/schemas/gql'
 import { parseBackup } from '~/utils/config-backup'
 
+/**
+ * graphql() 只认识 codegen 生成过的文档；没收录的查询它会返回 unknown，
+ * 传给 client.request 就是运行时 "[object Object]" 报错。
+ * 这里对未知结果退回原始字符串，graphql-request 会自己解析。
+ */
+function gqlString(source: string): string {
+  const document = graphql(source) as unknown
+  return typeof document === 'string' ? document : source
+}
+
+
 // 导入不是「恢复数据库」，而是按快照重建：节点和订阅先按链接找回或新建，
 // 再重建群组，最后把配置、分流、DNS 逐个建出来。
 // 这样即使目标设备已经有同名条目，也不会把现有数据覆盖成半截状态。
@@ -19,7 +30,36 @@ export interface RestoreResult {
   warnings: string[]
 }
 
-const IMPORT_NODES = graphql(`
+const EXISTING_NODES = gqlString(`
+  query RestoreExistingNodes {
+    nodes(first: 10000, after: null) {
+      edges {
+        id
+        link
+      }
+    }
+  }
+`)
+
+const EXISTING_SUBSCRIPTIONS = gqlString(`
+  query RestoreExistingSubscriptions {
+    subscriptions {
+      id
+      link
+    }
+  }
+`)
+
+const EXISTING_GROUPS = gqlString(`
+  query RestoreExistingGroups {
+    groups {
+      id
+      name
+    }
+  }
+`)
+
+const IMPORT_NODES = gqlString(`
   mutation RestoreImportNodes($rollbackError: Boolean!, $args: [ImportArgument!]!) {
     importNodes(rollbackError: $rollbackError, args: $args) {
       link
@@ -31,21 +71,22 @@ const IMPORT_NODES = graphql(`
   }
 `)
 
-const IMPORT_SUBSCRIPTION = graphql(`
+const IMPORT_SUBSCRIPTION = gqlString(`
   mutation RestoreImportSubscription($rollbackError: Boolean!, $arg: ImportArgument!) {
     importSubscription(rollbackError: $rollbackError, arg: $arg) {
       link
-      error
-      subscription {
+      sub {
         id
         link
       }
-      nodeCount
+      nodeImportResult {
+        error
+      }
     }
   }
 `)
 
-const CREATE_CONFIG = graphql(`
+const CREATE_CONFIG = gqlString(`
   mutation RestoreCreateConfig($name: String, $global: globalInput) {
     createConfig(name: $name, global: $global) {
       id
@@ -53,7 +94,7 @@ const CREATE_CONFIG = graphql(`
   }
 `)
 
-const CREATE_ROUTING = graphql(`
+const CREATE_ROUTING = gqlString(`
   mutation RestoreCreateRouting($name: String, $routing: String) {
     createRouting(name: $name, routing: $routing) {
       id
@@ -61,7 +102,7 @@ const CREATE_ROUTING = graphql(`
   }
 `)
 
-const CREATE_DNS = graphql(`
+const CREATE_DNS = gqlString(`
   mutation RestoreCreateDns($name: String, $dns: String) {
     createDns(name: $name, dns: $dns) {
       id
@@ -69,7 +110,7 @@ const CREATE_DNS = graphql(`
   }
 `)
 
-const CREATE_GROUP = graphql(`
+const CREATE_GROUP = gqlString(`
   mutation RestoreCreateGroup($name: String!, $policy: Policy!, $policyParams: [PolicyParam!]) {
     createGroup(name: $name, policy: $policy, policyParams: $policyParams) {
       id
@@ -77,20 +118,20 @@ const CREATE_GROUP = graphql(`
   }
 `)
 
-const GROUP_ADD_NODES = graphql(`
+const GROUP_ADD_NODES = gqlString(`
   mutation RestoreGroupAddNodes($id: ID!, $nodeIDs: [ID!]!) {
     groupAddNodes(id: $id, nodeIDs: $nodeIDs)
   }
 `)
 
-const GROUP_ADD_SUBSCRIPTIONS = graphql(`
+const GROUP_ADD_SUBSCRIPTIONS = gqlString(`
   mutation RestoreGroupAddSubscriptions($id: ID!, $subscriptionIDs: [ID!]!, $nameFilterRegex: String) {
     groupAddSubscriptions(id: $id, subscriptionIDs: $subscriptionIDs, nameFilterRegex: $nameFilterRegex)
   }
 `)
 
 interface ExistingNodes {
-  nodes: { edges: { node: { id: string, link: string } }[] }
+  nodes: { edges: { id: string, link: string }[] }
 }
 
 interface ExistingSubscriptions {
@@ -102,46 +143,12 @@ interface ExistingGroups {
 }
 
 async function loadExisting(client: GQLClientInterface) {
-  const nodes = (await client.request(
-    graphql(`
-      query RestoreExistingNodes {
-        nodes(first: 10000) {
-          edges {
-            node {
-              id
-              link
-            }
-          }
-        }
-      }
-    `) as never,
-  )) as ExistingNodes
-  const subscriptions = (await client.request(
-    graphql(`
-      query RestoreExistingSubscriptions {
-        subscriptions {
-          id
-          link
-          nodes {
-            id
-          }
-        }
-      }
-    `) as never,
-  )) as ExistingSubscriptions
-  const groups = (await client.request(
-    graphql(`
-      query RestoreExistingGroups {
-        groups {
-          id
-          name
-        }
-      }
-    `) as never,
-  )) as ExistingGroups
+  const nodes = (await client.request(EXISTING_NODES)) as ExistingNodes
+  const subscriptions = (await client.request(EXISTING_SUBSCRIPTIONS)) as ExistingSubscriptions
+  const groups = (await client.request(EXISTING_GROUPS)) as ExistingGroups
 
   const byLink = new Map<string, string>()
-  for (const edge of nodes.nodes.edges) byLink.set(edge.node.link, edge.node.id)
+  for (const edge of nodes.nodes.edges) byLink.set(edge.link, edge.id)
   const subscriptionByLink = new Map<string, { id: string, nodeIDs: string[] }>()
   for (const subscription of subscriptions.subscriptions) {
     subscriptionByLink.set(subscription.link, {
@@ -190,7 +197,7 @@ export async function restoreBackup(
   const missingNodes = [...nodeLinks].filter((link) => !existing.byLink.has(link))
   if (missingNodes.length) {
     try {
-      const imported = (await client.request(IMPORT_NODES as never, {
+      const imported = (await client.request(IMPORT_NODES, {
         rollbackError: true,
         args: missingNodes.map((link) => ({ link })),
       })) as { importNodes: { link: string, error: string, node: { id: string } | null }[] }
@@ -214,18 +221,23 @@ export async function restoreBackup(
       result.reused += 1
     } else {
       try {
-        const imported = (await client.request(IMPORT_SUBSCRIPTION as never, {
+        const imported = (await client.request(IMPORT_SUBSCRIPTION, {
           rollbackError: true,
           arg: { link },
         })) as {
-          importSubscription: { link: string, error: string, subscription: { id: string, link: string } | null }
+          importSubscription: {
+            link: string[]
+            sub: { id: string, link: string } | null
+            nodeImportResult: { error: string | null }[]
+          }
         }
         const entry = imported.importSubscription
-        if (entry.subscription) {
-          existing.subscriptionByLink.set(link, { id: entry.subscription.id, nodeIDs: [] })
+        if (entry.sub) {
+          existing.subscriptionByLink.set(link, { id: entry.sub.id, nodeIDs: [] })
           result.created += 1
-        } else if (entry.error) {
-          result.warnings.push(entry.error)
+        } else {
+          const failures = entry.nodeImportResult.map((item) => item.error).filter((value): value is string => !!value)
+          result.warnings.push(...(failures.length ? failures : [`订阅 ${link} 没有导入成功。`]))
         }
       } catch (error) {
         result.warnings.push(error instanceof Error ? error.message : String(error))
@@ -241,9 +253,9 @@ export async function restoreBackup(
       result.reused += 1
     } else {
       try {
-        const created = (await client.request(CREATE_GROUP as never, {
+        const created = (await client.request(CREATE_GROUP, {
           name: group.name,
-          policy: group.policy as never,
+          policy: group.policy,
           policyParams: group.policyParams,
         })) as { createGroup: { id: string } }
         id = created.createGroup.id
@@ -263,7 +275,7 @@ export async function restoreBackup(
       .filter((value): value is string => !!value)
     if (nodeIDs.length) {
       try {
-        await client.request(GROUP_ADD_NODES as never, { id, nodeIDs })
+        await client.request(GROUP_ADD_NODES, { id, nodeIDs })
       } catch (error) {
         result.warnings.push(`群组 ${group.name} 的节点：${error instanceof Error ? error.message : String(error)}`)
       }
@@ -275,7 +287,7 @@ export async function restoreBackup(
     if (subscriptionIDs.length) {
       try {
         const regex = group.subscriptionFilters.find((filter): filter is string => !!filter) ?? null
-        await client.request(GROUP_ADD_SUBSCRIPTIONS as never, { id, subscriptionIDs, nameFilterRegex: regex })
+        await client.request(GROUP_ADD_SUBSCRIPTIONS, { id, subscriptionIDs, nameFilterRegex: regex })
       } catch (error) {
         result.warnings.push(`群组 ${group.name} 的订阅：${error instanceof Error ? error.message : String(error)}`)
       }
@@ -286,7 +298,7 @@ export async function restoreBackup(
   // 4. 配置、分流、DNS：一律新建，不改动设备上已存在的同名条目。
   for (const config of backup.configs) {
     try {
-      await client.request(CREATE_CONFIG as never, { name: config.name, global: config.global as never })
+      await client.request(CREATE_CONFIG, { name: config.name, global: config.global as never })
       result.created += 1
     } catch (error) {
       result.warnings.push(`配置 ${config.name}：${error instanceof Error ? error.message : String(error)}`)
@@ -295,7 +307,7 @@ export async function restoreBackup(
   }
   for (const routing of backup.routings) {
     try {
-      await client.request(CREATE_ROUTING as never, { name: routing.name, routing: routing.routing })
+      await client.request(CREATE_ROUTING, { name: routing.name, routing: routing.routing })
       result.created += 1
     } catch (error) {
       result.warnings.push(`分流 ${routing.name}：${error instanceof Error ? error.message : String(error)}`)
@@ -304,7 +316,7 @@ export async function restoreBackup(
   }
   for (const entry of backup.dnss) {
     try {
-      await client.request(CREATE_DNS as never, { name: entry.name, dns: entry.dns })
+      await client.request(CREATE_DNS, { name: entry.name, dns: entry.dns })
       result.created += 1
     } catch (error) {
       result.warnings.push(`DNS ${entry.name}：${error instanceof Error ? error.message : String(error)}`)

@@ -11,10 +11,21 @@ import { useGQLQueryClient } from '~/contexts'
 import { graphql } from '~/schemas/gql'
 import { buildBackup, summariseBackup } from '~/utils/config-backup'
 
+/**
+ * graphql() 只认识 codegen 生成过的文档；没收录的查询它会返回 unknown，
+ * 传给 client.request 就是运行时 "[object Object]" 报错。
+ * 这里对未知结果退回原始字符串，graphql-request 会自己解析。
+ */
+function gqlString(source: string): string {
+  const document = graphql(source) as unknown
+  return typeof document === 'string' ? document : source
+}
+
+
 // 导出要一次拿全，不能复用面板各页面的 query：
 // 那些查询是按页面需要裁剪过的（比如 Configs 只取 global 的部分字段），
 // 拿它们拼快照会把没查到的字段写成空值。
-const EXPORT_QUERY = graphql(`
+const EXPORT_QUERY = gqlString(`
   query ExportConfigBackup {
     configs {
       id
@@ -146,7 +157,7 @@ export function useExportConfigBackup() {
     setPending(true)
     try {
       // 导出查询还没进 codegen 文档集，这里显式断言成文档节点。
-      const data = await gqlClient.request(EXPORT_QUERY as never)
+      const data = await gqlClient.request(EXPORT_QUERY)
       const backup = toBackup(data as ExportData, new Date().toISOString())
       return { backup, summary: summariseBackup(backup) }
     } finally {
