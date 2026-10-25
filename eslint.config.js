@@ -36,7 +36,10 @@ export default antfu(
     },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      // The React preset is off (see the ESLint 10 note above), so these two
+      // rules are the only static check on hook usage. Both are errors: a
+      // stale closure or a conditional hook is a bug, not a style opinion.
+      'react-hooks/exhaustive-deps': 'error',
     },
   },
   {

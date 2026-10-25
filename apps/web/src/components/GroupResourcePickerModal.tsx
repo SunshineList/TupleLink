@@ -48,7 +48,9 @@ function usePickerTests(tests: LatencyTests, scope: string) {
   const owned = useRef(false)
   const runningHere = useRef(false)
   runningHere.current = tests.scope === scope && tests.busy
-  const stop = tests.stop
+  // Read the two members the callback needs, so the dependency list can name them
+  // instead of the whole object (which is rebuilt on every render).
+  const { stop, test: runTests, busy } = tests
   useEffect(
     () => () => {
       if (owned.current || runningHere.current) stop()
@@ -57,15 +59,15 @@ function usePickerTests(tests: LatencyTests, scope: string) {
   )
   const test = useCallback(
     async (ids: string[]) => {
-      if (owned.current || tests.busy || !ids.length) return
+      if (owned.current || busy || !ids.length) return
       owned.current = true
       try {
-        await tests.test(ids, scope)
+        await runTests(ids, scope)
       } finally {
         owned.current = false
       }
     },
-    [tests.busy, tests.test, scope],
+    [busy, runTests, scope],
   )
   return {
     test,

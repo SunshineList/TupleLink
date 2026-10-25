@@ -95,9 +95,18 @@ export function GroupResource({
     return undefined
   }, [draggingResource])
 
-  const groups: GroupsQuery['groups'] = groupsQuery?.groups || []
-  const nodes: NodesQuery['nodes']['edges'] = nodesQuery?.nodes.edges || []
-  const subscriptions: SubscriptionsQuery['subscriptions'] = subscriptionsQuery?.subscriptions || []
+  // `|| []` allocates a fresh array on every render, which invalidated every
+  // useMemo that depends on these lists. Memoise the fallback so the identity
+  // only changes when the query data does.
+  const groups = useMemo<GroupsQuery['groups']>(() => groupsQuery?.groups || [], [groupsQuery?.groups])
+  const nodes = useMemo<NodesQuery['nodes']['edges']>(
+    () => nodesQuery?.nodes.edges || [],
+    [nodesQuery?.nodes.edges],
+  )
+  const subscriptions = useMemo<SubscriptionsQuery['subscriptions']>(
+    () => subscriptionsQuery?.subscriptions || [],
+    [subscriptionsQuery?.subscriptions],
+  )
   const groupSortOrder = appState.groupSortableKeys as string[]
 
   const setGroupExpanded = useCallback((groupId: string, expanded: boolean) => {

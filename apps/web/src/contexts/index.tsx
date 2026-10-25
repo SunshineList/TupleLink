@@ -56,6 +56,10 @@ export function QueryProvider({ children, colorScheme, themeMode, setThemeMode }
   // were created with, so the provider is keyed too: an identity change
   // remounts the consumers instead of leaving them on the retired cache.
   const identity = `${endpointURL}|${token}`
+  // `identity` is a reset key, not a captured value: the cache has to be
+  // rebuilt when the endpoint or token changes even though the factory body
+  // never reads it. The provider is keyed by the same string below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reset key, not a captured value
   const queryClient = useMemo(() => new QueryClient(), [identity])
 
   useEffect(() => () => queryClient.clear(), [queryClient])

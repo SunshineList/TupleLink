@@ -127,7 +127,10 @@ export function SubscriptionNodes({
 }) {
   const { t } = useTranslation()
   const scope = `subscription:${subscription.id}`
-  const test = useCallback((ids: string[]) => tests.test(ids, scope), [tests.test, scope])
+  // Destructure so the callback depends on the stable member instead of the
+  // whole `tests` object, which is rebuilt on every parent render.
+  const { test: runTests } = tests
+  const test = useCallback((ids: string[]) => runTests(ids, scope), [runTests, scope])
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<'custom' | 'latency'>('custom')
   const [adding, setAdding] = useState<{ id: string; name: string; type: 'node' } | null>(null)
