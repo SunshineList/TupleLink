@@ -1,0 +1,43 @@
+---
+name: 安装或升级失败
+about: ipk/apk 装不上，或升级后服务起不来
+title: "[install] "
+labels: [install]
+---
+
+## 环境
+
+| 项 | 值 |
+| --- | --- |
+| 固件 | 例如 iStoreOS 24.10.5 / ImmortalWrt 23.05 |
+| CPU 架构 | 例如 x86_64 / arm64 |
+| 内核 | 例如 6.6.119 |
+| NaiLink 版本 | 例如 0.6.31 |
+| 安装方式 | ipk / apk v3 |
+
+## 发生了什么
+
+<!-- 安装命令和完整输出。 -->
+
+## 期望是什么
+
+## 已经确认的事
+
+<!-- 下面这些能省掉一轮来回。 -->
+
+```sh
+# 安装包清单校验
+sh /usr/libexec/daed/install-check
+
+# 后端自检（BTF、geodata、内核选项、冲突服务）
+/usr/libexec/daed/check
+
+# 网络与路由只读诊断
+/usr/libexec/daed/network-check
+```
+
+- [ ] 我跑过上面的命令并把输出贴在下面了
+
+## 敏感信息
+
+<!-- 不要贴订阅链接、节点密码、登录凭据或 /etc/daed/ 下的数据库。 -->
