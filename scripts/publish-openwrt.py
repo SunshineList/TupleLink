@@ -21,6 +21,18 @@ def check_version(version):
             or not re.search(r"^PKG_VERSION:=.*," + re.escape(version) + r"\)$", make, re.M)
             or "\nrelease=openwrt-v" + version + "\n" not in installer):
         raise ValueError("Release version differs from source, installer or handbook")
+    # The handbook pages interpolate $version and $release, so they cannot go
+    # stale. README.md and the workflow input are hand-written and can: both
+    # point at a release tag, and a release published with either left behind
+    # sends readers to the previous version's assets.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    tag = "openwrt-v" + version
+    stale = sorted({match for match in re.findall(r"openwrt-v\d+\.\d+\.\d+", readme) if match != tag})
+    if stale:
+        raise ValueError("README.md links to " + ", ".join(stale) + " instead of " + tag)
+    workflow = (ROOT / ".github/workflows/openwrt.yml").read_text(encoding="utf-8")
+    if not re.search(r"^        default: '" + re.escape(version) + r"'$", workflow, re.M):
+        raise ValueError("Workflow version input differs from source")
 
 
 def validate_assets(directory, version, sha):

@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
@@ -85,6 +86,52 @@ class ReleaseSafetyTest(unittest.TestCase):
     def test_invalid_version(self):
         with self.assertRaises(ValueError):
             release.check_version("0.6.29; echo invalid")
+
+    def test_readme_links_to_the_current_release(self):
+        # README.md is hand-written, so unlike the handbook pages it can point
+        # at a previous tag after a bump. Both paths are checked: the release
+        # link and the source tarball link.
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        stale = {match for match in re.findall(r"openwrt-v\d+\.\d+\.\d+", readme) if match != "openwrt-v" + VERSION}
+        self.assertEqual(stale, set(), "README.md links to a release other than " + VERSION)
+
+    def test_workflow_default_matches_the_release(self):
+        workflow = (ROOT / ".github/workflows/openwrt.yml").read_text(encoding="utf-8")
+        defaults = re.findall(r"^        default: '(\d+\.\d+\.\d+)'$", workflow, re.M)
+        self.assertEqual(defaults, [VERSION], "the dispatch input must default to the release version")
+
+    def test_version_check_rejects_a_stale_readme(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        for name in ("README.md", "docs/site/site.json", "openwrt/Makefile", "openwrt/install.sh", ".github/workflows/openwrt.yml"):
+            destination = root / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes((ROOT / name).read_bytes())
+        (root / "README.md").write_text(
+            (root / "README.md").read_text(encoding="utf-8").replace("openwrt-v" + VERSION, "openwrt-v0.0.1", 1),
+            encoding="utf-8",
+        )
+        with patch.object(release, "ROOT", root):
+            with self.assertRaisesRegex(ValueError, "README.md links to"):
+                release.check_version(VERSION)
+
+    def test_version_check_rejects_a_stale_workflow_input(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        for name in ("README.md", "docs/site/site.json", "openwrt/Makefile", "openwrt/install.sh", ".github/workflows/openwrt.yml"):
+            destination = root / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes((ROOT / name).read_bytes())
+        workflow = root / ".github/workflows/openwrt.yml"
+        workflow.write_text(
+            workflow.read_text(encoding="utf-8").replace("default: '" + VERSION + "'", "default: '0.0.1'", 1),
+            encoding="utf-8",
+        )
+        with patch.object(release, "ROOT", root):
+            with self.assertRaisesRegex(ValueError, "Workflow version input"):
+                release.check_version(VERSION)
 
     def test_corruption_prevents_any_github_call(self):
         (self.directory / "install.sh").write_text("corrupted")
