@@ -12,6 +12,42 @@ import subprocess
 from build import ARCHITECTURES, HERE, prepare_sdk, verify_elf
 
 
+# The router ships the panel inside the package, so a dependency that quietly
+# pulls in a few megabytes is a release problem, not a local build annoyance.
+# The budget is what the bundle actually weighs after the Makefile's gzip rule,
+# measured on the 0.6.31 tree at 2.44 MiB. It is a ceiling with headroom, not a
+# target: it exists to catch a regression of the monaco/Shiki kind, where one
+# import re-adds several megabytes of grammar files nobody requests.
+WEB_BUNDLE_BUDGET = 4 * 1024 * 1024
+GZIP_THRESHOLD = 4096
+GZIP_SKIP_SUFFIXES = (".gz", ".woff", ".woff2")
+
+
+def bundled_size(web):
+    """Estimate the shipped size the same way wing/Makefile builds it."""
+    total = 0
+    for path in web.rglob("*"):
+        if not path.is_file():
+            continue
+        size = path.stat().st_size
+        if size > GZIP_THRESHOLD and not path.name.endswith(GZIP_SKIP_SUFFIXES):
+            # The Makefile keeps the compressed copy only when it is smaller.
+            total += min(size, len(gzip.compress(path.read_bytes(), 9)))
+        else:
+            total += size
+    return total
+
+
+def verify_web_budget(web, budget=WEB_BUNDLE_BUDGET):
+    """Fail the build when the panel outgrows the budgeted package size."""
+    size = bundled_size(web)
+    if size > budget:
+        raise ValueError(
+            "Bundled frontend is " + str(size) + " bytes, over the " + str(budget)
+            + "-byte budget; check for a dependency that adds unreachable chunks")
+    return size
+
+
 def verify_web_bundle(web, bundled):
     """Reject make/copy failures that otherwise silently embed a stale UI."""
     expected = {p.relative_to(web).as_posix(): p for p in web.rglob("*") if p.is_file()}
@@ -72,6 +108,9 @@ def main():
     subprocess.run(["make", "APPNAME=daed", "VERSION=" + args.version, "WEB_DIST=" + str(web),
                     "OUTPUT=" + str(output / "daed"), "bundle"], cwd=wing, env=env, check=True)
     verify_web_bundle(web, wing / "webrender/web")
+    # Checked after the bundle so a stale tree fails with the clearer message.
+    size = verify_web_budget(web)
+    print("bundled frontend: " + str(size) + " bytes")
     # The helpers do not use SQLite and remain pure Go on every architecture.
     env["CGO_ENABLED"] = "0"
     for name in ("btf-probe", "luci-proxy"):
