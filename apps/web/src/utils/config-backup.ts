@@ -79,6 +79,8 @@ export interface ConfigBackup {
   groups: BackupGroup[]
 }
 
+// 抛出的是 i18n 键而不是成品文案：调用方渲染时才翻译，
+// 这样切语言不需要重新解析文件。
 export class BackupFormatError extends Error {
   constructor(message: string) {
     super(message)
@@ -153,14 +155,14 @@ export function parseBackup(text: string): ConfigBackup {
   try {
     raw = JSON.parse(text)
   } catch {
-    throw new BackupFormatError('文件不是合法的 JSON。')
+    throw new BackupFormatError('backup.badJson')
   }
-  if (!isRecord(raw)) throw new BackupFormatError('备份文件的顶层必须是一个对象。')
+  if (!isRecord(raw)) throw new BackupFormatError('backup.badRoot')
   if (raw.kind !== BACKUP_KIND) {
-    throw new BackupFormatError('这不是 NaiLink 面板导出的配置文件。')
+    throw new BackupFormatError('backup.wrongKind')
   }
   if (typeof raw.version !== 'number' || raw.version > BACKUP_VERSION) {
-    throw new BackupFormatError('备份文件的格式版本比当前面板更新，请先升级插件。')
+    throw new BackupFormatError('backup.tooNew')
   }
 
   const configs = Array.isArray(raw.configs) ? raw.configs : []

@@ -75,7 +75,7 @@ export function ConfigBackupDialog({ onOpenChange }: Props) {
       const backup = parseBackup(await file.text())
       setPendingFile({ backup, summary: summariseBackup(backup) })
     } catch (cause) {
-      setError(cause instanceof BackupFormatError ? cause.message : t('backup.unreadable'))
+      setError(cause instanceof BackupFormatError ? t(cause.message, { defaultValue: t('backup.unreadable') }) : t('backup.unreadable'))
     }
   }
 

@@ -40,15 +40,15 @@ describe('parseBackup', () => {
 
   it('rejects files that are not ours', () => {
     expect(() => parseBackup('{}')).toThrow(BackupFormatError)
-    expect(() => parseBackup('{"kind":"something-else","version":1}')).toThrow(/NaiLink/)
+    expect(() => parseBackup('{"kind":"something-else","version":1}')).toThrow('backup.wrongKind')
   })
 
   it('rejects broken JSON with a readable message', () => {
-    expect(() => parseBackup('{')).toThrow(/JSON/)
+    expect(() => parseBackup('{')).toThrow('backup.badJson')
   })
 
   it('refuses a backup written by a newer panel', () => {
-    expect(() => parseBackup(JSON.stringify({ kind: BACKUP_KIND, version: BACKUP_VERSION + 1 }))).toThrow(/升级/)
+    expect(() => parseBackup(JSON.stringify({ kind: BACKUP_KIND, version: BACKUP_VERSION + 1 }))).toThrow('backup.tooNew')
   })
 
   it('keeps unknown global keys so a newer upstream field survives', () => {

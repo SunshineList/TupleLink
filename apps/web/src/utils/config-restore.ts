@@ -1,5 +1,6 @@
 import type { GQLClientInterface } from '~/contexts'
 import type { ConfigBackup } from '~/utils/config-backup'
+import { i18n } from '~/i18n'
 import { graphql } from '~/schemas/gql'
 import { parseBackup } from '~/utils/config-backup'
 
@@ -130,6 +131,10 @@ const GROUP_ADD_SUBSCRIPTIONS = gqlString(`
   }
 `)
 
+function message(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 interface ExistingNodes {
   nodes: { edges: { id: string, link: string }[] }
 }
@@ -237,7 +242,7 @@ export async function restoreBackup(
           result.created += 1
         } else {
           const failures = entry.nodeImportResult.map((item) => item.error).filter((value): value is string => !!value)
-          result.warnings.push(...(failures.length ? failures : [`订阅 ${link} 没有导入成功。`]))
+          result.warnings.push(...(failures.length ? failures : [i18n.t('backup.subscriptionFailed', { link })]))
         }
       } catch (error) {
         result.warnings.push(error instanceof Error ? error.message : String(error))
@@ -262,7 +267,7 @@ export async function restoreBackup(
         existing.groupByName.set(group.name, id)
         result.created += 1
       } catch (error) {
-        result.warnings.push(`群组 ${group.name}：${error instanceof Error ? error.message : String(error)}`)
+        result.warnings.push(i18n.t('backup.groupFailed', { name: group.name, message: message(error) }))
       }
     }
     if (!id) {
@@ -277,7 +282,7 @@ export async function restoreBackup(
       try {
         await client.request(GROUP_ADD_NODES, { id, nodeIDs })
       } catch (error) {
-        result.warnings.push(`群组 ${group.name} 的节点：${error instanceof Error ? error.message : String(error)}`)
+        result.warnings.push(i18n.t('backup.groupNodesFailed', { name: group.name, message: message(error) }))
       }
     }
 
@@ -289,7 +294,7 @@ export async function restoreBackup(
         const regex = group.subscriptionFilters.find((filter): filter is string => !!filter) ?? null
         await client.request(GROUP_ADD_SUBSCRIPTIONS, { id, subscriptionIDs, nameFilterRegex: regex })
       } catch (error) {
-        result.warnings.push(`群组 ${group.name} 的订阅：${error instanceof Error ? error.message : String(error)}`)
+        result.warnings.push(i18n.t('backup.groupSubscriptionsFailed', { name: group.name, message: message(error) }))
       }
     }
     tick(group.name)
@@ -301,7 +306,7 @@ export async function restoreBackup(
       await client.request(CREATE_CONFIG, { name: config.name, global: config.global as never })
       result.created += 1
     } catch (error) {
-      result.warnings.push(`配置 ${config.name}：${error instanceof Error ? error.message : String(error)}`)
+      result.warnings.push(i18n.t('backup.configFailed', { name: config.name, message: message(error) }))
     }
     tick(config.name)
   }
@@ -310,7 +315,7 @@ export async function restoreBackup(
       await client.request(CREATE_ROUTING, { name: routing.name, routing: routing.routing })
       result.created += 1
     } catch (error) {
-      result.warnings.push(`分流 ${routing.name}：${error instanceof Error ? error.message : String(error)}`)
+      result.warnings.push(i18n.t('backup.routingFailed', { name: routing.name, message: message(error) }))
     }
     tick(routing.name)
   }
@@ -319,7 +324,7 @@ export async function restoreBackup(
       await client.request(CREATE_DNS, { name: entry.name, dns: entry.dns })
       result.created += 1
     } catch (error) {
-      result.warnings.push(`DNS ${entry.name}：${error instanceof Error ? error.message : String(error)}`)
+      result.warnings.push(i18n.t('backup.dnsFailed', { name: entry.name, message: message(error) }))
     }
     tick(entry.name)
   }
