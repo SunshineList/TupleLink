@@ -3,6 +3,7 @@ import { ArrowDown, Pause } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '~/components/ui/button'
+import { logLevelColors, splitLogLevels } from '~/utils/log-level'
 
 // Use the same read-only LuCI RPC as the native logs view. Never expose a new
 // unauthenticated backend URL or pass the LuCI session through a query string.
@@ -97,6 +98,13 @@ export function RouterLogs() {
           </button>
         </p>
       )}
+      <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="日志级别颜色说明">
+        {(['debug', 'info', 'warning', 'error'] as const).map((level) => (
+          <span key={level} className={logLevelColors[level]}>
+            {{ debug: 'DEBUG 调试', info: 'INFO 信息', warning: 'WARN 警告', error: 'ERROR 错误' }[level]}
+          </span>
+        ))}
+      </div>
       <pre
         id="router-log-output"
         ref={output}
@@ -116,7 +124,11 @@ export function RouterLogs() {
         className="max-h-[65dvh] overflow-auto whitespace-pre-wrap break-words text-sm outline-none [overflow-anchor:none] focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span ref={content} className="block">
-          {logs || (query.isPending ? '正在读取日志…' : '暂无日志。')}
+          {splitLogLevels(logs || (query.isPending ? '正在读取日志…' : '暂无日志。')).map((entry, index) => (
+            <span key={index} data-log-level={entry.level} className={logLevelColors[entry.level]}>
+              {entry.text}
+            </span>
+          ))}
         </span>
       </pre>
     </section>

@@ -2,11 +2,11 @@
   "luci-app-daed-router": {
     "description": "Manage the Daed service",
     "read": {
-      "ubus": { "daed-router": ["status", "logs"] },
+      "ubus": { "daed-router": ["status", "logs", "maintenance"] },
       "uci": ["daed", "network"]
     },
     "write": {
-      "ubus": { "daed-router": ["action"] },
+      "ubus": { "daed-router": ["action", "maintain"] },
       "uci": ["daed"]
     }
   }

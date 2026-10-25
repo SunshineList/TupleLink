@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useGeneralQuery, useRunMutation } from '~/apis'
 import { CommunityLinks } from '~/components/CommunityLinks'
+import { RouterVersion } from '~/components/RouterMaintenance'
 import { ThemePicker } from '~/components/ThemePicker'
 import { Button } from '~/components/ui/button'
 
@@ -48,6 +49,7 @@ export function RouterHeader() {
         </div>
         <CommunityLinks />
         <div className="router-toolbar-actions flex flex-wrap items-center gap-2">
+          <RouterVersion />
           <ThemePicker variant="compact" />
           <span
             role="status"

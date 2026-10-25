@@ -31,6 +31,7 @@ import { deriveTime } from '~/utils'
 import { groupColumnBase, groupColumnLocations } from '~/utils/group-columns'
 import { useLatencyTests } from '~/hooks/useLatencyTests'
 import { RouterLogs } from '~/pages/RouterLogs'
+import { RouterGeodata } from '~/components/RouterMaintenance'
 import { Config } from './Config'
 import { DNS } from './DNS'
 import { GroupResource } from './Group'
@@ -859,6 +860,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
               <Config />
               <DNS />
               <Routing />
+              {area === 'advanced' && <RouterGeodata />}
             </>
           )}
         </div>

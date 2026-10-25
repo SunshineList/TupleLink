@@ -73,6 +73,9 @@ class LuCISessionTests(unittest.TestCase):
                 self.assertIn("Status: 403", denied)
                 self.assertIn("origin_rejected", denied)
             reader = ubus("login", {"username": "fixture-reader", "password": "fixture-password"})["ubus_rpc_session"]
+            for method, expected in [("maintenance", True), ("maintain", False)]:
+                access = ubus("access", {"ubus_rpc_session": reader, "scope": "ubus", "object": "daed-router", "function": method})
+                self.assertEqual(access["access"], expected)
             self.assertIn("Status: 403", bootstrap(reader))
             self.assertIn("permission_denied", bootstrap(reader))
             ubus("destroy", {"ubus_rpc_session": admin})

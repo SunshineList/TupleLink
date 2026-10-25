@@ -3,6 +3,8 @@
 'require rpc'
 'require poll'
 'require ui'
+'require dom'
+'require view.daed-router.log-format as logFormat'
 'require view.daed-router.community as community'
 
 var logs = rpc.declare({ object: 'daed-router', method: 'logs', expect: {} })
@@ -15,6 +17,7 @@ return view.extend({
     var following = true
     var latest = ''
     var pending = null
+    var container = null
     var content = E('span', { style: 'display:block' }, '正在读取日志…')
     var output = E(
       'pre',
@@ -69,7 +72,7 @@ return view.extend({
     var failure = E('p', { role: 'alert', style: 'display:none' })
     function showLatest() {
       var text = latest || '暂无日志。'
-      if (content.textContent !== text) content.textContent = text
+      if (content.textContent !== text) dom.content(content, logFormat.render(text))
       output.scrollTop = output.scrollHeight
     }
     function updateHint() {
@@ -93,6 +96,7 @@ return view.extend({
       if (pending) return pending
       pending = logs()
         .then(function (data) {
+          logFormat.theme(container)
           latest = data.logs || ''
           failure.style.display = 'none'
           if (following) {
@@ -113,7 +117,7 @@ return view.extend({
     }
     poll.add(refresh, 2)
     refresh()
-    return E('div', {}, [
+    container = E('div', {}, [
       E(
         'div',
         {
@@ -131,7 +135,9 @@ return view.extend({
         [hint, toggle],
       ),
       failure,
+      logFormat.legend(),
       output,
     ])
+    return container
   },
 })

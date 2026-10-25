@@ -41,6 +41,7 @@ function load(name, protocol = 'http:', page = 'dashboard') {
   vm.runInContext("String.prototype.format = function(...args) { let i=0; return this.replace(/%s/g, () => args[i++]); };", context);
   context.community = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'community.js'), 'utf8') + '\n})()', context);
   context.access = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'access.js'), 'utf8') + '\n})()', context);
+  context.logFormat = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'log-format.js'), 'utf8') + '\n})()', context);
   const view = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, name + '.js'), 'utf8') + '\n})()', context);
   return { view, polls, calls, fetchCalls, setSession: value => {session = value;}, legacySession: () => {delete context.rpc.getSessionID;}, setResponse: value => {response = value;}, setNetworkFailure: () => {networkFailure = true;}, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; }, setFailure: value => { rpcFailure = value; } };
 }
@@ -177,6 +178,17 @@ test('logs are rendered as text instead of executable HTML', async () => {
   const tree = module.view.render();
   await module.polls[0]();
   assert.equal(elements(tree, 'pre')[0].textContent, '<script>alert(1)</script>');
+});
+
+test('native logs color record levels and continuations without altering text', async () => {
+  const module=load('logs');
+  const text='time="now" level=warning msg="failed"\ncontinuation\ntime="later" level=info msg="quoted level=error"\n{"level":"error","msg":"<script>"}\n';
+  module.setResult({logs:text});const tree=module.view.render();await module.polls[0]();
+  assert.equal(elements(tree,'pre')[0].textContent,text);
+  const records=elements(tree,'span').filter(node=>node.attrs['data-log-level']);
+  assert.deepEqual(records.map(node=>node.attrs['data-log-level']),['warning','warning','info','error']);
+  assert.notEqual(records[0].attrs.style,records[2].attrs.style);
+  assert.notEqual(records[2].attrs.style,records[3].attrs.style);
 });
 
 test('native logs follow the tail, freeze history and resume to the latest bounded snapshot', async () => {

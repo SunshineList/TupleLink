@@ -128,6 +128,38 @@ class InstallerMenuTests(unittest.TestCase):
         calls = (self.router.root / 'tmp/pm-calls').read_text().splitlines()
         self.assertFalse(any(line.startswith(('update', 'install ', 'remove ', 'add ', 'del ')) for line in calls))
 
+    def test_online_update_refuses_new_install_or_downgrade_before_stopping(self):
+        for installed in (False, True):
+            with self.subTest(installed=installed):
+                router = test_router.RouterTests()
+                router.setUp()
+                try:
+                    if installed:
+                        router.managed()
+                        router.write('/usr/share/daed-router/version', '0.7.99-1\n')
+                    result = router.install('--install', '--update-only')
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('Online update refused' if installed else 'Existing managed install required', result.stderr)
+                    calls = (router.root / 'tmp/pm-calls').read_text()
+                    self.assertFalse(any(line.startswith(('update', 'install ', 'add ', 'remove ', 'del ')) for line in calls.splitlines()))
+                    if installed:
+                        self.assertTrue((router.root / 'tmp/daemon-running').exists())
+                finally:
+                    router.tearDown()
+
+    def test_uninstall_stops_maintenance_and_backs_up_private_geodata(self):
+        self.router.script('/usr/libexec/daed/nailink-maintenance', 'echo "$*" > /tmp/maintenance-stopped')
+        self.router.write('/etc/daed/geodata/data-1/geosite.dat', 'old private rules')
+        self.router.write('/var/run/daed-maintenance/job.json', '{}')
+        result = self.router.install('--uninstall')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.router.root / 'tmp/maintenance-stopped').read_text().strip(), 'stop')
+        self.assertFalse((self.router.root / 'usr/libexec/daed/nailink-maintenance').exists())
+        self.assertFalse((self.router.root / 'var/run/daed-maintenance').exists())
+        backup = next((self.router.root / 'root/daed-backups').glob('*.tar.gz'))
+        with tarfile.open(backup) as archive:
+            self.assertEqual(archive.extractfile('etc/daed/geodata/data-1/geosite.dat').read(), b'old private rules')
+
     def test_explicit_older_release_still_works_without_the_new_shortcut(self):
         self.router.assets(version='0.6.14')
         with (self.router.root / 'fixtures/install').open('a') as stream:

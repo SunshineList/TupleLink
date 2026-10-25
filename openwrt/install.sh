@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=slobys/NaiLink
-release=openwrt-v0.6.31
+release=openwrt-v0.6.32
 asset_dir=''
 mode=install
 action=install
@@ -16,6 +16,7 @@ menu=auto
 explicit_action=0
 explicit_release=0
 latest_install=0
+update_only=0
 
 fail() { printf 'NaiLink: %s\n' "$*" >&2; exit 1; }
 usage() {
@@ -23,6 +24,7 @@ usage() {
 Usage: sh install.sh [--install | --uninstall | --reinstall] [--release TAG] [--asset-dir DIRECTORY] [--check | --dry-run]
   --menu        Open the Chinese install/update, uninstall and check menu.
   --install     Install or upgrade this script's release without the menu.
+  --update-only Require an existing managed install; never install fresh.
   --uninstall   Back up data, remove NaiLink packages and clear its config/data.
   --reinstall   Verify new assets, then back up/uninstall and install fresh.
   --check       Read-only compatibility check; no package/repository changes.
@@ -141,6 +143,7 @@ while [ "$#" -gt 0 ]; do
 	--release) [ "$#" -ge 2 ] || fail 'Missing release tag.'; release=$2; explicit_release=1; shift 2 ;;
 	--asset-dir) [ "$#" -ge 2 ] || fail 'Missing asset directory.'; asset_dir=$2; shift 2 ;;
 	--menu) menu=1; shift ;;
+	--update-only) update_only=1; explicit_action=1; shift ;;
 	--install|--uninstall|--reinstall) action=${1#--}; explicit_action=1; shift ;;
 	--check) mode=check; explicit_action=1; shift ;;
 	--dry-run) mode=dry-run; explicit_action=1; shift ;;
@@ -154,6 +157,7 @@ if [ "$menu" = auto ]; then
 	if [ "$explicit_action" = 0 ] && [ -t 0 ]; then menu=1; fi
 fi
 [ "$mode" != check ] || [ "$action" = install ] || fail '--check cannot be combined with uninstall/reinstall.'
+[ "$update_only" != 1 ] || [ "$action" = install ] || fail '--update-only requires install/update mode.'
 case "$release" in ''|*[!a-zA-Z0-9._-]*) fail 'Invalid release tag.' ;; esac
 [ "$(id -u)" = 0 ] || fail 'Run on the router as root.'
 if [ ! -r /etc/openwrt_release ] || ! command -v uci >/dev/null 2>&1; then
@@ -228,6 +232,7 @@ uninstall_daed() {
 	for directory in /etc/daed /root/daed-backups; do
 		[ ! -L "$directory" ] || fail "Refusing to clear a symlinked directory: $directory"
 	done
+	[ ! -x /usr/libexec/daed/nailink-maintenance ] || /usr/libexec/daed/nailink-maintenance stop || fail 'Cannot stop NaiLink maintenance before uninstall.'
 	if [ -x /etc/init.d/daed ]; then
 		stopped=1
 		/etc/init.d/daed stop || fail 'Cannot stop NaiLink before uninstall.'
@@ -278,6 +283,8 @@ uninstall_daed() {
 	if pidof daed >/dev/null 2>&1; then fail 'NaiLink restarted during removal; data was retained.'; fi
 	# Fixed paths only; never follow data directory symlinks or touch other apps.
 	rm -rf /etc/daed
+	rm -rf /var/run/daed-maintenance
+	rm -f /usr/libexec/daed/nailink-maintenance
 	rm -f /etc/config/daed /etc/config/daed.apk-new /etc/config/daed.opkg-dist /etc/init.d/daed /usr/bin/daed /usr/sbin/daed-router-setup /usr/sbin/nailink
 	rm -f /usr/libexec/daed/check /usr/libexec/daed/btf-probe /usr/share/daed-router/version
 	rm -f /usr/libexec/daed/luci-proxy /www/cgi-bin/daed-router
@@ -374,6 +381,16 @@ elif installed daed-router; then
 	managed=1
 elif [ -e /usr/bin/daed ] || [ -e /etc/config/daed ] || [ -e /etc/init.d/daed ] || [ -d /etc/daed ]; then
 	fail 'An existing unmanaged NaiLink installation was found. Back it up and migrate explicitly; it will not be overwritten.'
+fi
+if [ "$update_only" = 1 ]; then
+	[ "$managed" = 1 ] || fail 'Existing managed install required for online update; no fresh installation was performed.'
+	online_current=$(cat /usr/share/daed-router/version)
+	online_current=${online_current%%-*}
+	awk -v target="$version" -v current="$online_current" 'BEGIN {
+		if (target !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ || current !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) exit 1;
+		split(target,a,"."); split(current,b,".");
+		for (i=1;i<=3;i++) {if(a[i]+0>b[i]+0)exit 0;if(a[i]+0<b[i]+0)exit 1;}
+	}' || fail 'Online update refused: installed version changed or downgrade requested. Check again.'
 fi
 if [ "$action" != reinstall ] && { installed daed || installed luci-app-daed; }; then fail 'Another NaiLink package is installed; use --reinstall for a backed-up fresh installation.'; fi
 printf 'NaiLink: %s / %s / %s, release %s\n' "$machine" "$format" "$selected_arch" "$version"

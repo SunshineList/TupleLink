@@ -5,11 +5,19 @@ set -e
 
 case "${1:-}" in
 list)
-	printf '%s\n' '{"status":{},"logs":{},"action":{"action":""}}'
+	printf '%s\n' '{"status":{},"logs":{},"maintenance":{},"maintain":{"action":""},"action":{"action":""}}'
 	;;
 call)
 	case "${2:-}" in
 	status) /usr/libexec/daed/check ;;
+	maintenance) /usr/libexec/daed/luci-proxy --maintenance status ;;
+	maintain)
+		input=''; read -r input || :
+		json_load "${input:-\{\}}" || exit 1
+		action=''; json_get_var action action
+		case "$action" in check|update|geodata) /usr/libexec/daed/luci-proxy --maintenance "$action" ;;
+		*) printf '%s\n' '{"success":false,"code":"invalid_action"}' ;; esac
+		;;
 	logs)
 		json_init
 		logs=$(tail -c 32768 /var/log/daed/daed.log 2>/dev/null | tail -n 120 | \

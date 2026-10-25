@@ -67,6 +67,7 @@ class BackendPrepareTests(unittest.TestCase):
         self.assertEqual(lifecycle.count("routerPublishControlPlane(c, conf)"), 2)
         self.assertIn("c.routerRestoreRouting(v, now)", (self.root / "dae-core/control/dns_control.go").read_text(encoding="utf-8"))
         self.assertEqual((self.root / "cmd/run.go").read_text(encoding="utf-8").count('mux.HandleFunc("/health/ready"'), 1)
+        self.assertIn('[]string{cfgDir, cfgDir + "/geodata/current"}', (self.root / "cmd/run.go").read_text(encoding="utf-8"))
         before = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
         PREPARE.prepare(self.root)
         after = {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}

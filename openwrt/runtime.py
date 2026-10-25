@@ -75,8 +75,11 @@ def main():
     # The helpers do not use SQLite and remain pure Go on every architecture.
     env["CGO_ENABLED"] = "0"
     for name in ("btf-probe", "luci-proxy"):
+        sources = [str(HERE / (name + ".go"))]
+        if name == "luci-proxy":
+            sources += [str(HERE / "maintenance.go"), str(HERE / "maintenance-geodata.go")]
         subprocess.run(["go", "build", "-trimpath", "-ldflags=-s -w", "-o", str(output / name),
-                        str(HERE / (name + ".go"))], cwd=wing, env=env, check=True)
+                        *sources], cwd=wing, env=env, check=True)
     for name in ("daed", "btf-probe", "luci-proxy"):
         verify_elf(output / name, args.cpu)
 
