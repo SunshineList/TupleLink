@@ -122,23 +122,23 @@ export function SimpleCard({
             <button
               type="button"
               className={cn(
-                'flex-1 p-3 text-left transition-colors rounded-l-xl',
+                'flex-1 min-w-0 p-2 text-left transition-colors rounded-l-xl sm:p-3',
                 selected ? 'bg-primary/10' : 'hover:bg-accent',
               )}
               onClick={onSelect}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 {selected && (
                   <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground shrink-0">
                     <Check className="w-3 h-3" strokeWidth={3} />
                   </div>
                 )}
-                <h4 className={cn('font-semibold', selected && 'text-primary')}>{name}</h4>
+                <h4 className={cn('truncate font-semibold', selected && 'text-primary')}>{name}</h4>
               </div>
             </button>
           )}
 
-          <div className="flex items-center gap-2 p-3">
+          <div className="flex shrink-0 items-center gap-1 p-2 sm:gap-2 sm:p-3">
             {!isEditing && onRename && (
               <SimpleTooltip label={t('actions.rename')}>
                 <Button variant="ghost" size="xs" onClick={handleStartEdit}>
