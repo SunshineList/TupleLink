@@ -35,4 +35,4 @@ PR 目标为本仓库 `main`。不要直接更新固定后端子模块；增量�
 
 发布时从 `main` 手动运行 **OpenWrt plugin**，填写与源码一致的版本号；默认只生成 artifact。勾选 `publish` 后，全部检查成功才创建 GitHub 测试版草稿，上传安装包、校验清单和完整源码。维护者检查草稿后发布。
 
-同名已发布版本和不匹配的标签不会被覆盖；同一提交的失败草稿可重试。此流程无需创建发布 PR，也不依赖 Docker Hub、Quay 或原项目组织权限。在线文档只由 **Online documentation** 部署。
+同名已发布版本和不匹配的标签不会被覆盖；同一提交的失败草稿可重试。此流程无需创建发布 PR，也不依赖 Docker Hub、Quay 或原项目组织权限。在线文档只由 **Online documentation** 部署。该工作流的 build 每次都会跑；deploy 需要先在仓库 Settings → Pages 打开 GitHub Pages（Source 选 GitHub Actions），再把 Actions variable `DOCS_DEPLOY` 设为 `1`，否则 deploy 会跳过而不是失败。

@@ -34,7 +34,11 @@ jobs:
           path: .build/docs-site
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # GitHub Pages has to be enabled once from the repository settings, and
+    # that toggle lives outside the workflow. Until it is, configure-pages
+    # fails every run and the red badge hides whatever else broke. Gate the
+    # deploy on a variable the maintainer can flip on when Pages is on.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DOCS_DEPLOY == '1'
     needs: build
     runs-on: ubuntu-24.04
     permissions:
