@@ -190,7 +190,12 @@ export function SubscriptionResource({
                     >
                       {t('panel.lastUpdated')} {dayjs(updatedAt).format('MM-DD HH:mm')}
                     </time>
-                    {status === 'ok' && <span className="subscription-update-ok">{t('panel.updateSuccess')}</span>}
+                    <span
+                      className={cn('subscription-update-ok', status && 'subscription-update-failed')}
+                      title={status || undefined}
+                    >
+                      {status || t('panel.neverUpdated')}
+                    </span>
                     {cronEnable && (
                       <span className="subscription-auto" title={cronExp}>
                         {t('panel.autoUpdate')}

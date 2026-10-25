@@ -1248,6 +1248,14 @@ form {
 .subscription-update-ok {
   color: var(--muted-foreground);
 }
+/* 后端把订阅失败原因写进 Status；这是用户唯一能看到的地方，别用灰色埋掉。 */
+.subscription-update-failed {
+  max-width: 22ch;
+  overflow: hidden;
+  color: oklch(0.68 0.14 62);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .subscription-card-footer {
   display: flex;
   flex-wrap: wrap;

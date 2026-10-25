@@ -517,7 +517,8 @@
     "timeRange": "Time range",
     "totalTrafficShort": "Session traffic",
     "statsUnavailable": "Updates unavailable",
-    "logs": "Runtime log"
+    "logs": "Runtime log",
+    "neverUpdated": "Never updated"
   },
   "importResource": {
     "optionalTag": "Label (optional)",
