@@ -570,6 +570,7 @@
   },
   "logs": {
     "title": "NaiLink 运行日志",
+    "legend": "日志级别",
     "hintLive": "每 2 秒刷新 · 自动跟随最新日志",
     "hintHistoryNew": "正在查看历史 · 有新日志，点击回到最新",
     "hintHistory": "正在查看历史 · 已暂停跟随",

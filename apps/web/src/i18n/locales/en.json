@@ -570,6 +570,7 @@
   },
   "logs": {
     "title": "NaiLink runtime log",
+    "legend": "Log levels",
     "hintLive": "Refreshes every 2 seconds · following the latest entries",
     "hintHistoryNew": "Viewing history · new entries available, jump to latest",
     "hintHistory": "Viewing history · following paused",
