@@ -31,6 +31,7 @@ def router_transactions(text):
 
 
 def router_auth(text):
+    text = text.replace('[]string{cfgDir}', '[]string{cfgDir, cfgDir + "/geodata/current"}')
     text = (text.replace('ctx := context.Background()', 'ctx := r.Context()')
             .replace('db.DB(context.TODO()).Model(&db.User{})', 'db.DB(r.Context()).Model(&db.User{})')
             .replace('err == nil && time.Now().Before(expireAt.Time)', 'err == nil && expireAt != nil && time.Now().Before(expireAt.Time)'))
@@ -41,6 +42,24 @@ def router_auth(text):
 
 
 def router_lifecycle(text):
+    if '*RouterGeodataTransaction' not in text:
+        text = text.replace('Callback chan<- error', 'Callback chan<- error\n\tGeodata *RouterGeodataTransaction', 1)
+    if 'routerSetGeodataRoot(externGeoDataDirs)' not in text:
+        text = text.replace('defer close(GracefullyExit)', 'defer close(GracefullyExit)\n\trouterSetGeodataRoot(externGeoDataDirs)', 1)
+    if 'routerBeginGeodata(newConf.Geodata)' not in text:
+        text = text.replace('newConf.Callback <- nil', 'if newConf.Geodata != nil { _, err := routerBeginGeodata(newConf.Geodata); newConf.Callback <- err } else { newConf.Callback <- nil }', 1)
+    if 'routerBeginGeodata(newReloadMsg.Geodata)' not in text:
+        text = text.replace('newConf := newReloadMsg.Config', '''newConf := newReloadMsg.Config
+            var rollbackGeodata func() error
+            if newReloadMsg.Geodata != nil {
+                var geoErr error
+                rollbackGeodata, geoErr = routerBeginGeodata(newReloadMsg.Geodata)
+                if geoErr != nil { newReloadMsg.Callback <- geoErr; continue }
+                newConf = conf
+            }''', 1)
+        text = text.replace('// Load last config back.', '''// Restore the old asset pointer before the fallback reads the old config.
+                if rollbackGeodata != nil { if geoErr := rollbackGeodata(); geoErr != nil { log.Error("[Reload] Cannot restore previous geodata") } }
+                // Load last config back.''', 1)
     text = text.replace('"sync"', '"sync"\n\t"sync/atomic"') if '"sync/atomic"' not in text else text
     text = text.replace('var c *control.ControlPlane', 'var currentControlPlane atomic.Pointer[control.ControlPlane]')
     text = text.replace('func ControlPlane() (*control.ControlPlane, error) {\n\tif c == nil', 'func ControlPlane() (*control.ControlPlane, error) {\n\tc := currentControlPlane.Load()\n\tif c == nil')
@@ -332,7 +351,8 @@ func _fetchLinksContext(ctx context.Context, subscriptionLink string, transport 
     target: String!
 }
 type Mutation {
-    testNodeUDP(id: ID!): NodeUdpTest! @hasRole(role: ADMIN)''', 1)),
+    testNodeUDP(id: ID!): NodeUdpTest! @hasRole(role: ADMIN)
+    activateGeodata(target: String!, previous: String!): Int! @hasRole(role: ADMIN)''', 1)),
     }
     for relative, (original, transform) in patches.items():
         destination = root / relative
@@ -369,6 +389,12 @@ type Mutation {
     run = run.replace('tx := db.BeginTx(context.TODO())\n', 'tx := db.BeginTx(context.TODO())\n\tif tx.Error != nil { return 0, tx.Error }\n\tdefer tx.Rollback()\n') if 'defer tx.Rollback()' not in run else run
     run = run.replace('\ttx.Commit()\n', '\tif err := tx.Commit().Error; err != nil { return 0, err }\n')
     mutation_text = mutation_text[:begin] + run + mutation_text[end:]
+    schema_file = root / "graphql/root_schema.go"
+    schema_text = schema_file.read_text(encoding="utf-8")
+    if 'activateGeodata(target:' not in schema_text:
+        schema_text = schema_text.replace('type Mutation {', 'type Mutation {\n    activateGeodata(target: String!, previous: String!): Int! @hasRole(role: ADMIN)', 1)
+    schema_file.write_text(schema_text, encoding="utf-8", newline="\n")
+    generated["graphql/root_schema.go"] = digest(schema_text.encode())
     mutation_file.write_text(mutation_text, encoding="utf-8", newline="\n")
     generated["graphql/mutation.go"] = digest(mutation_text.encode())
     destination = root / "graphql/service/node/router_latency_test.go"
@@ -385,6 +411,10 @@ type Mutation {
         ("graphql/router_transactions_test.go", "transaction_test.go"),
         ("cmd/router_http_context_test.go", "http_context_test.go"),
         ("dae/router_network_ready.go", "network_ready.go"),
+        ("dae/router_geodata_update.go", "geodata_update.go"),
+        ("dae/router_geodata_update_test.go", "geodata_update_test.go"),
+        ("graphql/router_geodata_mutation.go", "geodata_mutation.go"),
+        ("graphql/router_geodata_mutation_test.go", "geodata_mutation_test.go"),
         ("dae/router_restart_state.go", "restart_state.go"),
         ("dae/router_restart_state_test.go", "restart_state_test.go"),
         ("cmd/router_readiness_http.go", "readiness_http.go"),

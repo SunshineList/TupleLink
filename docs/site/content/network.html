@@ -104,7 +104,20 @@ fallback: proxy</code></pre>
   <li>用目标局域网设备重新发起连接，测试应直连和应代理的网站。</li>
   <li>结合“运行日志”、实际绑定和连接结果判断；需要时切回保留的旧方案再应用。</li>
 </ol>
+<h2 id="geodata">更新 GeoIP / GeoSite</h2>
 <p>
-  规则库来自固件的 <code>v2ray-geoip</code> /
-  <code>v2ray-geosite</code> 包。缺少规则文件时修复固件依赖，不要创建空文件来跳过检查。
+  安装时提供固件的 <code>v2ray-geoip</code> / <code>v2ray-geosite</code> 依赖。0.6.32 起，在<strong
+    >高级设置 → GeoIP / GeoSite 规则库</strong
+  >点击“一键更新规则库”，可下载 Loyalsoldier/v2ray-rules-dat 的最新发布数据。
+</p>
+<p>
+  两份文件的 SHA-256 和完整格式都通过后才成对启用，显示当前批次。数据保存在 NaiLink 独立目录
+  <code>/etc/daed/geodata</code>，保留当前和上一批次，不修改其他插件使用的系统文件。
+</p>
+<p>
+  代理运行时会用当前运行配置重新加载规则，短暂影响已有连接；加载失败先恢复旧文件再恢复旧控制面。未应用的配置编辑不会顺带生效，原本停止的代理不会被自动开启。下载或校验失败可直接重试；通信中断而无法确认加载结果时，先查看日志和当前批次。
+</p>
+<p>
+  检测到 <code>/etc/daed/geoip.dat</code> 或
+  <code>/etc/daed/geosite.dat</code> 自定义文件时会停止自动更新，保留文件供你自行管理。不要创建空文件来跳过依赖检查。
 </p>

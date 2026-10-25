@@ -24,6 +24,7 @@ GitHub 的 Download ZIP 不包含后端子模块。已有工作区运行 `git su
 pnpm build --filter=daed
 python3 openwrt/prepare-wing.py wing
 make VERSION=0.6.31
+make VERSION=0.6.32
 ./daed --version
 sudo ./daed run --config /etc/daed
 ```
@@ -45,6 +46,7 @@ sudo systemctl enable --now daed
 
 ```sh
 docker build --build-arg DAED_VERSION=0.6.31 -t nailink:local .
+docker build --build-arg DAED_VERSION=0.6.32 -t nailink:local .
 docker run --rm nailink:local daed --version
 docker compose up -d
 ```

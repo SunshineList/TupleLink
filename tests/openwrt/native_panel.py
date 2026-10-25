@@ -9,6 +9,7 @@ import hashlib
 import http.server
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sqlite3
@@ -28,10 +29,14 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--old-menu", type=Path, help="Use a real previous-release LuCI menu until upgrade")
     parser.add_argument("--old-proxy", type=Path, help="Use the previous gateway until upgrade for cache/performance comparisons")
+    parser.add_argument("--maintenance-fixture", action="store_true", help="Use private trusted HTTPS/procd fixtures for online-update tests")
+    parser.add_argument("--geodata-probe", type=Path, help="Test-only geodata fixture generator")
     args = parser.parse_args()
     if os.geteuid() != 0:
         parser.error("Run as root with an isolated, checksum-verified OpenWrt rootfs")
     project = Path(__file__).resolve().parents[2]
+    if args.maintenance_fixture and not args.geodata_probe:
+        parser.error("--maintenance-fixture requires --geodata-probe")
     root = args.workspace / "root"
     if args.workspace.exists():
         parser.error("Workspace already exists; select a new dedicated directory")
@@ -72,6 +77,13 @@ def main():
     checker = root / "usr/libexec/daed/check"
     checker.write_text("#!/bin/sh\necho '{\"running\":true,\"listen\":\"127.0.0.1:12025\",\"checks\":[]}'\n")
     checker.chmod(0o755)
+    def runtime_version(binary):
+        text = subprocess.check_output([str(binary), "--version"], text=True)
+        match = re.search(r"[0-9]+\.[0-9]+\.[0-9]+", text)
+        return match[0] + "-1" if match else "unknown"
+    marker = root / "usr/share/daed-router/version"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(runtime_version(args.old_runtime) + "\n")
     board = root / "usr/libexec/rpcd/system"
     board.write_text("#!/bin/sh\ncase \"$1\" in list) echo '{\"board\":{}}';; call) echo '{\"hostname\":\"OpenWrt UI test\",\"rootfs_type\":\"squashfs\",\"release\":{\"description\":\"Isolated OpenWrt 24.10.4\"}}';; esac\n")
     board.chmod(0o755)
@@ -168,12 +180,19 @@ def main():
             return {name: hashlib.sha256(repr(sorted(connection.execute('SELECT * FROM "' + name.replace('"', '""') + '"').fetchall(), key=repr)).encode()).hexdigest() for name in tables}
 
     baseline = None
+    maintenance = None
     try:
         processes.append(subprocess.Popen(["chroot", str(root), "/sbin/ubusd"], stdout=streams[0], stderr=subprocess.STDOUT))
         for _ in range(50):
             if (root / "var/run/ubus/ubus.sock").exists():
                 break
             time.sleep(0.05)
+        if args.maintenance_fixture:
+            from maintenance_fixture import MaintenanceFixture
+            maintenance = MaintenanceFixture(root, project, args.geodata_probe)
+            namespace = maintenance.procd()
+            namespace.maintenance_namespace = True
+            processes.append(namespace)
         processes.append(subprocess.Popen(["chroot", str(root), "/sbin/rpcd"], stdout=streams[1], stderr=subprocess.STDOUT))
         daemon = start_daemon(args.old_runtime)
         processes.append(subprocess.Popen(["chroot", str(root), "/usr/sbin/uhttpd", "-f", "-p", "127.0.0.1:18080", "-s", "127.0.0.1:18443", "-C", "/etc/smoke.crt", "-K", "/etc/smoke.key", "-h", "/www", "-x", "/cgi-bin", "-u", "/ubus", "-n", "8", "-t", "60"], stdout=streams[3], stderr=subprocess.STDOUT))
@@ -206,6 +225,7 @@ def main():
                             cache.unlink()
                     subprocess.run([str(args.proxy), "--config", str(root / "etc/daed"), "--prepare"], check=True)
                     daemon = start_daemon(args.runtime)
+                    marker.write_text(runtime_version(args.runtime) + "\n")
                     after = snapshot()
                     answer["unchanged"] = baseline == after
                     answer["changed_tables"] = sorted(name for name in set(baseline) | set(after) if baseline.get(name) != after.get(name))
@@ -229,6 +249,22 @@ def main():
                         state["proxy_down"] = request["down"]
                     answer["requests"] = state["proxy_requests"]
                     answer["address"] = "127.0.0.1:" + str(socks.server_address[1])
+                elif action == "maintenance" and maintenance:
+                    if "fail" in request:
+                        if request["fail"] not in ("", "download", "checksum", "invalid_geodata"): raise ValueError("Invalid fixture failure mode")
+                        maintenance.state["fail"] = request["fail"]
+                    if request.get("bump"):
+                        maintenance.state["geo"] = str(int(maintenance.state["geo"]) + 1)
+                    if "custom" in request:
+                        custom = root / "etc/daed/geoip.dat"
+                        if request["custom"]:
+                            if custom.exists(): raise ValueError("Custom fixture already exists")
+                            custom.write_text("native maintenance custom fixture")
+                        elif custom.exists() and custom.read_text() == "native maintenance custom fixture":
+                            custom.unlink()
+                    pointer = root / "etc/daed/geodata/current"
+                    answer["current"] = os.readlink(pointer) if pointer.is_symlink() else ""
+                    answer["requests"] = maintenance.state["requests"]
                 result.write_text(json.dumps(answer))
             time.sleep(0.1)
     finally:
@@ -236,7 +272,8 @@ def main():
             daemon.terminate()
             daemon.wait(timeout=10)
         for process in reversed(processes):
-            process.terminate()
+            if getattr(process, "maintenance_namespace", False): process.kill()
+            else: process.terminate()
         for process in reversed(processes):
             process.wait(timeout=10)
         feed.shutdown()
@@ -248,6 +285,8 @@ def main():
         proxy_feed.server_close()
         for stream in streams:
             stream.close()
+        if maintenance:
+            maintenance.close()
 
 
 if __name__ == "__main__":

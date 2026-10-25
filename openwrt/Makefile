@@ -60,6 +60,8 @@ define Package/daed-router/install
 	$(INSTALL_BIN) ./files/daed.init $(1)/etc/init.d/daed
 	$(INSTALL_CONF) ./files/daed.config $(1)/etc/config/daed
 	$(INSTALL_DIR) $(1)/usr/libexec/daed $(1)/usr/share/daed-router
+	# Keep the one-shot task outside init.d: package upgrades must not stop it.
+	$(INSTALL_BIN) ./files/maintenance.init $(1)/usr/libexec/daed/nailink-maintenance
 	$(INSTALL_BIN) ./files/daed-check $(1)/usr/libexec/daed/check
 	$(INSTALL_BIN) ./files/subscription-proxy $(1)/usr/libexec/daed/subscription-proxy
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/btf-probe $(1)/usr/libexec/daed/btf-probe

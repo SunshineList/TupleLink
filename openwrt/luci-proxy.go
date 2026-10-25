@@ -357,7 +357,13 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 func main() {
 	configDir := flag.String("config", "/etc/daed", "NaiLink configuration directory")
 	initialize := flag.Bool("prepare", false, "Prepare local identity before starting NaiLink")
+	maintenance := flag.String("maintenance", "", "Run an authorized local maintenance task")
+	maintenanceJob := flag.String("maintenance-job", "", "One-shot maintenance task identifier")
 	flag.Parse()
+	if *maintenance != "" {
+		maintenanceCLI(*maintenance, *configDir, *maintenanceJob)
+		return
+	}
 	if *initialize {
 		if err := prepare(*configDir); err != nil {
 			fmt.Fprintln(os.Stderr, "Cannot prepare LuCI access:", err)

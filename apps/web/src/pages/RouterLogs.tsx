@@ -5,6 +5,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
+import { logLevelColors } from '~/utils/log-level'
 import { parseLogLines } from '~/utils/log-lines'
 
 // Use the same read-only LuCI RPC as the native logs view. Never expose a new
@@ -135,6 +136,13 @@ export function RouterLogs() {
           </button>
         </p>
       )}
+      <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label={t('logs.legend')}>
+        {(['debug', 'info', 'warning', 'error'] as const).map((level) => (
+          <span key={level} className={cn('font-semibold uppercase', LEVEL_TONE[level])}>
+            {t(`logs.level.${level}`)}
+          </span>
+        ))}
+      </div>
       <div
         id="router-log-output"
         ref={output}

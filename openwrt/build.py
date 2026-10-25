@@ -150,6 +150,8 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             executables.append("usr/sbin/daed-router-setup")
             executables.append("usr/sbin/nailink")
             executables.append("usr/libexec/daed/network-check")
+            expected["usr/libexec/daed/nailink-maintenance"] = "files/maintenance.init"
+            executables.append("usr/libexec/daed/nailink-maintenance")
         else:
             expected = {"usr/share/luci/menu.d/luci-app-daed-router.json": "files/menu.json", "usr/share/rpcd/acl.d/luci-app-daed-router.json": "files/acl.json", "usr/libexec/rpcd/daed-router": "files/rpcd-daed"}
             expected.update({"www/luci-static/resources/view/daed-router/" + path.name: "htdocs/" + path.name for path in (HERE / "htdocs").glob("*.js")})

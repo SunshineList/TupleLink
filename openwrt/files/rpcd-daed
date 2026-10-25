@@ -5,7 +5,7 @@ set -e
 
 case "${1:-}" in
 list)
-	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"action":{"action":""}}'
+	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"maintenance":{},"maintain":{"action":""},"action":{"action":""}}'
 	;;
 call)
 	case "${2:-}" in
@@ -43,6 +43,14 @@ call)
 		json_add_boolean truncated "$([ "${size:-0}" -gt 32768 ] && echo 1 || echo 0)"
 		[ "$status" = 0 ] || json_add_string note 'The check exited early; the output above may be incomplete.'
 		json_dump
+		;;
+	maintenance) /usr/libexec/daed/luci-proxy --maintenance status ;;
+	maintain)
+		input=''; read -r input || :
+		json_load "${input:-\{\}}" || exit 1
+		action=''; json_get_var action action
+		case "$action" in check|update|geodata) /usr/libexec/daed/luci-proxy --maintenance "$action" ;;
+		*) printf '%s\n' '{"success":false,"code":"invalid_action"}' ;; esac
 		;;
 	logs)
 		json_init

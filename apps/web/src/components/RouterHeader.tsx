@@ -8,6 +8,7 @@ import { useGeneralQuery, useRunMutation } from '~/apis'
 import { CommunityLinks } from '~/components/CommunityLinks'
 import { NetworkCheckDialog } from '~/components/NetworkCheckDialog'
 import { HealthChip, RouterHealth } from '~/components/RouterHealth'
+import { RouterVersion } from '~/components/RouterMaintenance'
 import { ThemePicker } from '~/components/ThemePicker'
 import { Button } from '~/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '~/components/ui/sheet'
@@ -72,6 +73,7 @@ export function RouterHeader() {
               <HealthChip status={status.data} />
             </Button>
           )}
+          <RouterVersion />
           <ThemePicker variant="compact" />
           <span
             role="status"
