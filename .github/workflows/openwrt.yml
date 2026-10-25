@@ -118,12 +118,13 @@ jobs:
       - name: go vet
         if: matrix.cpu == 'x86_64'
         run: |
-          # vet the real packages in the backend module, then the two helpers
-          # that are compiled as single files by runtime.py. Running them
-          # together fails because both are package main.
+          # vet the real packages in the backend module, then the helpers in
+          # the same file groups runtime.py hands to go build: luci-proxy
+          # needs maintenance.go next to it or maintenanceCLI is undefined.
+          # Running the two helpers together still fails, both are package main.
           (cd wing && GOOS=linux GOARCH=amd64 go vet -tags daed_stub_ebpf ./...)
           (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/btf-probe.go)
-          (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/luci-proxy.go)
+          (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/luci-proxy.go ../openwrt/maintenance.go ../openwrt/maintenance-geodata.go)
       - name: BTF parser tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
