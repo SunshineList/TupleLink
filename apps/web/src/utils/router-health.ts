@@ -23,6 +23,8 @@ export interface RouterStatus {
   running?: boolean
   enabled?: boolean
   autostart?: boolean
+  // luci-app-daed-router 提供 LuCI 菜单入口；只装 daed-router 时这里为 false。
+  luci?: boolean
   checks?: RouterCheck[]
 }
 
@@ -92,6 +94,12 @@ export function formatVersion(status?: RouterStatus | null): string {
 export function formatPlatform(status?: RouterStatus | null): string {
   const parts = [status?.firmware, status?.release].filter((part): part is string => !!part && part !== 'unknown')
   return parts.join(' ')
+}
+
+// 只装了 daed-router 的情况下 ubus 方法与面板资源都在，但 LuCI 菜单里没有入口。
+// 用户从「系统 - 软件包」看是装好的，却找不到面板，只能去猜。
+export function panelMissing(status?: RouterStatus | null): boolean {
+  return status?.luci === false
 }
 
 export function shouldOfferStart(status?: RouterStatus | null): boolean {

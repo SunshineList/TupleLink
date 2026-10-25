@@ -9,6 +9,7 @@ import {
   attentionChecks,
   formatPlatform,
   formatVersion,
+  panelMissing,
   readChecks,
   summariseHealth,
 } from '~/utils/router-health'
@@ -83,6 +84,17 @@ function CheckRow({ check }: { check: RouterCheck }) {
 
 // 试验架构上的失败长得和配置错误一模一样，用户只能反复重装。
 // 这里用一句话把责任归到位：先说明是板子的问题，再说代理内核本身没问题。
+function PanelMissingNote({ status }: { status?: RouterStatus | null }) {
+  const { t } = useTranslation()
+  if (!panelMissing(status)) return null
+  return (
+    <div role="status" className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm">
+      <p className="font-medium text-destructive">{t('health.luciMissing')}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{t('health.luciMissingHint')}</p>
+    </div>
+  )
+}
+
 function ArchitectureNote({ architecture }: { architecture?: string | null }) {
   const { t } = useTranslation()
   const tier = architectureTier(architecture)
@@ -119,6 +131,7 @@ export function RouterHealth({ status, className }: { status?: RouterStatus | nu
       <div className={cn('flex flex-col gap-3', className)}>
         <p className="text-xs text-muted-foreground">{status ? t('health.noChecks') : t('health.unavailable')}</p>
         <RouterBootToggle status={status} />
+        <PanelMissingNote status={status} />
       </div>
     )
   }
@@ -138,6 +151,8 @@ export function RouterHealth({ status, className }: { status?: RouterStatus | nu
       </div>
 
       <RouterBootToggle status={status} />
+
+      <PanelMissingNote status={status} />
 
       <ArchitectureNote architecture={status?.architecture} />
 

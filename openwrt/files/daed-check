@@ -170,6 +170,11 @@ boot=0
 json_add_boolean autostart "$boot"
 version=$(cat /usr/share/daed-router/version 2>/dev/null) || version=uninstalled
 json_add_string version "$version"
+# 面板本身由 luci-app-daed-router 提供；只装 daed-router 时 ubus 方法齐全，
+# 但 LuCI 里没有入口，用户会以为插件装坏了。这里如实上报，让面板说明清楚。
+luci=0
+[ -f /usr/share/luci/menu.d/luci-app-daed-router.json ] && luci=1
+json_add_boolean luci "$luci"
 json_dump
 if [ "${1:-}" = --check ]; then
 	[ "$compatible" = 1 ]

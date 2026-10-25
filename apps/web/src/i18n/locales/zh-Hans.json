@@ -568,7 +568,9 @@
     },
     "open": "查看系统自检",
     "description": "路由器在启动代理前执行的只读检查。",
-    "blockedHint": "存在阻塞项时代理无法启动。请先处理上面列出的固件或软件包问题，然后重新打开此面板。"
+    "blockedHint": "存在阻塞项时代理无法启动。请先处理上面列出的固件或软件包问题，然后重新打开此面板。",
+    "luciMissing": "没有安装 LuCI 入口包",
+    "luciMissingHint": "运行时包已经装好，所以这个页面能用，但 LuCI 菜单里还没有入口。装上同版本的 luci-app-daed-router 就会出现正常入口。"
   },
   "logs": {
     "title": "NaiLink 运行日志",

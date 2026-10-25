@@ -568,7 +568,9 @@
     },
     "open": "Open system diagnostics",
     "description": "Read-only checks run by the router before the proxy starts.",
-    "blockedHint": "A blocking check must be resolved before the proxy can start. Fix the firmware or package listed above, then reopen this panel."
+    "blockedHint": "A blocking check must be resolved before the proxy can start. Fix the firmware or package listed above, then reopen this panel.",
+    "luciMissing": "The LuCI entry point is not installed",
+    "luciMissingHint": "The daemon package is present, so this page works, but there is no menu item in LuCI yet. Install luci-app-daed-router of the same version to get the normal entry."
   },
   "logs": {
     "title": "NaiLink runtime log",

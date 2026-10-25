@@ -7,6 +7,7 @@ import {
   bootState,
   formatPlatform,
   formatVersion,
+  panelMissing,
   readChecks,
   serviceLevel,
   shouldOfferStart,
@@ -147,6 +148,19 @@ describe('shouldOfferStart', () => {
     expect(shouldOfferStart({ ...healthy, running: true })).toBe(false)
     expect(shouldOfferStart({ ...healthy, compatible: false })).toBe(false)
     expect(shouldOfferStart(undefined)).toBe(false)
+  })
+})
+
+describe('panelMissing', () => {
+  it('reports a router where only the daemon package is installed', () => {
+    expect(panelMissing({ ...healthy, luci: false })).toBe(true)
+  })
+  it('stays quiet when the LuCI entry point is installed', () => {
+    expect(panelMissing({ ...healthy, luci: true })).toBe(false)
+  })
+  it('does not guess when the router says nothing', () => {
+    expect(panelMissing(healthy)).toBe(false)
+    expect(panelMissing(undefined)).toBe(false)
   })
 })
 

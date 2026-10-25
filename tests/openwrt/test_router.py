@@ -423,6 +423,19 @@ echo '{"ready":true,"phase":"ready"}' > /tmp/readiness''')
         self.assertTrue(json.loads(result.stdout)["success"])
         self.assertFalse((self.root / "tmp/daemon-running").exists())
 
+    def test_rpc_status_reports_a_missing_luci_entry_point(self):
+        self.managed()
+        self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
+        # 只装了 daed-router 时菜单文件不存在，自检必须如实上报，
+        # 否则用户看着包装好了却找不到入口。
+        result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(json.loads(result.stdout)["luci"])
+        self.write("/usr/share/luci/menu.d/luci-app-daed-router.json", "{}")
+        result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)["luci"])
+
     def test_rpc_network_reports_the_check_without_touching_the_router(self):
         self.managed()
         self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
