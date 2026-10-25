@@ -4,9 +4,15 @@ import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { version } from './package.json'
+import site from '../../docs/site/site.json'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+// The panel shows the plugin version, not the npm package version: apps/web
+// still carries the upstream daed number, and showing 1.28.0 next to a 0.6.30
+// package was actively misleading. site.json is the source the release tooling
+// already validates against the Makefile, the installer and the workflow.
+const version = site.version
 
 export default defineConfig(() => {
   return {
