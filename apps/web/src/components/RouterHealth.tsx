@@ -4,7 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { RouterBootToggle } from '~/components/RouterBootToggle'
 import { Badge } from '~/components/ui/badge'
 import { cn } from '~/lib/utils'
-import { attentionChecks, formatPlatform, formatVersion, readChecks, summariseHealth } from '~/utils/router-health'
+import {
+  architectureTier,
+  attentionChecks,
+  formatPlatform,
+  formatVersion,
+  readChecks,
+  summariseHealth,
+} from '~/utils/router-health'
 
 const LEVEL_ICON = {
   ok: CheckCircle2,
@@ -74,6 +81,28 @@ function CheckRow({ check }: { check: RouterCheck }) {
   )
 }
 
+// 试验架构上的失败长得和配置错误一模一样，用户只能反复重装。
+// 这里用一句话把责任归到位：先说明是板子的问题，再说代理内核本身没问题。
+function ArchitectureNote({ architecture }: { architecture?: string | null }) {
+  const { t } = useTranslation()
+  const tier = architectureTier(architecture)
+  if (tier === 'supported' || tier === 'unknown') return null
+  return (
+    <p
+      className={cn(
+        'rounded-lg border p-3 text-xs leading-relaxed',
+        tier === 'experimental'
+          ? 'border-amber-500/30 bg-amber-500/5 text-amber-900 dark:text-amber-200'
+          : 'border-destructive/30 bg-destructive/5 text-destructive',
+      )}
+    >
+      {t(tier === 'experimental' ? 'health.archExperimental' : 'health.archUnsupported', {
+        arch: architecture,
+      })}
+    </p>
+  )
+}
+
 // 路由器本来就会返回一份完整的诊断载荷；面板之前直接把它扔掉了，
 // 所以不兼容的固件看起来和健康固件一模一样，
 // 直到用户按下「启动」再去看日志。
@@ -109,6 +138,8 @@ export function RouterHealth({ status, className }: { status?: RouterStatus | nu
       </div>
 
       <RouterBootToggle status={status} />
+
+      <ArchitectureNote architecture={status?.architecture} />
 
       {attention.length > 0 ? (
         <ul className="flex flex-col gap-2">

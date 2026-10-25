@@ -541,6 +541,8 @@
     "noChecks": "当前 NaiLink 版本不上报自检信息。",
     "unavailable": "自检信息需在 LuCI 后台查看。",
     "kernel": "内核 {{kernel}}",
+    "archUnsupported": "没有面向 {{arch}} 的安装包。支持 x86_64 与 ARM64，ARMv7 / MIPS32 为试验性构建。此固件无法运行透明代理。",
+    "archExperimental": "当前 {{arch}} 为试验性构建：常见的 32 位内核无法加载透明代理所需的 BPF 回调。安装可能显示成功，但实际无法分流流量。需要稳定运行请换用 x86_64 或 ARM64。",
     "bootTitle": "开机自动启动",
     "bootOnHint": "路由器通电后代理会自动启动。",
     "bootOffHint": "重启后代理保持停止，需要手动启动。",
@@ -623,5 +625,28 @@
     "copy": "复制报告",
     "copied": "报告已复制",
     "open": "打开网络检查"
+  },
+  "backup": {
+    "title": "备份与恢复配置",
+    "open": "备份或恢复配置",
+    "description": "把节点、订阅、群组、DNS 和分流保存成一份你自己保管的 JSON，刷机或换路由器后导入即可恢复。",
+    "exportTitle": "导出",
+    "exportHint": "文件里含节点和订阅链接，请当作密码一样保管。",
+    "export": "下载备份",
+    "exporting": "正在导出…",
+    "exported": "已导出 {{count}} 项条目。",
+    "importTitle": "恢复",
+    "importHint": "同名的现有条目会被复用而不是覆盖，也不会删除任何数据。",
+    "choose": "选择备份文件",
+    "unreadable": "这个文件不是可用的备份。",
+    "preview": "包含 {{configs}} 份配置、{{routings}} 条分流、{{dnss}} 条 DNS、{{groups}} 个群组、{{nodes}} 个节点、{{subscriptions}} 个订阅。",
+    "mergeHint": "恢复只会补齐缺失的条目，路由器上现有的内容保持不变。",
+    "restore": "开始恢复",
+    "restoring": "正在恢复 {{done}}/{{total}}…",
+    "restored": "已恢复 {{count}} 项条目。",
+    "restoredWithWarnings": "已恢复，但有 {{count}} 项被跳过，请查看下面的列表。",
+    "reportCreated": "新建 {{count}} 项条目。",
+    "reportReused": "复用了 {{count}} 项现有条目。",
+    "close": "关闭"
   }
 }

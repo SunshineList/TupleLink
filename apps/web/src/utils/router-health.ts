@@ -98,6 +98,21 @@ export function shouldOfferStart(status?: RouterStatus | null): boolean {
   return !!status && status.running === false && status.compatible !== false
 }
 
+// 官方支持的架构能跑完整数据面，试验架构则已知在常见 32 位内核上
+// 加载不了必需的 BPF 回调。用户拿到的只是「安装失败」或「延迟全红」，
+// 却看不出根因就是手里这块板子，所以把架构结论单独拎出来给一句人话。
+export type ArchitectureTier = 'supported' | 'experimental' | 'unsupported' | 'unknown'
+
+const EXPERIMENTAL_ARCHES = new Set(['armv7', 'armv7l', 'mips', 'mipsel', 'mipsle'])
+
+export function architectureTier(architecture?: string | null): ArchitectureTier {
+  const arch = architecture?.trim().toLowerCase()
+  if (!arch || arch === 'unknown') return 'unknown'
+  if (arch === 'x86_64' || arch === 'aarch64') return 'supported'
+  if (EXPERIMENTAL_ARCHES.has(arch)) return 'experimental'
+  return 'unsupported'
+}
+
 // `autostart` 对应 /etc/init.d/daed enable，是唯一能跨重启保留的状态；
 // `enabled` 只表示守护进程当前允许运行。
 // 一旦在已开机自启的安装上手动停掉代理，两者就会不一致，

@@ -1,16 +1,18 @@
 import { useIsMutating } from '@tanstack/react-query'
-import { Activity, Network, Power, Stethoscope } from 'lucide-react'
+import { Activity, HardDriveDownload, Network, Power, Stethoscope } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useGeneralQuery, useRunMutation } from '~/apis'
 import { CommunityLinks } from '~/components/CommunityLinks'
+import { ConfigBackupDialog } from '~/components/ConfigBackupDialog'
 import { NetworkCheckDialog } from '~/components/NetworkCheckDialog'
 import { HealthChip, RouterHealth } from '~/components/RouterHealth'
 import { RouterVersion } from '~/components/RouterMaintenance'
 import { ThemePicker } from '~/components/ThemePicker'
 import { Button } from '~/components/ui/button'
+import { Dialog } from '~/components/ui/dialog'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '~/components/ui/sheet'
 import { useRouterStatus } from '~/hooks/useRouterStatus'
 import { summariseHealth } from '~/utils/router-health'
@@ -31,6 +33,7 @@ export function RouterHeader() {
   const health = summariseHealth(status.data)
   const [healthOpen, setHealthOpen] = useState(false)
   const [networkOpen, setNetworkOpen] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(false)
   const run = useRunMutation()
   const saving =
     useIsMutating({ predicate: (mutation) => mutation.options.mutationKey?.[0] !== 'node-latency-test' }) > 0
@@ -167,10 +170,26 @@ export function RouterHeader() {
               <Network aria-hidden="true" />
               {t('network.open')}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 ml-2"
+              onClick={() => {
+                // 同样先关抽屉再开对话框，避免两个 modal 的 focus trap 打架。
+                setHealthOpen(false)
+                setBackupOpen(true)
+              }}
+            >
+              <HardDriveDownload aria-hidden="true" />
+              {t('backup.open')}
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
       <NetworkCheckDialog open={networkOpen} onOpenChange={setNetworkOpen} />
+      <Dialog open={backupOpen} onOpenChange={setBackupOpen}>
+        <ConfigBackupDialog onOpenChange={setBackupOpen} />
+      </Dialog>
     </header>
   )
 }

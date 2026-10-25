@@ -541,6 +541,8 @@
     "noChecks": "This NaiLink version does not report diagnostics.",
     "unavailable": "Diagnostics are available from the LuCI panel.",
     "kernel": "kernel {{kernel}}",
+    "archUnsupported": "No release package targets {{arch}}. Supported: x86_64 and ARM64; experimental: ARMv7 and MIPS32. This firmware will not run the transparent proxy.",
+    "archExperimental": "This {{arch}} build is experimental: common 32-bit kernels cannot load the BPF callbacks the transparent proxy needs. Installations may appear to succeed and then fail to route traffic. Use x86_64 or ARM64 for a supported setup.",
     "bootTitle": "Start after reboot",
     "bootOnHint": "The proxy starts automatically when the router powers on.",
     "bootOffHint": "The proxy stays stopped until someone starts it by hand.",
@@ -623,5 +625,28 @@
     "copy": "Copy report",
     "copied": "Report copied",
     "open": "Open network check"
+  },
+  "backup": {
+    "title": "Back up and restore configuration",
+    "open": "Back up or restore configuration",
+    "description": "Save nodes, subscriptions, groups, DNS and routing to a JSON file you keep, then restore it after flashing or on a new router.",
+    "exportTitle": "Export",
+    "exportHint": "The file contains node and subscription links, so treat it like a password.",
+    "export": "Download backup",
+    "exporting": "Exporting…",
+    "exported": "Exported {{count}} entries.",
+    "importTitle": "Restore",
+    "importHint": "Existing entries with the same name are reused, not overwritten. Nothing is deleted.",
+    "choose": "Choose a backup file",
+    "unreadable": "This file cannot be read as a backup.",
+    "preview": "Contains {{configs}} configs, {{routings}} routing rules, {{dnss}} DNS, {{groups}} groups, {{nodes}} nodes and {{subscriptions}} subscriptions.",
+    "mergeHint": "Restoring adds missing entries and keeps what is already on the router.",
+    "restore": "Restore this backup",
+    "restoring": "Restoring {{done}}/{{total}}…",
+    "restored": "Restored {{count}} entries.",
+    "restoredWithWarnings": "Restored, but {{count}} entries were skipped. Check the list below.",
+    "reportCreated": "Created {{count}} entries.",
+    "reportReused": "Reused {{count}} existing entries.",
+    "close": "Close"
   }
 }

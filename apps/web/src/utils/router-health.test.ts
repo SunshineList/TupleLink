@@ -1,6 +1,7 @@
 import type { RouterStatus } from './router-health'
 import { describe, expect, it } from 'vitest'
 import {
+  architectureTier,
   attentionChecks,
   bootAction,
   bootState,
@@ -176,5 +177,34 @@ describe('bootAction', () => {
 
   it('offers no action when the state is unknown', () => {
     expect(bootAction('unknown')).toBeNull()
+  })
+})
+
+describe('architecture tier', () => {
+  it('treats the two shipped architectures as supported', () => {
+    expect(architectureTier('x86_64')).toBe('supported')
+    expect(architectureTier('aarch64')).toBe('supported')
+    expect(architectureTier('X86_64')).toBe('supported')
+  })
+
+  it('flags the experiment-only architectures', () => {
+    expect(architectureTier('armv7')).toBe('experimental')
+    expect(architectureTier('armv7l')).toBe('experimental')
+    expect(architectureTier('mips')).toBe('experimental')
+    expect(architectureTier('mipsel')).toBe('experimental')
+    expect(architectureTier('mipsle')).toBe('experimental')
+  })
+
+  it('reports anything else as unsupported', () => {
+    expect(architectureTier('armv5')).toBe('unsupported')
+    expect(architectureTier('mips64')).toBe('unsupported')
+    expect(architectureTier('riscv64')).toBe('unsupported')
+  })
+
+  it('stays silent when the router reports nothing', () => {
+    expect(architectureTier('')).toBe('unknown')
+    expect(architectureTier('unknown')).toBe('unknown')
+    expect(architectureTier(undefined)).toBe('unknown')
+    expect(architectureTier(null)).toBe('unknown')
   })
 })
