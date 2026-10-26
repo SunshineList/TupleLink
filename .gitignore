@@ -35,3 +35,6 @@ harness.mjs
 shot*.mjs
 probe*.mjs
 .firecrawl/
+
+# runtime.py 打包时临时放进来的前端产物
+openwrt/web/

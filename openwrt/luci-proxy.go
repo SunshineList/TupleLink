@@ -35,6 +35,23 @@ const credentialName = "luci-session.json"
 var validSession = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
 var fingerprintedAsset = regexp.MustCompile(`^assets/[a-zA-Z0-9_][a-zA-Z0-9_.-]*-[a-zA-Z0-9_-]{8,}\.(js|css|woff2?|ttf|svg|png|webp|wasm)$`)
 
+// 面板产物里只有这几类不带指纹的固定文件名，其余静态资源都带 contenthash。
+var staticFiles = map[string]bool{
+	"index.html":  true,
+	"logo.webp":   true,
+	"favicon.ico": true,
+}
+
+// isStaticPath 判断某个请求是不是面板自己的静态文件。
+// 只认构建产物里真实存在的形态，避免把 /graphql、/session 或路径穿越吃掉。
+func isStaticPath(requestPath string) bool {
+	name := strings.TrimPrefix(requestPath, "/")
+	if name == "" {
+		return true
+	}
+	return fingerprintedAsset.MatchString(name) || staticFiles[name]
+}
+
 func cacheableAsset(name string, response *http.Response) bool {
 	if response.StatusCode != http.StatusOK || !fingerprintedAsset.MatchString(name) {
 		return false
@@ -302,6 +319,11 @@ func gateway(configDir string, target *url.URL, access func(context.Context, str
 		}
 		if path != "graphql" && r.Method == http.MethodPost {
 			http.Error(w, "Method not allowed", 405)
+			return
+		}
+		// 面板产物优先由本地处理：更新界面只需重编这个二进制，
+		// 不必重建带 eBPF 的 daed。读不到资源时仍回落到上游。
+		if serveWebAsset(w, r, path) {
 			return
 		}
 		if r.ContentLength > 8<<20 {

@@ -7,6 +7,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 
 from build import ARCHITECTURES, HERE, prepare_sdk, verify_elf
@@ -113,11 +114,19 @@ def main():
     print("bundled frontend: " + str(size) + " bytes")
     # The helpers do not use SQLite and remain pure Go on every architecture.
     env["CGO_ENABLED"] = "0"
+    # 面板前端同时嵌进网关：以后改界面只要重编 luci-proxy，
+    # 不用重建带 eBPF 的 daed（那一步需要 clang 与内核头文件）。
+    staged = HERE / "web"
+    shutil.rmtree(staged, ignore_errors=True)
+    shutil.copytree(web, staged)
     for name in ("btf-probe", "luci-proxy"):
         sources = [str(HERE / (name + ".go"))]
+        tags = []
         if name == "luci-proxy":
-            sources += [str(HERE / "maintenance.go"), str(HERE / "maintenance-geodata.go")]
-        subprocess.run(["go", "build", "-trimpath", "-ldflags=-s -w", "-o", str(output / name),
+            sources += [str(HERE / "maintenance.go"), str(HERE / "maintenance-geodata.go"),
+                        str(HERE / "webassets.go")]
+            tags = ["-tags", "webassets"]
+        subprocess.run(["go", "build", "-trimpath", "-ldflags=-s -w", *tags, "-o", str(output / name),
                         *sources], cwd=wing, env=env, check=True)
     for name in ("daed", "btf-probe", "luci-proxy"):
         verify_elf(output / name, args.cpu)
