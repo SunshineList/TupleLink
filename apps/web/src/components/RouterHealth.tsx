@@ -62,7 +62,8 @@ export function HealthChip({ status }: { status?: RouterStatus | null }) {
       )}
     >
       <HealthDot level={health.level} />
-      {label}
+      {/* 窄屏放不下「1 项提醒」这样的整句，只留数字；aria-label 在触发按钮上。 */}
+      <span className="health-chip-label">{label}</span>
     </span>
   )
 }

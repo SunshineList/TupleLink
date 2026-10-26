@@ -652,7 +652,8 @@
     "crashed": "The panel hit an unexpected error",
     "crashedHint": "Nothing was changed on the router. Retry the view, or reload the page. If it keeps happening, open the runtime log from the router menu.",
     "crashedRetry": "Retry",
-    "crashedReload": "Reload page"
+    "crashedReload": "Reload page",
+    "more": "More"
   },
   "network": {
     "title": "Network check",

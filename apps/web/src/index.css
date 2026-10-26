@@ -1427,13 +1427,17 @@ form {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Four controls do not fit 358px with labels; the pill keeps its dot and the
-     theme button keeps its swatch, and both keep an accessible name. */
+  /* 窄屏靠图标保住可达名：状态胶囊贴着标题，文字留着（它说明了页面在什么状态），
+     主题按钮只留色块，停止代理只留电源图标，三者都还有 aria-label。 */
   .router-status-pill {
     padding-inline: 8px;
+    font-size: 11px;
   }
-  .router-status-text,
-  .theme-picker-label {
+  .theme-picker-label,
+  .router-stop-label {
+    display: none;
+  }
+  .health-chip-label {
     display: none;
   }
   .router-toolbar-actions {

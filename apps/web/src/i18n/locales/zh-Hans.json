@@ -652,7 +652,8 @@
     "crashed": "面板遇到意外错误",
     "crashedHint": "路由器上的配置没有被改动。可以重试该页面，或重新加载。如果反复出现，请从路由器菜单打开运行日志。",
     "crashedRetry": "重试",
-    "crashedReload": "重新加载页面"
+    "crashedReload": "重新加载页面",
+    "more": "更多"
   },
   "network": {
     "title": "网络检查",

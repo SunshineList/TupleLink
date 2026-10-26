@@ -64,9 +64,9 @@ export function RouterVersion() {
   return (
     <>
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
-        className="min-h-11 tabular-nums"
+        className="h-9 tabular-nums text-muted-foreground hover:text-foreground"
         onClick={show}
         aria-label={t('maintenance.checkAria', { version: data?.current || t('maintenance.reading') })}
       >
