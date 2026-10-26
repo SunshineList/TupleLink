@@ -625,7 +625,11 @@
       "error": "error",
       "fatal": "fatal",
       "unknown": "raw"
-    }
+    },
+    "onlyProblems": "Problems only",
+    "expandDetail": "Show {{count}} candidates",
+    "collapseDetail": "Hide candidates",
+    "emptyFiltered": "No warnings or errors in this window. {{count}} entries are hidden."
   },
   "shell": {
     "sessionExpired": "The router session expired. Reload the LuCI page to sign in again.",

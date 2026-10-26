@@ -92,3 +92,42 @@ describe('parseLogLines', () => {
     expect(parseLogLines('   \n  ')).toEqual([])
   })
 })
+
+describe('multi-line records', () => {
+  // dae 把候选列表写在 msg 的引号里，一条记录能占 50 行。
+  const list = [
+    'time="Oct 25 18:28:24" level=info msg="Group \'proxy\' [tcp4]:',
+    '   1. [] hk01: 141ms',
+    '   2. [] jp02: 260ms"',
+    'time="Oct 25 18:28:25" level=warning msg="Marking dialer as unavailable"',
+  ].join('\n')
+
+  it('把引号内的续行并回同一条记录', () => {
+    const lines = parseLogLines(list)
+    expect(lines).toHaveLength(2)
+    expect(lines[0].message).toBe("Group 'proxy' [tcp4]:")
+    expect(lines[0].detail).toEqual(['   1. [] hk01: 141ms', '   2. [] jp02: 260ms'])
+    expect(lines[1].level).toBe('warning')
+  })
+
+  it('没有续行的记录不带 detail', () => {
+    expect(parseLogLines(list)[1].detail).toBeUndefined()
+  })
+
+  it('引号闭合后紧跟的新记录不会被吞掉', () => {
+    const lines = parseLogLines('time="t" level=info msg="a"\ntime="t" level=error msg="b"')
+    expect(lines.map((line) => line.message)).toEqual(['a', 'b'])
+  })
+
+  it('转义引号不会误判记录边界', () => {
+    const lines = parseLogLines('time="t" level=info msg="say \\"hi\\" now"\ntime="t" level=info msg="next"')
+    expect(lines).toHaveLength(2)
+    expect(lines[0].message).toBe('say "hi" now')
+  })
+
+  it('不是记录开头的孤立行仍然单独出现', () => {
+    const lines = parseLogLines('panic: something bad\ntime="t" level=info msg="ok"')
+    expect(lines).toHaveLength(2)
+    expect(lines[0].level).toBe('unknown')
+  })
+})

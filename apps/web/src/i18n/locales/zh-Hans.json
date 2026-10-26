@@ -625,7 +625,11 @@
       "error": "错误",
       "fatal": "致命",
       "unknown": "原文"
-    }
+    },
+    "onlyProblems": "只看问题",
+    "expandDetail": "展开 {{count}} 个候选",
+    "collapseDetail": "收起候选",
+    "emptyFiltered": "这段日志里没有警告或错误，隐藏了 {{count}} 条。"
   },
   "shell": {
     "sessionExpired": "路由器登录已失效，请刷新后台页面重新登录。",

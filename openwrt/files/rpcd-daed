@@ -68,7 +68,36 @@ call)
 		;;
 	logs)
 		json_init
-		logs=$(tail -c 32768 /var/log/daed/daed.log 2>/dev/null | tail -n 120 | \
+		# 一条 dae 记录可能跨几十行：候选列表写在 msg 的引号里，中位数 46 行。
+		# 按物理行取 120 行只剩几十条记录，所以这里按「记录」回数 120 条。
+		# 每条记录保留头 12 行和最后一行，中间换成计数标记：
+		# 末行带着收尾引号和 group=/dialer= 等字段，丢了它 msg 就不闭合，
+		# 整条记录会退化成无法解析的孤立行。完整列表在面板里可以展开。
+		# LC_ALL=C 是必需的：busybox awk 在 UTF-8 locale 下遇到候选名里的
+		# 非 ASCII 字节会直接 towc 失败退出。
+		logs=$(LC_ALL=C tail -c 262144 /var/log/daed/daed.log 2>/dev/null | LC_ALL=C awk '
+			function emit(   i) {
+				if (!body) return
+				slot = (slot + 1) % 120
+				n[slot] = ""
+				if (body <= 13) {
+					for (i = 1; i <= body; i++) n[slot] = n[slot] "\n" buf[i]
+				} else {
+					for (i = 1; i <= 12; i++) n[slot] = n[slot] "\n" buf[i]
+					n[slot] = n[slot] "\n   … " (body - 13) " more lines"
+					n[slot] = n[slot] "\n" buf[body]
+				}
+				body = 0
+				if (total < 120) total++
+			}
+			/^(time=|\{|\[(trace|debug|info|warn|warning|error|fatal|panic)\])/ { emit() }
+			{ buf[++body] = $0 }
+			END {
+				emit()
+				from = (total < 120) ? 0 : (slot + 1) % 120
+				for (k = 0; k < total; k++) printf "%s\n", substr(n[(from + k) % 120], 2)
+			}
+		' | tail -c 32768 | \
 			sed -E 's#[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]"<>]+#[URL REDACTED]#g; s/([Tt]oken|[Pp]assword|[Aa]uthorization)([=: ]+)[^, ]+/\1\2[REDACTED]/g') || logs=''
 		json_add_string logs "$logs"
 		json_dump

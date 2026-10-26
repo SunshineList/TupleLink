@@ -39,10 +39,20 @@ export function RouterLogs() {
   // Freeze what the user is reading while the bounded server tail keeps moving.
   const [history, setHistory] = useState<string | null>(null)
   const [raw, setRaw] = useState(false)
+  // 候选列表是 dae 的调试输出，一条能占 50 行；默认折叠，需要时展开。
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
+  const [quiet, setQuiet] = useState(false)
   const liveLogs = query.data?.logs ?? ''
   const logs = history ?? liveLogs
   const isFollowing = history === null
-  const lines = useMemo(() => parseLogLines(logs), [logs])
+  const parsed = useMemo(() => parseLogLines(logs), [logs])
+  // 「只看问题」隐藏 info 及以下。dae 每几秒就重选一次 dialer，
+  // 健康的 info 行会把真正的 warning 冲走。
+  const lines = useMemo(
+    () => (quiet ? parsed.filter((line) => line.level === 'warning' || line.level === 'error' || line.level === 'fatal') : parsed),
+    [parsed, quiet],
+  )
+  const hidden = parsed.length - lines.length
 
   function followLatest() {
     following.current = true
@@ -117,6 +127,16 @@ export function RouterLogs() {
           </div>
           <Button
             type="button"
+            size="sm"
+            variant={quiet ? 'secondary' : 'ghost'}
+            aria-pressed={quiet}
+            className="h-8"
+            onClick={() => setQuiet((value) => !value)}
+          >
+            {t('logs.onlyProblems')}
+          </Button>
+          <Button
+            type="button"
             variant={isFollowing ? 'outline' : 'default'}
             className="min-h-11"
             aria-controls="router-log-output"
@@ -162,7 +182,9 @@ export function RouterLogs() {
       >
         <div ref={content}>
           {lines.length === 0 ? (
-            <p className="text-muted-foreground">{t(query.isPending ? 'logs.loading' : 'logs.empty')}</p>
+            <p className="text-muted-foreground">
+              {query.isPending ? t('logs.loading') : hidden ? t('logs.emptyFiltered', { count: hidden }) : t('logs.empty')}
+            </p>
           ) : raw ? (
             <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">
               {lines.map((line) => line.raw).join('\n')}
@@ -179,13 +201,35 @@ export function RouterLogs() {
                   <span className={cn('font-semibold uppercase', LEVEL_TONE[line.level])}>
                     {t(`logs.level.${line.level}`)}
                   </span>
-                  <span className="break-words">
+                  <span className="min-w-0 break-words">
                     {line.message}
                     {line.fields.map(([key, value]) => (
                       <span key={key} className="ml-2 text-muted-foreground">
                         {key}={value}
                       </span>
                     ))}
+                    {line.detail && (
+                      <button
+                        type="button"
+                        className="ml-2 text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                        aria-expanded={expanded.has(index)}
+                        onClick={() =>
+                          setExpanded((current) => {
+                            const next = new Set(current)
+                            if (next.has(index)) next.delete(index)
+                            else next.add(index)
+                            return next
+                          })
+                        }
+                      >
+                        {expanded.has(index)
+                          ? t('logs.collapseDetail')
+                          : t('logs.expandDetail', { count: line.detail.length })}
+                      </button>
+                    )}
+                    {line.detail && expanded.has(index) && (
+                      <span className="mt-1 block whitespace-pre-wrap text-muted-foreground">{line.detail.join('\n')}</span>
+                    )}
                   </span>
                 </li>
               ))}
