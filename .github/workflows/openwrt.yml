@@ -86,12 +86,14 @@ jobs:
           path: apps/web/dist-openwrt/
 
   runtime:
-    if: github.event_name == 'workflow_dispatch'
     needs: web
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
-        cpu: [x86_64, arm64, armv7, mips, mipsle]
+        # push 只编译 x86_64，别让一次提交等五个架构的 SDK 全下完；
+        # 全架构矩阵和 apk 打包留给手动触发与发版。
+        cpu: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["x86_64","arm64","armv7","mips","mipsle"]' || '["x86_64"]') }}
     env:
       GOOS: linux
       CGO_ENABLED: '0'
@@ -207,27 +209,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: ipk-x86_64
-            cpu: x86_64
-          - target: ipk-arm64
-            cpu: arm64
-          - target: apk-x86_64
-            cpu: x86_64
-          - target: apk-arm64
-            cpu: arm64
-          - target: ipk-armv7
-            cpu: armv7
-          - target: apk-armv7
-            cpu: armv7
-          - target: ipk-mips
-            cpu: mips
-          - target: apk-mips
-            cpu: mips
-          - target: ipk-mipsle
-            cpu: mipsle
-          - target: apk-mipsle
-            cpu: mipsle
+        # 手动触发时才出全架构 ipk+apk；push 只出本机构建和测试用的 x86_64 ipk。
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '[{"target":"ipk-x86_64","cpu":"x86_64"},{"target":"ipk-arm64","cpu":"arm64"},{"target":"apk-x86_64","cpu":"x86_64"},{"target":"apk-arm64","cpu":"arm64"},{"target":"ipk-armv7","cpu":"armv7"},{"target":"apk-armv7","cpu":"armv7"},{"target":"ipk-mips","cpu":"mips"},{"target":"apk-mips","cpu":"mips"},{"target":"ipk-mipsle","cpu":"mipsle"},{"target":"apk-mipsle","cpu":"mipsle"}]' || '[{"target":"ipk-x86_64","cpu":"x86_64"}]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -256,28 +239,11 @@ jobs:
     needs: test
     runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - cpu: x86_64
-            goarch: amd64
-            qemu_package: qemu-system-x86
-            qemu: qemu-system-x86_64
-            expect: success
-          - cpu: armv7
-            goarch: arm
-            qemu_package: qemu-system-arm
-            qemu: qemu-system-arm
-            expect: failure
-          - cpu: mips
-            goarch: mips
-            qemu_package: qemu-system-mips
-            qemu: qemu-system-mips
-            expect: failure
-          - cpu: mipsle
-            goarch: mipsle
-            qemu_package: qemu-system-mips
-            qemu: qemu-system-mipsel
-            expect: failure
+        # QEMU 起虚拟机是最慢的一环：push 只验证 x86_64 这条真内核路径，
+        # 其余架构的「预期不兼容」结论留给手动触发确认。
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '[{"cpu":"x86_64","goarch":"amd64","qemu_package":"qemu-system-x86","qemu":"qemu-system-x86_64","expect":"success"},{"cpu":"armv7","goarch":"arm","qemu_package":"qemu-system-arm","qemu":"qemu-system-arm","expect":"failure"},{"cpu":"mips","goarch":"mips","qemu_package":"qemu-system-mips","qemu":"qemu-system-mips","expect":"failure"},{"cpu":"mipsle","goarch":"mipsle","qemu_package":"qemu-system-mips","qemu":"qemu-system-mipsel","expect":"failure"}]' || '[{"cpu":"x86_64","goarch":"amd64","qemu_package":"qemu-system-x86","qemu":"qemu-system-x86_64","expect":"success"}]') }}
     steps:
       - uses: actions/checkout@v7
         with:
