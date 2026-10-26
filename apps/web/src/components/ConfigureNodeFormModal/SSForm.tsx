@@ -13,7 +13,7 @@ import { useNodeForm } from '~/hooks'
 export type SSFormValues = z.infer<typeof ssSchema>
 
 export function SSForm({ onLinkGeneration, initialValues, actionsPortal }: NodeFormProps<SSFormValues>) {
-  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t } = useNodeForm({
+  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t: translate } = useNodeForm({
     schema: ssSchema,
     defaultValues: DEFAULT_SS_FORM_VALUES,
     initialValues,
@@ -21,6 +21,10 @@ export function SSForm({ onLinkGeneration, initialValues, actionsPortal }: NodeF
     generateLink: generateSSURL,
     parseLink: parseSSUrl,
   })
+
+  // t() 的键类型推导在本文件会超过 TS 的实例化深度上限（TS2589），窄化成
+  // (key) => string 即可；键名仍受语言包约束，由 i18n 测试兜底。
+  const t = translate as unknown as (key: string) => string
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">

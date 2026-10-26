@@ -812,5 +812,16 @@
         "hint": "UDP above port 1000 goes direct, avoids disconnects"
       }
     }
+  },
+  "routingWizard": {
+    "title": "Traffic routing",
+    "hint": "Pick where each service should go. Lines you wrote by hand stay untouched.",
+    "direct": "Direct",
+    "block": "Block",
+    "followDefault": "Follow fallback",
+    "save": "Save rules",
+    "sendAllToProxy": "Send all to {{group}}",
+    "matcherHint": "Matched by {{matcher}}",
+    "saved": "Rules saved."
   }
 }

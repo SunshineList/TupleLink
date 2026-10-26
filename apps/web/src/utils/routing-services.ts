@@ -1,0 +1,229 @@
+// 分流「服务」目录：把「我想让这个服务走哪个节点」变成一行合法的 routingA。
+//
+// 为什么用 domain(suffix:...) 而不是 geosite 分类：
+// 分类名由 geosite.dat 提供，不同发行版（v2fly / Loyalsoldier / 自建）名字不一样，
+// 写错一个分类会让整张分流表加载失败（wing/dae-core/component/routing/optimizer.go
+// 里任一 loadGeoSite 出错就中断全部规则）。域名后缀不依赖数据文件，永远成立。
+//
+// 只有在本机 geosite.dat 里实测存在的分类才用 geosite：cn / ads / netflix / youtube /
+// google / apple / amazon / epic。其余一律走 suffix。
+
+export interface ServiceLabel {
+  en: string
+  'zh-Hans': string
+}
+
+export type ServiceId =
+  | 'youtube'
+  | 'netflix'
+  | 'disney'
+  | 'spotify'
+  | 'tiktok'
+  | 'telegram'
+  | 'twitter'
+  | 'github'
+  | 'openai'
+  | 'anthropic'
+  | 'google'
+  | 'microsoft'
+  | 'apple'
+  | 'amazon'
+  | 'steam'
+  | 'epic'
+  | 'cn'
+  | 'ads'
+  | 'lan'
+  | 'pt'
+  | 'game-udp'
+
+export interface RoutingService {
+  id: ServiceId
+  /** 列表里的短标签，避免为每个服务引入一个图标组件。 */
+  badge: string
+  /**
+   * 显示名放在代码里而不是语言包：这些都是品牌名，中英写法基本一致，
+   * 而语言包每多一个键都会让 t() 的返回类型变宽，触发 TS2589。
+   */
+  label: ServiceLabel
+  /** 写进配置的匹配器，不含箭头。 */
+  matcher: string
+  /** 默认动作：true 表示默认走代理群组。 */
+  proxyByDefault: boolean
+}
+
+const service = (
+  id: ServiceId,
+  badge: string,
+  en: string,
+  matcher: string,
+  proxyByDefault = true,
+  zh: string = en,
+): RoutingService => ({ id, badge, label: { en, 'zh-Hans': zh }, matcher, proxyByDefault })
+
+/** 多个域名后缀拼成一个 domain 匹配器。 */
+const suffixes = (...domains: string[]): string =>
+  `domain(${domains.map((domain) => `suffix:${domain}`).join(', ')})`
+
+export const ROUTING_SERVICES: RoutingService[] = [
+  service('youtube', 'YT', 'YouTube', 'domain(geosite:youtube)'),
+  service('netflix', 'NF', 'Netflix', 'domain(geosite:netflix)'),
+  service('disney', 'D+', 'Disney+', suffixes('disneyplus.com', 'disney.com', 'dssott.com', 'bamgrid.com')),
+  service('spotify', 'SP', 'Spotify', suffixes('spotify.com', 'scdn.co', 'spotifycdn.com')),
+  service('tiktok', 'TT', 'TikTok', suffixes('tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'ibytedtos.com')),
+  // Telegram 只有 geoip 分类可靠；域名侧补上 telegram.org 与 t.me。
+  service('telegram', 'TG', 'Telegram', 'domain(suffix:telegram.org, suffix:t.me) || dip(geoip:telegram)'),
+  service('twitter', 'X', 'X (Twitter)', suffixes('twitter.com', 'x.com', 'twimg.com', 't.co'), true, 'X（推特）'),
+  service('github', 'GH', 'GitHub', suffixes('github.com', 'githubusercontent.com', 'githubassets.com', 'github.io')),
+  service('openai', 'AI', 'OpenAI / ChatGPT', suffixes('openai.com', 'chatgpt.com', 'oaistatic.com', 'oaiusercontent.com')),
+  service('anthropic', 'AN', 'Claude', suffixes('anthropic.com', 'claude.ai', 'claudeusercontent.com')),
+  service('google', 'G', 'Google', 'domain(geosite:google)'),
+  service('microsoft', 'MS', 'Microsoft', suffixes('microsoft.com', 'live.com', 'office.com', 'microsoftonline.com', 'windowsupdate.com'), true, '微软'),
+  service('apple', 'AP', 'Apple', 'domain(geosite:apple)', true, '苹果'),
+  service('amazon', 'AZ', 'Amazon', 'domain(geosite:amazon)', true, '亚马逊'),
+  service('steam', 'ST', 'Steam', suffixes('steampowered.com', 'steamstatic.com', 'steamcommunity.com', 'steamusercontent.com')),
+  service('epic', 'EP', 'Epic Games', suffixes('epicgames.com', 'epicgames.dev', 'epicgamescdn.com', 'unrealengine.com'), true, 'Epic 游戏'),
+  service('cn', 'CN', 'China mainland', 'domain(geosite:cn)', false, '中国大陆'),
+  service('ads', 'AD', 'Ads', 'domain(geosite:ads)', false, '广告域名'),
+  service('lan', 'LAN', 'Home network', 'dip(geoip:private)', false, '家庭内网'),
+  // PT 站是私有 tracker（要邀请才能进），域名每家不同，向导里没法列举。
+  // 按 BT 常用端口放行，比按域名猜更不容易误伤。
+  service('pt', 'PT', 'Private tracker (PT)', 'l4proto(tcp) && dport(6881-6999)', false, 'PT 站'),
+  // 联机游戏大量走 UDP，经过代理会掉线；这条要排在所有代理规则之前才有意义。
+  service('game-udp', 'UDP', 'Game UDP', 'l4proto(udp) && dport(1000-65535)', false, '游戏 UDP'),
+]
+
+export const ROUTING_SERVICE_IDS = new Set<ServiceId>(ROUTING_SERVICES.map((item) => item.id))
+
+export function serviceById(id: ServiceId): RoutingService | undefined {
+  return ROUTING_SERVICES.find((item) => item.id === id)
+}
+
+/** 按 i18next 的语言码取显示名；除 zh 系以外一律用英文。 */
+export function serviceLabel(id: ServiceId, language: string): string {
+  const found = serviceById(id)
+  if (!found) return id
+  return language.startsWith('zh') ? found.label['zh-Hans'] : found.label.en
+}
+
+/** 目标动作：走某个群组，或者直连/阻断。 */
+export type RoutingAction =
+  | { kind: 'group', group: string }
+  | { kind: 'direct' }
+  | { kind: 'block' }
+
+export function actionTarget(action: RoutingAction): string {
+  if (action.kind === 'group') return action.group
+  if (action.kind === 'block') return 'block'
+  return 'direct'
+}
+
+export function actionEquals(a: RoutingAction | undefined, b: RoutingAction): boolean {
+  if (!a) return false
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'group' && b.kind === 'group') return a.group === b.group
+  return true
+}
+
+/** 一行 `matcher -> target`，箭头两侧各留一个空格，与官方示例一致。 */
+export function ruleLine(matcher: string, target: string): string {
+  return `${matcher} -> ${target}`
+}
+
+export interface ServiceRule {
+  service: ServiceId
+  action: RoutingAction
+}
+
+const ARROW = /\s*->\s*/
+
+/**
+ * 从 routingA 文本里认出「服务 -> 动作」的映射。
+ *
+ * 只认匹配器与 ROUTING_SERVICES 完全一致的行；认不出的行留给高级编辑器，
+ * 这里绝不改写它们——用户手写的规则比向导更重要。
+ */
+export function parseServiceRules(source: string): Map<ServiceId, RoutingAction> {
+  const matcherToService = new Map<string, ServiceId>()
+  for (const item of ROUTING_SERVICES) matcherToService.set(item.matcher, item.id)
+
+  const result = new Map<ServiceId, RoutingAction>()
+  for (const raw of source.split('\n')) {
+    const line = raw.replace(/#.*$/, '').trim()
+    if (!line || /^fallback\s*:/.test(line)) continue
+    const parts = line.split(ARROW)
+    if (parts.length !== 2) continue
+    const matcher = parts[0].trim()
+    const target = parts[1].trim()
+    const id = matcherToService.get(matcher)
+    if (!id) continue
+    result.set(
+      id,
+      target === 'direct' || target === 'must_direct'
+        ? { kind: 'direct' }
+        : target === 'block'
+          ? { kind: 'block' }
+          : { kind: 'group', group: target },
+    )
+  }
+  return result
+}
+
+/**
+ * 把「服务 -> 动作」写回 routingA 文本。
+ *
+ * 规则：
+ * - 认得出的服务行整行替换，按 ROUTING_SERVICES 的顺序统一生成，避免每次保存抖动；
+ * - 认不出的行（含整行注释）原样保留，位置不变；
+ * - 新生成的行插在第一条 fallback 之前，因为 fallback 之后不会被执行；
+ * - 连续空行折叠成一个，反复保存不会把文件撑大。
+ */
+export function writeServiceRules(source: string, rules: ServiceRule[]): string {
+  const matcherToService = new Map<string, ServiceId>()
+  for (const item of ROUTING_SERVICES) matcherToService.set(item.matcher, item.id)
+
+  const wanted = new Map<ServiceId, RoutingAction>()
+  for (const rule of rules) {
+    if (serviceById(rule.service)) wanted.set(rule.service, rule.action)
+  }
+
+  const kept: string[] = []
+  for (const raw of source.split('\n')) {
+    const trimmed = raw.trim()
+    if (!trimmed) {
+      if (kept.length && kept[kept.length - 1] !== '') kept.push('')
+      continue
+    }
+    // 整行注释原样保留：用户自己的备注比向导生成的规则更重要。
+    if (trimmed.startsWith('#')) {
+      kept.push(raw.replace(/\s+$/, ''))
+      continue
+    }
+    const line = raw.replace(/#.*$/, '').trim()
+    if (!line) continue
+    const parts = line.split(ARROW)
+    const matcher = parts.length === 2 ? parts[0].trim() : ''
+    if (matcher && matcherToService.has(matcher)) continue
+    kept.push(raw.replace(/\s+$/, ''))
+  }
+  while (kept.length && kept[kept.length - 1] === '') kept.pop()
+
+  const generated: string[] = []
+  for (const item of ROUTING_SERVICES) {
+    const action = wanted.get(item.id)
+    if (!action) continue
+    generated.push(ruleLine(item.matcher, actionTarget(action)))
+  }
+
+  const fallbackIndex = kept.findIndex((line) => /^\s*fallback\s*:/.test(line))
+  if (fallbackIndex < 0) {
+    return `${[...kept, ...generated].join('\n')}\n`
+  }
+  return `${[...kept.slice(0, fallbackIndex), ...generated, ...kept.slice(fallbackIndex)].join('\n')}\n`
+}
+
+/** 一条规则都没配时，向导给出的默认建议：国内与内网直连，游戏 UDP 直连。 */
+export const DEFAULT_SERVICE_RULES: ServiceRule[] = [
+  { service: 'game-udp', action: { kind: 'direct' } },
+  { service: 'lan', action: { kind: 'direct' } },
+  { service: 'cn', action: { kind: 'direct' } },
+]

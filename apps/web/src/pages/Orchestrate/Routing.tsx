@@ -1,7 +1,7 @@
 import type { RoutingFormModalRef } from '~/components/RoutingFormModal'
 import type { RoutingsQuery } from '~/schemas/gql/graphql'
 import { useStore } from '@nanostores/react'
-import { Map, Settings2 } from 'lucide-react'
+import { ListTree, Map, Settings2 } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -16,9 +16,11 @@ import {
 } from '~/apis'
 import { RoutingFormModal } from '~/components/RoutingFormModal'
 import { RoutingPresetPicker } from '~/components/RoutingPresetPicker'
+import { RoutingWizard } from '~/components/RoutingWizard'
 import { Section } from '~/components/Section'
 import { SimpleCard } from '~/components/SimpleCard'
 import { Button } from '~/components/ui/button'
+import { Dialog } from '~/components/ui/dialog'
 import { SimpleTooltip } from '~/components/ui/tooltip'
 import { DEFAULT_GROUP_NAME } from '~/constants/default'
 import { useDisclosure } from '~/hooks'
@@ -74,6 +76,7 @@ export function Routing() {
     }
   }
 
+  const [openedWizard, { open: openWizard, close: closeWizard }] = useDisclosure(false)
   const [openedCreateRoutingFormModal, { open: openCreateRoutingFormModal, close: closeCreateRoutingFormModal }] =
     useDisclosure(false)
   const [openedUpdateRoutingFormModal, { open: openUpdateRoutingFormModal, close: closeUpdateRoutingFormModal }] =
@@ -85,14 +88,27 @@ export function Routing() {
       icon={<Map className="h-5 w-5" />}
       onCreate={openCreateRoutingFormModal}
       actions={
-        <RoutingPresetPicker
-          proxyGroup={proxyGroupName}
-          existing={selectedRouting?.routing.string ?? ''}
-          pending={updateRoutingMutation.isPending}
-          onPick={(_id, lines) => {
-            void addPresetRules(lines)
-          }}
-        />
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-h-9"
+            disabled={!selectedRouting}
+            onClick={openWizard}
+            aria-label={t('routingWizard.title')}
+          >
+            <ListTree className="h-4 w-4" />
+            <span className="hidden sm:inline">{t('routingWizard.title')}</span>
+          </Button>
+          <RoutingPresetPicker
+            proxyGroup={proxyGroupName}
+            existing={selectedRouting?.routing.string ?? ''}
+            pending={updateRoutingMutation.isPending}
+            onPick={(_id, lines) => {
+              void addPresetRules(lines)
+            }}
+          />
+        </>
       }
       bordered
     >
@@ -132,6 +148,24 @@ export function Routing() {
           }}
         />
       ))}
+
+      <Dialog open={openedWizard} onOpenChange={(next) => (next ? openWizard() : closeWizard())}>
+        <RoutingWizard
+          text={selectedRouting?.routing.string ?? ''}
+          groups={(groupsQuery?.groups ?? []).map((group) => group.name)}
+          pending={updateRoutingMutation.isPending}
+          onSave={async (text) => {
+            if (!selectedRouting) return
+            try {
+              await updateRoutingMutation.mutateAsync({ id: selectedRouting.id, routing: text })
+              toast.success(t('routingWizard.saved'))
+              closeWizard()
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : String(error))
+            }
+          }}
+        />
+      </Dialog>
 
       <RoutingFormModal
         title={t('routing')}

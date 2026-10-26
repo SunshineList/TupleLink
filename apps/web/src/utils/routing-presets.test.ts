@@ -69,7 +69,7 @@ describe('render preset', () => {
 
   it('不依赖群组的预设即使没有群组也能用', () => {
     const ads = ROUTING_RULE_PRESETS.find((item) => item.id === 'ad-block')!
-    expect(renderPreset(ads, '')).toEqual(['domain(geosite:category-ads-all) -> must_direct'])
+    expect(renderPreset(ads, '')).toEqual(['domain(geosite:ads) -> must_direct'])
   })
 
   it('每条预设都至少有一行，并且都带 -> 目标', () => {

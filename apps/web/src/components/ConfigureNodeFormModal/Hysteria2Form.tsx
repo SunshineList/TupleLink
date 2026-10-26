@@ -35,7 +35,8 @@ function generateHysteria2Link(data: Hysteria2FormValues): string {
 }
 
 export function Hysteria2Form({ onLinkGeneration, initialValues, actionsPortal }: NodeFormProps<Hysteria2FormValues>) {
-  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t } = useNodeForm({
+  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t: translate } =
+    useNodeForm({
     schema: hysteria2Schema,
     defaultValues: DEFAULT_HYSTERIA2_FORM_VALUES,
     initialValues,
@@ -43,6 +44,9 @@ export function Hysteria2Form({ onLinkGeneration, initialValues, actionsPortal }
     generateLink: generateHysteria2Link,
     parseLink: parseHysteria2Url,
   })
+
+  // t() 的键类型推导在本文件里会超过 TS 的实例化深度上限（TS2589），窄化即可。
+  const t = translate as unknown as (key: string) => string
 
   // 端口跳跃是这一页最容易填错的一格：逗号必须是半角、区间用减号、每段 1-65535。
   // 这里只做提示，不拦住保存——后端仍按自己的规则解析，用户可能有意写别的形式。

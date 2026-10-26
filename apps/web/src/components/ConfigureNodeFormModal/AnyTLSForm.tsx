@@ -14,7 +14,8 @@ import { generateAnytlsLink } from './protocols/complex'
 export type AnytlsFormValues = z.infer<typeof anytlsSchema>
 
 export function AnyTLSForm({ onLinkGeneration, initialValues, actionsPortal }: NodeFormProps<AnytlsFormValues>) {
-  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t } = useNodeForm({
+  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t: translate } =
+    useNodeForm({
     schema: anytlsSchema,
     defaultValues: DEFAULT_ANYTLS_FORM_VALUES,
     initialValues,
@@ -22,6 +23,10 @@ export function AnyTLSForm({ onLinkGeneration, initialValues, actionsPortal }: N
     generateLink: generateAnytlsLink,
     parseLink: parseAnytlsUrl,
   })
+
+  // 这个文件里 t() 的键类型推导会超过 TS 的实例化深度上限（TS2589），
+  // 窄化成 (key) => string 就不会了；键名仍然受语言包约束，靠测试兜底。
+  const t = translate as unknown as (key: string) => string
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">

@@ -104,7 +104,7 @@ export function ConfigureNodeFormModal({ opened, onClose }: { opened: boolean; o
         <div className="flex-1 flex flex-col min-h-0">
           <ScrollableDialogBody className="flex-1 space-y-4">
             <Input
-              label={t('tag')}
+              label={t('tag') as string}
               withAsterisk
               value={tag}
               onChange={(e) => setValue('tag', e.target.value)}

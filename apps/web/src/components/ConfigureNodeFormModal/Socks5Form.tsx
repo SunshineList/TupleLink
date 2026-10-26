@@ -31,7 +31,7 @@ function generateSocks5Link(data: Socks5FormValues): string {
 }
 
 export function Socks5Form({ onLinkGeneration, initialValues, actionsPortal }: NodeFormProps<Socks5FormValues>) {
-  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t } = useNodeForm({
+  const { formValues, setValue, handleSubmit, onSubmit, submit, resetForm, isDirty, isValid, errors, t: translate } = useNodeForm({
     schema: socks5Schema,
     defaultValues: DEFAULT_SOCKS5_FORM_VALUES,
     initialValues,
@@ -39,6 +39,10 @@ export function Socks5Form({ onLinkGeneration, initialValues, actionsPortal }: N
     generateLink: generateSocks5Link,
     parseLink: parseSocks5Url,
   })
+
+  // t() 的键类型推导在本文件会超过 TS 的实例化深度上限（TS2589），窄化成
+  // (key) => string 即可；键名仍受语言包约束，由 i18n 测试兜底。
+  const t = translate as unknown as (key: string) => string
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">

@@ -112,11 +112,11 @@ export function GenericNodeForm({ config, onLinkGeneration, initialValues, actio
     return <div className="text-muted-foreground">No fields configured for this protocol</div>
   }
 
-  // Create a translation helper that accepts any string
-  const translate = (key: string): string => {
-    // Using 'as never' to bypass i18next strict type checking
-    return t(key as never) as string
-  }
+  // Create a translation helper that accepts any string。
+  // t 先窄化成 (key) => string 再调用：直接 t(key as never) 在语言包变大后
+  // 会让 TS 的键类型推导超过实例化深度上限（TS2589）。
+  const plain = t as unknown as (key: string) => string
+  const translate = (key: string): string => plain(key)
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-2">

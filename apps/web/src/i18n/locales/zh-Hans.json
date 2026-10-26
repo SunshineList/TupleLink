@@ -812,5 +812,16 @@
         "hint": "1000 以上 UDP 直连，避免掉线"
       }
     }
+  },
+  "routingWizard": {
+    "title": "分流向导",
+    "hint": "给每个服务选一个出口。你手写的规则不会被改动。",
+    "direct": "直连",
+    "block": "阻断",
+    "followDefault": "跟随 fallback",
+    "save": "保存分流",
+    "sendAllToProxy": "全部走 {{group}}",
+    "matcherHint": "匹配 {{matcher}}",
+    "saved": "分流已保存。"
   }
 }
