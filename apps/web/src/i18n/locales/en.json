@@ -841,6 +841,7 @@
       "geoip": "geoip country",
       "ip": "IP or CIDR",
       "port": "TCP port range"
-    }
+    },
+    "invalidCode": "These categories do not exist: {{codes}}. Saving them would disable the whole routing table."
   }
 }

@@ -841,6 +841,7 @@
       "geoip": "geoip 国家",
       "ip": "IP 或网段",
       "port": "TCP 端口范围"
-    }
+    },
+    "invalidCode": "这些分类不存在：{{codes}}。写进去会让整张分流表失效。"
   }
 }

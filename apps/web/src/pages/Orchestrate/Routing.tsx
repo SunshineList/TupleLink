@@ -27,6 +27,17 @@ import { useDisclosure } from '~/hooks'
 import { defaultResourcesAtom } from '~/store'
 import { createGroupCompletionItems, setDynamicCompletionItems } from '~/utils/editor-completions'
 import { insertRoutingRules } from '~/utils/routing-presets'
+import { describeInvalidCode, invalidCodes } from '~/utils/routing-validate'
+
+/** 卡片摘要只显示前几条规则，避免长规则表把卡片撑爆。 */
+function previewRules(source: string): string {
+  const lines = source
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length <= 4) return lines.join('\n')
+  return [...lines.slice(0, 4), `… +${lines.length - 4}`].join('\n')
+}
 
 export function Routing() {
   const { t } = useTranslation()
@@ -59,11 +70,21 @@ export function Routing() {
     return defaultGroup?.name || DEFAULT_GROUP_NAME
   }, [groupsQuery?.groups, defaultGroupID])
 
+  // 写回前先自己核对分类：dae 只要遇到一个查不到的分类就整张表放弃，
+  // 与其等它在日志里报 code xxx not found，不如在点保存时就指出是哪个名字。
+  const guardRouting = (text: string): boolean => {
+    const unknown = invalidCodes(text)
+    if (!unknown.length) return true
+    toast.error(t('routingWizard.invalidCode', { codes: unknown.map(describeInvalidCode).join('、') }))
+    return false
+  }
+
   // 快捷添加把规则并进当前选中的配置：读取最新的字符串，插入后再整体写回，
   // 这样连点多个预设不会互相覆盖（每次都基于上一次的返回值）。
   const addPresetRules = async (lines: string[]) => {
     if (!selectedRouting) return
     const result = insertRoutingRules(selectedRouting.routing.string, lines)
+    if (!guardRouting(result.text)) return
     if (!result.inserted.length) {
       toast.info(t('routingPresets.alreadyAdded'))
       return
@@ -146,9 +167,12 @@ export function Routing() {
               routing: routing.routing.string,
             })
           }}
+          preview={
+            <pre className="max-h-24 overflow-hidden rounded-lg bg-muted/40 p-2 text-[11px] leading-relaxed whitespace-pre-wrap">
+              {previewRules(routing.routing.string) || t('panel.noRulesYet')}
+            </pre>
+          }
         >
-          {/* 传了 children 才会出现「详情」按钮：分流规则本来就该能直接看到，
-              不需要先点开编辑器。 */}
           <pre className="overflow-x-auto rounded-lg bg-muted/40 p-3 text-xs leading-relaxed whitespace-pre-wrap">
             {routing.routing.string.trim() || t('panel.noRulesYet')}
           </pre>
@@ -161,7 +185,7 @@ export function Routing() {
           groups={(groupsQuery?.groups ?? []).map((group) => group.name)}
           pending={updateRoutingMutation.isPending}
           onSave={async (text) => {
-            if (!selectedRouting) return
+            if (!selectedRouting || !guardRouting(text)) return
             try {
               await updateRoutingMutation.mutateAsync({ id: selectedRouting.id, routing: text })
               toast.success(t('routingWizard.saved'))
@@ -181,6 +205,7 @@ export function Routing() {
         proxyGroupName={proxyGroupName}
         proxyGroupReady={!!groupsQuery?.groups && !!defaultGroupID}
         handleSubmit={async (values) => {
+          if (!guardRouting(values.text)) return
           await createRoutingMutation.mutateAsync({
             name: values.name,
             routing: values.text,
@@ -196,7 +221,7 @@ export function Routing() {
         configType="routing"
         proxyGroupName={proxyGroupName}
         handleSubmit={async (values) => {
-          if (updateRoutingFormModalRef.current) {
+          if (updateRoutingFormModalRef.current && guardRouting(values.text)) {
             await updateRoutingMutation.mutateAsync({
               id: updateRoutingFormModalRef.current.editingID,
               routing: values.text,
