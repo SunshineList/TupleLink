@@ -43,7 +43,7 @@ function load(name, protocol = 'http:', page = 'dashboard') {
   context.access = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'access.js'), 'utf8') + '\n})()', context);
   context.logFormat = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, 'log-format.js'), 'utf8') + '\n})()', context);
   const view = vm.runInContext('(function(){' + fs.readFileSync(path.join(htdocs, name + '.js'), 'utf8') + '\n})()', context);
-  return { view, polls, calls, fetchCalls, setSession: value => {session = value;}, legacySession: () => {delete context.rpc.getSessionID;}, setResponse: value => {response = value;}, setNetworkFailure: () => {networkFailure = true;}, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; }, setFailure: value => { rpcFailure = value; } };
+  return { view, logFormat: context.logFormat, polls, calls, fetchCalls, setSession: value => {session = value;}, legacySession: () => {delete context.rpc.getSessionID;}, setResponse: value => {response = value;}, setNetworkFailure: () => {networkFailure = true;}, setAuthorized: value => { authorized = value; }, setResult: value => { result = value; }, setFailure: value => { rpcFailure = value; } };
 }
 
 function elements(node, tag) {
@@ -250,4 +250,27 @@ test('community links are reachable from logs and service fallback pages', () =>
       assert.ok(link.attrs['aria-label']);
     }
   }
+});
+
+test('日志格式模块支持级别与关键字过滤', () => {
+  const { logFormat } = load(panelModule, 'https:', 'logs');
+  assert.equal(typeof logFormat.filter, 'function', 'log-format must expose filter');
+  const sample =
+    'time="Oct 26 17:23:32" level=error msg="boom" dialer="x"\n' +
+    'time="Oct 26 17:23:34" level=info msg="ok" dialer="y"\n';
+  assert.equal(logFormat.filter(sample, {}).length, 2);
+  assert.equal(logFormat.filter(sample, { levels: ['error'] }).length, 1);
+  assert.equal(logFormat.filter(sample, { search: 'BOOM' }).length, 1, 'search must be case-insensitive');
+  assert.equal(logFormat.filter(sample, { search: 'nomatch' }).length, 0);
+  assert.equal(logFormat.filter('', {}).length, 0);
+});
+
+test('日志级别图例可以点击切换', () => {
+  const { logFormat } = load(panelModule, 'https:', 'logs');
+  const buttons = elements(logFormat.legend(() => {}, ['error']), 'button');
+  assert.equal(buttons.length, 4, 'legend must be clickable when a handler is passed');
+  const byLevel = (level) => buttons.find((item) => item.attrs['data-log-level-toggle'] === level);
+  assert.equal(byLevel('error').attrs['aria-pressed'], 'true');
+  assert.equal(byLevel('info').attrs['aria-pressed'], 'false');
+  assert.equal(elements(logFormat.legend(), 'button').length, 0, 'static legend stays plain text');
 });

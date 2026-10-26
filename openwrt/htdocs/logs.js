@@ -16,6 +16,8 @@ return view.extend({
   render: function () {
     var following = true
     var latest = ''
+    var searchText = ''
+    var activeLevels = []
     var pending = null
     var container = null
     var content = E('span', { style: 'display:block' }, '正在读取日志…')
@@ -56,6 +58,18 @@ return view.extend({
       { id: 'router-log-hint', role: 'status', style: 'margin:4px 0;color:var(--text-color-medium,#666)' },
       '每 2 秒刷新 · 自动跟随最新日志',
     )
+    var searchBox = E('input', {
+      type: 'search',
+      placeholder: '过滤行…',
+      'aria-label': '搜索日志',
+      spellcheck: 'false',
+      autocomplete: 'off',
+      style: 'min-height:44px;min-width:0;flex:1 1 220px;padding:0 10px;border:1px solid var(--border-color-medium,#ccc);border-radius:6px;background:transparent;color:inherit',
+      input: function (event) {
+        searchText = event.target.value
+        redraw()
+      },
+    })
     var toggle = E(
       'button',
       {
@@ -70,10 +84,54 @@ return view.extend({
       '暂停跟随',
     )
     var failure = E('p', { role: 'alert', style: 'display:none' })
+    var count = E('span', { style: 'margin-left:auto;color:var(--text-color-medium,#666);font-variant-numeric:tabular-nums' })
+    var legendHost = E('div', { style: 'display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:8px' })
+    function rebuildLegend() {
+      dom.content(legendHost, [logFormat.legend(toggleLevel, activeLevels), count])
+    }
+    rebuildLegend()
+    function visible() {
+      return logFormat.filter(latest, { search: searchText, levels: activeLevels })
+    }
+
     function showLatest() {
-      var text = latest || '暂无日志。'
+      var entries = visible()
+      var text = entries
+        .map(function (entry) {
+          return entry.text
+        })
+        .join('')
+      if (!text) text = latest ? '没有符合条件的日志。' : '暂无日志。'
       if (content.textContent !== text) dom.content(content, logFormat.render(text))
+      count.textContent = latest
+        ? '显示 ' + entries.length + ' / 共 ' + logFormat.parse(latest).length + ' 条'
+        : ''
       output.scrollTop = output.scrollHeight
+    }
+
+    // 改筛选条件时不用等下一次轮询，立刻按当前快照重画。
+    function redraw() {
+      if (following) showLatest()
+      else {
+        var entries = visible()
+        var text = entries
+          .map(function (entry) {
+            return entry.text
+          })
+          .join('')
+        dom.content(content, logFormat.render(text || (latest ? '没有符合条件的日志。' : '暂无日志。')))
+        count.textContent = latest
+          ? '显示 ' + entries.length + ' / 共 ' + logFormat.parse(latest).length + ' 条'
+          : ''
+      }
+    }
+
+    function toggleLevel(level) {
+      var at = activeLevels.indexOf(level)
+      if (at === -1) activeLevels.push(level)
+      else activeLevels.splice(at, 1)
+      rebuildLegend()
+      redraw()
     }
     function updateHint() {
       var text = following
@@ -132,10 +190,10 @@ return view.extend({
           style:
             'display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px',
         },
-        [hint, toggle],
+        [hint, searchBox, toggle],
       ),
       failure,
-      logFormat.legend(),
+      legendHost,
       output,
     ])
     return container

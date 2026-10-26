@@ -43,13 +43,41 @@ return baseclass.extend({
       )
     })
   },
-  legend: function () {
-    return E('p', { style: 'display:flex;flex-wrap:wrap;gap:14px;font-size:12px', 'aria-label': '日志级别颜色说明' }, [
-      E('span', { style: 'color:var(--nailink-log-debug,' + colors.debug + ')' }, 'DEBUG 调试'),
-      E('span', { style: 'color:var(--nailink-log-info,' + colors.info + ')' }, 'INFO 信息'),
-      E('span', { style: 'color:var(--nailink-log-warning,' + colors.warning + ')' }, 'WARN 警告'),
-      E('span', { style: 'color:var(--nailink-log-error,' + colors.error + ')' }, 'ERROR 错误'),
-    ])
+  // 按级别和关键字挑行。dae 每几秒重选一次 dialer，健康的 info 行会把真正的
+  // 警告冲走，所以这两个筛选是日常最需要的东西。
+  filter: function (text, options) {
+    var needle = ((options && options.search) || '').trim().toLowerCase()
+    var wanted = (options && options.levels) || []
+    return this.parse(text).filter(function (entry) {
+      var level = entry.level === 'plain' ? 'info' : entry.level
+      if (wanted.length && wanted.indexOf(level) === -1) return false
+      if (needle && entry.text.toLowerCase().indexOf(needle) === -1) return false
+      return true
+    })
+  },
+  legend: function (onToggle, active) {
+    var levels = [
+      ['debug', 'DEBUG 调试'],
+      ['info', 'INFO 信息'],
+      ['warning', 'WARN 警告'],
+      ['error', 'ERROR 错误'],
+    ]
+    var selected = active || []
+    return E(
+      'p',
+      { style: 'display:flex;flex-wrap:wrap;align-items:center;gap:10px;font-size:12px', 'aria-label': '日志级别颜色说明' },
+      levels.map(function (item) {
+        var level = item[0]
+        var on = selected.indexOf(level) !== -1
+        var style =
+          'color:var(--nailink-log-' + level + ',' + colors[level] + ');' +
+          'background:none;border:0;padding:0;font:inherit;cursor:pointer;' +
+          (on ? 'text-decoration:underline;font-weight:600' : 'opacity:.55')
+        var props = { 'data-log-level-toggle': level, 'aria-pressed': on ? 'true' : 'false', style: style }
+        if (typeof onToggle === 'function') props.click = function () { onToggle(level) }
+        return E(typeof onToggle === 'function' ? 'button' : 'span', props, item[1])
+      }),
+    )
   },
   theme: function (node) {
     if (!node || typeof window.getComputedStyle !== 'function') return
