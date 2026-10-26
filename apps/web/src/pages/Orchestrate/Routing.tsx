@@ -15,7 +15,6 @@ import {
   useUpdateRoutingMutation,
 } from '~/apis'
 import { RoutingFormModal } from '~/components/RoutingFormModal'
-import { RoutingPresetPicker } from '~/components/RoutingPresetPicker'
 import { RoutingWizard } from '~/components/RoutingWizard'
 import { Section } from '~/components/Section'
 import { SimpleCard } from '~/components/SimpleCard'
@@ -26,7 +25,6 @@ import { DEFAULT_GROUP_NAME } from '~/constants/default'
 import { useDisclosure } from '~/hooks'
 import { defaultResourcesAtom } from '~/store'
 import { createGroupCompletionItems, setDynamicCompletionItems } from '~/utils/editor-completions'
-import { insertRoutingRules } from '~/utils/routing-presets'
 import { describeInvalidCode, invalidCodes } from '~/utils/routing-validate'
 
 /** 卡片摘要只显示前几条规则，避免长规则表把卡片撑爆。 */
@@ -79,24 +77,6 @@ export function Routing() {
     return false
   }
 
-  // 快捷添加把规则并进当前选中的配置：读取最新的字符串，插入后再整体写回，
-  // 这样连点多个预设不会互相覆盖（每次都基于上一次的返回值）。
-  const addPresetRules = async (lines: string[]) => {
-    if (!selectedRouting) return
-    const result = insertRoutingRules(selectedRouting.routing.string, lines)
-    if (!guardRouting(result.text)) return
-    if (!result.inserted.length) {
-      toast.info(t('routingPresets.alreadyAdded'))
-      return
-    }
-    try {
-      await updateRoutingMutation.mutateAsync({ id: selectedRouting.id, routing: result.text })
-      toast.success(t('routingPresets.added', { count: result.inserted.length }))
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error))
-    }
-  }
-
   const [openedWizard, { open: openWizard, close: closeWizard }] = useDisclosure(false)
   const [openedCreateRoutingFormModal, { open: openCreateRoutingFormModal, close: closeCreateRoutingFormModal }] =
     useDisclosure(false)
@@ -121,14 +101,6 @@ export function Routing() {
             <ListTree className="h-4 w-4" />
             <span className="hidden sm:inline">{t('routingWizard.title')}</span>
           </Button>
-          <RoutingPresetPicker
-            proxyGroup={proxyGroupName}
-            existing={selectedRouting?.routing.string ?? ''}
-            pending={updateRoutingMutation.isPending}
-            onPick={(_id, lines) => {
-              void addPresetRules(lines)
-            }}
-          />
         </>
       }
       bordered
