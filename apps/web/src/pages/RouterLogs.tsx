@@ -41,18 +41,44 @@ export function RouterLogs() {
   const [raw, setRaw] = useState(false)
   // 候选列表是 dae 的调试输出，一条能占 50 行；默认折叠，需要时展开。
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
-  const [quiet, setQuiet] = useState(false)
+  // 空集合表示「全部级别」，避免默认就把某档藏起来。
+  const [levels, setLevels] = useState<Set<LogLevel>>(() => new Set())
+  const [search, setSearch] = useState('')
   const liveLogs = query.data?.logs ?? ''
   const logs = history ?? liveLogs
   const isFollowing = history === null
   const parsed = useMemo(() => parseLogLines(logs), [logs])
-  // 「只看问题」隐藏 info 及以下。dae 每几秒就重选一次 dialer，
-  // 健康的 info 行会把真正的 warning 冲走。
-  const lines = useMemo(
-    () => (quiet ? parsed.filter((line) => line.level === 'warning' || line.level === 'error' || line.level === 'fatal') : parsed),
-    [parsed, quiet],
-  )
+  // 级别筛选 + 关键字筛选。dae 每几秒就重选一次 dialer，健康的 info 行会把
+  // 真正的 warning 冲走，所以「只看问题」是最常用的档位。
+  const lines = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    return parsed.filter((line) => {
+      if (levels.size && !levels.has(line.level)) return false
+      if (!needle) return true
+      return line.raw.toLowerCase().includes(needle)
+    })
+  }, [parsed, levels, search])
   const hidden = parsed.length - lines.length
+  const onlyProblems = levels.size === 3 && levels.has('warning') && levels.has('error') && levels.has('fatal')
+
+  function toggleLevel(level: LogLevel) {
+    setLevels((current) => {
+      const next = new Set(current)
+      if (next.has(level)) next.delete(level)
+      else next.add(level)
+      return next
+    })
+  }
+
+  function toggleProblemsOnly() {
+    setLevels(onlyProblems ? new Set() : new Set<LogLevel>(['warning', 'error', 'fatal']))
+  }
+
+  // 过滤后条数给个上限说明：日志是环形缓冲，总数不是全部历史。
+  const levelCountLabel =
+    hidden > 0
+      ? t('logs.countFiltered', { shown: lines.length, total: parsed.length })
+      : t('logs.count', { count: parsed.length })
 
   function followLatest() {
     following.current = true
@@ -106,6 +132,15 @@ export function RouterLogs() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t('logs.searchPlaceholder')}
+            aria-label={t('logs.search')}
+            className="h-8 w-full min-w-0 rounded-lg border bg-background px-2.5 text-xs sm:w-56"
+            spellCheck={false}
+          />
           <div
             className="flex gap-1 rounded-lg border p-0.5"
             role="group"
@@ -128,10 +163,10 @@ export function RouterLogs() {
           <Button
             type="button"
             size="sm"
-            variant={quiet ? 'secondary' : 'ghost'}
-            aria-pressed={quiet}
+            variant={onlyProblems ? 'secondary' : 'ghost'}
+            aria-pressed={onlyProblems}
             className="h-8"
-            onClick={() => setQuiet((value) => !value)}
+            onClick={toggleProblemsOnly}
           >
             {t('logs.onlyProblems')}
           </Button>
@@ -155,12 +190,25 @@ export function RouterLogs() {
           </button>
         </p>
       )}
-      <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label={t('logs.legend')}>
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" aria-label={t('logs.legend')}>
         {(['debug', 'info', 'warning', 'error'] as const).map((level) => (
-          <span key={level} className={cn('font-semibold uppercase', LEVEL_TONE[level])}>
+          <button
+            key={level}
+            type="button"
+            aria-pressed={levels.has(level)}
+            onClick={() => toggleLevel(level)}
+            className={cn(
+              'rounded-md px-1.5 py-0.5 font-semibold uppercase transition-colors',
+              LEVEL_TONE[level],
+              levels.has(level) ? 'bg-muted ring-1 ring-border' : 'hover:bg-muted/60',
+            )}
+          >
             {t(`logs.level.${level}`)}
-          </span>
+          </button>
         ))}
+        <span className="ml-auto tabular-nums text-muted-foreground">
+          {levelCountLabel}
+        </span>
       </div>
       <div
         id="router-log-output"

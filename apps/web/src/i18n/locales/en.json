@@ -630,7 +630,11 @@
     "onlyProblems": "Problems only",
     "expandDetail": "Show {{count}} candidates",
     "collapseDetail": "Hide candidates",
-    "emptyFiltered": "No warnings or errors in this window. {{count}} entries are hidden."
+    "emptyFiltered": "No warnings or errors in this window. {{count}} entries are hidden.",
+    "search": "Search the log",
+    "searchPlaceholder": "Filter lines…",
+    "count": "{{count}} entries",
+    "countFiltered": "{{shown}} of {{total}} entries"
   },
   "shell": {
     "sessionExpired": "The router session expired. Reload the LuCI page to sign in again.",

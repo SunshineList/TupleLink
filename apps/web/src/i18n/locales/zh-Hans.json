@@ -630,7 +630,11 @@
     "onlyProblems": "只看问题",
     "expandDetail": "展开 {{count}} 个候选",
     "collapseDetail": "收起候选",
-    "emptyFiltered": "这段日志里没有警告或错误，隐藏了 {{count}} 条。"
+    "emptyFiltered": "这段日志里没有警告或错误，隐藏了 {{count}} 条。",
+    "search": "搜索日志",
+    "searchPlaceholder": "过滤行…",
+    "count": "共 {{count}} 条",
+    "countFiltered": "{{shown}} / {{total}} 条"
   },
   "shell": {
     "sessionExpired": "路由器登录已失效，请刷新后台页面重新登录。",
