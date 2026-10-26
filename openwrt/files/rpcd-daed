@@ -5,7 +5,7 @@ set -e
 
 case "${1:-}" in
 list)
-	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"maintenance":{},"maintain":{"action":""},"action":{"action":""}}'
+	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"maintenance":{},"maintain":{"action":""},"mirror":{"url":""},"action":{"action":""}}'
 	;;
 call)
 	case "${2:-}" in
@@ -45,6 +45,20 @@ call)
 		json_dump
 		;;
 	maintenance) /usr/libexec/daed/luci-proxy --maintenance status ;;
+	mirror)
+		# 只接受 https 前缀或空串（清空回直连）。校验放在写入之前，
+		# 免得一个手滑的值把后续所有下载引到别处。
+		input=''; read -r input || :
+		json_load "${input:-\{\}}" || exit 1
+		url=''; json_get_var url url
+		case "$url" in
+			'') uci -q delete daed.main.github_mirror ;;
+			https://*) uci -q set daed.main.github_mirror="$url" ;;
+			*) printf '%s\n' '{"success":false,"code":"invalid_mirror"}'; exit 0 ;;
+		esac
+		uci -q commit daed || { printf '%s\n' '{"success":false,"code":"state_failed"}'; exit 0; }
+		printf '%s\n' '{"success":true}'
+		;;
 	maintain)
 		input=''; read -r input || :
 		json_load "${input:-\{\}}" || exit 1

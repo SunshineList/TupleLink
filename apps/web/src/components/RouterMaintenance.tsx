@@ -1,10 +1,11 @@
 import { Download, LoaderCircle, RefreshCw } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { useRouterMaintenance } from '~/hooks/useRouterMaintenance'
-import { jobActive, maintenanceMessages, newerVersion } from '~/utils/router-maintenance'
+import { jobActive, maintenanceMessages, newerVersion, setMaintenanceMirror } from '~/utils/router-maintenance'
 
 function MaintenanceProgress({ type }: { type: 'update' | 'geodata' }) {
   const { t } = useTranslation()
@@ -117,6 +118,24 @@ export function RouterGeodata() {
   const { t } = useTranslation()
   const { query, mutation, busy } = useRouterMaintenance()
   const data = query.data?.geodata
+  const [mirror, setMirror] = useState(query.data?.mirror || '')
+  const [saving, setSaving] = useState(false)
+  const [mirrorError, setMirrorError] = useState('')
+  useEffect(() => setMirror(query.data?.mirror || ''), [query.data?.mirror])
+  async function saveMirror(event: React.FormEvent) {
+    event.preventDefault()
+    setSaving(true)
+    setMirrorError('')
+    try {
+      await setMaintenanceMirror(mirror.trim())
+      await query.refetch()
+      toast.success(t('maintenance.mirrorSaved'))
+    } catch (error) {
+      setMirrorError((error as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
   return (
     <section className="col-span-full rounded-xl border bg-card p-5" aria-label={t('maintenance.geodataRegion')}>
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -134,6 +153,31 @@ export function RouterGeodata() {
           {t('maintenance.geodataUpdate')}
         </Button>
       </div>
+      <form className="mt-6 border-t border-border pt-5" onSubmit={saveMirror}>
+        <label className="block text-sm font-medium" htmlFor="github-mirror">
+          {t('maintenance.mirrorTitle')}
+        </label>
+        <p className="mt-1 max-w-2xl text-xs text-muted-foreground">{t('maintenance.mirrorHint')}</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            id="github-mirror"
+            className="min-h-11 min-w-0 flex-1 rounded-lg border bg-background px-3 text-sm"
+            placeholder="https://mirror.example"
+            value={mirror}
+            onChange={(event) => setMirror(event.target.value)}
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <Button type="submit" variant="outline" className="min-h-11" disabled={saving}>
+            {saving ? t('maintenance.mirrorSaving') : t('maintenance.mirrorSave')}
+          </Button>
+        </div>
+        {mirrorError && (
+          <p role="alert" className="mt-2 text-sm text-destructive">
+            {mirrorError}
+          </p>
+        )}
+      </form>
       <div className="mt-3">
         <MaintenanceProgress type="geodata" />
       </div>

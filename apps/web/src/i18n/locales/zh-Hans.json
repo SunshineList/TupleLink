@@ -756,7 +756,13 @@
     "geodataSystem": "当前使用系统规则库或自定义文件",
     "geodataUpdate": "一键更新规则库",
     "latestVersion": "最新版本",
-    "checkAria": "NaiLink 版本 {{version}}，检查更新"
+    "checkAria": "NaiLink 版本 {{version}}，检查更新",
+    "mirrorTitle": "GitHub 代理",
+    "mirrorHint": "可选。github.com 慢或不通时，下载会走这个前缀。留空表示直连。",
+    "mirrorSave": "保存代理",
+    "mirrorSaving": "保存中…",
+    "mirrorSaved": "代理已保存。",
+    "invalid_mirror": "代理地址必须以 https:// 开头。"
   },
   "routingPresets": {
     "open": "快捷添加",

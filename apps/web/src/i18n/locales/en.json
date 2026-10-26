@@ -756,7 +756,13 @@
     "geodataSystem": "using the system or a custom rule set",
     "geodataUpdate": "Update the rule set",
     "latestVersion": "latest",
-    "checkAria": "NaiLink version {{version}}, check for updates"
+    "checkAria": "NaiLink version {{version}}, check for updates",
+    "mirrorTitle": "GitHub mirror",
+    "mirrorHint": "Optional. Downloads go through this prefix when github.com is slow or blocked. Leave empty to connect directly.",
+    "mirrorSave": "Save mirror",
+    "mirrorSaving": "Saving…",
+    "mirrorSaved": "Mirror saved.",
+    "invalid_mirror": "The mirror address must start with https://."
   },
   "routingPresets": {
     "open": "Quick add",

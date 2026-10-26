@@ -17,6 +17,8 @@ export interface MaintenanceStatus {
   latest?: { version: string; tag: string; checked: number }
   geodata?: { version: string; tag: string; checked: number }
   job?: MaintenanceJob
+  // 当前生效的 GitHub 代理；空串表示直连。
+  mirror?: string
 }
 
 // 维护结果码到文案的映射。文案本身在 locales 里，`errors` 段共用同一套 code，
@@ -47,6 +49,7 @@ export const maintenanceMessages: Record<string, string> = {
   backend_unavailable: 'maintenance.backend_unavailable',
   unsafe_state: 'maintenance.unsafe_state',
   state_failed: 'maintenance.state_failed',
+  invalid_mirror: 'maintenance.invalid_mirror',
   interrupted: 'maintenance.interrupted',
   operation_failed: 'maintenance.operation_failed',
 }
@@ -90,3 +93,21 @@ async function maintenanceRPC(method: 'maintenance' | 'maintain', action?: strin
 }
 export const readMaintenance = () => maintenanceRPC('maintenance')
 export const startMaintenance = (action: 'check' | 'update' | 'geodata') => maintenanceRPC('maintain', action)
+
+// 代理是同步写 uci，不进维护队列：写完之后下一次下载就生效，
+// 不需要排队，也不会跟正在跑的 geodata 任务抢锁。
+export async function setMaintenanceMirror(url: string): Promise<void> {
+  const host = window.parent as Window & {
+    L?: {
+      require: (name: string) => Promise<{ declare: (spec: object) => (params: object) => Promise<{ success?: boolean; code?: string }> }>
+    }
+  }
+  if (host === window || !host.L?.require) throw new Error(i18n.t('maintenance.hostUnavailable'))
+  const rpc = await host.L.require('rpc')
+  const result = await rpc.declare({ object: 'daed-router', method: 'mirror', params: ['url'], expect: {} })({ url })
+  if (!result?.success) {
+    throw new Error(i18n.t(maintenanceMessages[result?.code || ''] || maintenanceMessages.operation_failed, {
+      defaultValue: i18n.t('maintenance.operation_failed'),
+    }))
+  }
+}
