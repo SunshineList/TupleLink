@@ -146,7 +146,13 @@ export function Routing() {
               routing: routing.routing.string,
             })
           }}
-        />
+        >
+          {/* 传了 children 才会出现「详情」按钮：分流规则本来就该能直接看到，
+              不需要先点开编辑器。 */}
+          <pre className="overflow-x-auto rounded-lg bg-muted/40 p-3 text-xs leading-relaxed whitespace-pre-wrap">
+            {routing.routing.string.trim() || t('panel.noRulesYet')}
+          </pre>
+        </SimpleCard>
       ))}
 
       <Dialog open={openedWizard} onOpenChange={(next) => (next ? openWizard() : closeWizard())}>

@@ -546,7 +546,8 @@
     "logs": "Runtime log",
     "neverUpdated": "Never updated",
     "subscriptionFailed": "The last update failed: {{reason}}",
-    "noNodesAfterFailure": "This subscription returned no nodes."
+    "noNodesAfterFailure": "This subscription returned no nodes.",
+    "noRulesYet": "No rules yet. Add one from Set apps or Quick add."
   },
   "importResource": {
     "optionalTag": "Label (optional)",
