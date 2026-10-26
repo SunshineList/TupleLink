@@ -814,7 +814,7 @@
     }
   },
   "routingWizard": {
-    "title": "Traffic routing",
+    "title": "Set apps",
     "hint": "Pick where each service should go. Lines you wrote by hand stay untouched.",
     "direct": "Direct",
     "block": "Block",
