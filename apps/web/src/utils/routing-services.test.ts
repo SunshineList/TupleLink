@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   actionEquals,
   actionTarget,
+  customRuleOf,
   DEFAULT_SERVICE_RULES,
+  matcherOf,
+  parseCustomRules,
   parseServiceRules,
   ROUTING_SERVICES,
   ruleLine,
   serviceById,
+  writeRules,
   writeServiceRules,
 } from './routing-services'
 
@@ -128,5 +132,89 @@ describe('routing services', () => {
       { service: 'ads', action: { kind: 'block' } },
     ])
     expect(text.trim().split('\n').at(-1)).toBe('domain(geosite:ads) -> block')
+  })
+})
+
+describe('自定义规则', () => {
+  it('geosite 分类写成 domain(geosite:...)', () => {
+    expect(matcherOf('geosite', 'netflix')).toBe('domain(geosite:netflix)')
+  })
+
+  it('geoip 国家写成 dip(geoip:...)', () => {
+    expect(matcherOf('geoip', 'jp')).toBe('dip(geoip:jp)')
+  })
+
+  it('自定义域名可以用后缀、关键字、完整域名三种写法', () => {
+    expect(matcherOf('domain-suffix', 'example.com')).toBe('domain(suffix:example.com)')
+    expect(matcherOf('domain-keyword', 'pt')).toBe('domain(keyword:pt)')
+    expect(matcherOf('domain-full', 'a.example.com')).toBe('domain(full:a.example.com)')
+  })
+
+  it('空值不生成匹配器，避免写出 domain(suffix:)', () => {
+    expect(matcherOf('domain-suffix', '   ')).toBe('')
+  })
+
+  it('认得出的匹配器能反解回结构', () => {
+    expect(customRuleOf('domain(geosite:ads)', { kind: 'block' })).toEqual({
+      kind: 'geosite',
+      value: 'ads',
+      action: { kind: 'block' },
+    })
+    expect(customRuleOf('l4proto(tcp) && dport(6881-6999)', { kind: 'direct' })).toEqual({
+      kind: 'port',
+      value: '6881-6999',
+      action: { kind: 'direct' },
+    })
+  })
+
+  it('复杂的组合匹配器不归向导管', () => {
+    expect(customRuleOf('domain(suffix:a.com) && dport(443)', { kind: 'direct' })).toBeNull()
+    expect(customRuleOf('pname(curl)', { kind: 'direct' })).toBeNull()
+  })
+
+  it('能读出配置里的自定义规则，并跳过服务预设', () => {
+    const text = [
+      'domain(geosite:netflix) -> proxy',
+      'domain(suffix:pt.example) -> direct',
+      'dip(geoip:jp) -> JP',
+      'fallback: proxy',
+    ].join('\n')
+    expect(parseCustomRules(text)).toEqual([
+      { kind: 'domain-suffix', value: 'pt.example', action: { kind: 'direct' } },
+      { kind: 'geoip', value: 'jp', action: { kind: 'group', group: 'JP' } },
+    ])
+  })
+
+  it('写回时自定义规则排在服务预设前面，手写规则与注释原样保留', () => {
+    const text = [
+      '# 我的备注',
+      'pname(NetworkManager, systemd-resolved, dnsmasq) -> must_direct',
+      'domain(suffix:old.example) -> proxy',
+      'someCustomMatcher(1) -> direct',
+      'fallback: proxy',
+    ].join('\n')
+    const out = writeRules(
+      text,
+      [{ service: 'netflix', action: { kind: 'group', group: 'proxy' } }],
+      [{ kind: 'geosite', value: 'ads', action: { kind: 'block' } }],
+    )
+    const lines = out.trim().split('\n')
+    expect(lines[0]).toBe('# 我的备注')
+    expect(lines).toContain('domain(geosite:ads) -> block')
+    expect(lines).toContain('domain(geosite:netflix) -> proxy')
+    expect(lines).toContain('someCustomMatcher(1) -> direct')
+    expect(lines.indexOf('domain(geosite:ads) -> block')).toBeLessThan(
+      lines.indexOf('domain(geosite:netflix) -> proxy'),
+    )
+    expect(lines.indexOf('domain(geosite:netflix) -> proxy')).toBeLessThan(lines.indexOf('fallback: proxy'))
+    expect(lines).not.toContain('domain(suffix:old.example) -> proxy')
+  })
+
+  it('重复的自定义规则只写一次', () => {
+    const out = writeRules('fallback: proxy', [], [
+      { kind: 'geoip', value: 'jp', action: { kind: 'direct' } },
+      { kind: 'geoip', value: 'jp', action: { kind: 'block' } },
+    ])
+    expect(out.split('\n').filter((line) => line.includes('geoip:jp'))).toHaveLength(1)
   })
 })

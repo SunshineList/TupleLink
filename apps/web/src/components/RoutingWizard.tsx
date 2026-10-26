@@ -1,9 +1,10 @@
-import type { RoutingAction, ServiceId } from '~/utils/routing-services'
-import { Check, Loader2 } from 'lucide-react'
+import type { CustomRule, MatcherKind, RoutingAction, ServiceId } from '~/utils/routing-services'
+import { Check, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '~/components/ui/button'
 import { DialogTitle } from '~/components/ui/dialog'
+import { Input } from '~/components/ui/input'
 import {
   ScrollableDialogBody,
   ScrollableDialogContent,
@@ -20,10 +21,14 @@ import {
 import { cn } from '~/lib/utils'
 import {
   actionEquals,
+  GEOIP_HINTS,
+  GEOSITE_HINTS,
+  matcherOf,
+  parseCustomRules,
   parseServiceRules,
   ROUTING_SERVICES,
   serviceLabel,
-  writeServiceRules,
+  writeRules,
 } from '~/utils/routing-services'
 
 export interface RoutingWizardProps {
@@ -40,6 +45,16 @@ const DIRECT = '::direct'
 const BLOCK = '::block'
 const UNSET = '::unset'
 
+const KINDS: MatcherKind[] = [
+  'domain-suffix',
+  'domain-keyword',
+  'domain-full',
+  'geosite',
+  'geoip',
+  'ip',
+  'port',
+]
+
 function valueOf(action: RoutingAction | undefined): string {
   if (!action) return UNSET
   if (action.kind === 'direct') return DIRECT
@@ -55,18 +70,20 @@ function actionOf(value: string): RoutingAction | undefined {
 }
 
 /**
- * 分流向导：一个服务一行，右边选它走哪个出口。
+ * 分流向导：服务与自定义规则都能指定出口。
  *
- * 相比原来的「快捷添加」弹层，这里能同时看到全部服务当前的去向，
+ * 相比原来的「快捷添加」弹层，这里能同时看到所有规则当前的去向，
  * 也能直接改成直连/阻断，不用再去读 routingA 文本。
  */
 export function RoutingWizard({ text, groups, pending, onSave }: RoutingWizardProps) {
   const { t, i18n } = useTranslation()
   const [draft, setDraft] = useState<Map<ServiceId, RoutingAction>>(() => parseServiceRules(text))
+  const [custom, setCustom] = useState<CustomRule[]>(() => parseCustomRules(text))
 
   // 外部配置变了（换了分流集、别处保存过）就重新同步，避免拿着旧草稿覆盖。
   useEffect(() => {
     setDraft(parseServiceRules(text))
+    setCustom(parseCustomRules(text))
   }, [text])
 
   const defaultTarget = groups[0] ?? ''
@@ -80,8 +97,39 @@ export function RoutingWizard({ text, groups, pending, onSave }: RoutingWizardPr
       if (next === undefined || now === undefined) return true
       if (!actionEquals(next, now)) return true
     }
-    return false
-  }, [draft, text])
+    const before = parseCustomRules(text)
+    if (before.length !== custom.length) return true
+    return custom.some((rule, index) => {
+      const other = before[index]
+      return (
+        rule.kind !== other.kind
+        || rule.value !== other.value
+        || !actionEquals(rule.action, other.action)
+      )
+    })
+  }, [custom, draft, text])
+
+  const updateRule = (index: number, patch: Partial<CustomRule>) => {
+    setCustom((previous) => previous.map((rule, at) => (at === index ? { ...rule, ...patch } : rule)))
+  }
+
+  const targetSelect = (value: string, onChange: (next: string) => void, label: string) => (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger size="sm" className="w-36 shrink-0" aria-label={label}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent align="end">
+        <SelectItem value={UNSET}>{t('routingWizard.followDefault')}</SelectItem>
+        <SelectItem value={DIRECT}>{t('routingWizard.direct')}</SelectItem>
+        <SelectItem value={BLOCK}>{t('routingWizard.block')}</SelectItem>
+        {groups.map((group) => (
+          <SelectItem key={group} value={group}>
+            {group}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
 
   return (
     <ScrollableDialogContent size="xl">
@@ -116,9 +164,9 @@ export function RoutingWizard({ text, groups, pending, onSave }: RoutingWizardPr
                 </span>
                 <span className="block truncate text-xs text-muted-foreground">{service.matcher}</span>
               </span>
-              <Select
-                value={valueOf(action)}
-                onValueChange={(next: string) => {
+              {targetSelect(
+                valueOf(action),
+                (next) => {
                   setDraft((previous) => {
                     const updated = new Map(previous)
                     const parsed = actionOf(next)
@@ -126,29 +174,98 @@ export function RoutingWizard({ text, groups, pending, onSave }: RoutingWizardPr
                     else updated.delete(service.id)
                     return updated
                   })
-                }}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className="w-36 shrink-0"
-                  aria-label={serviceLabel(service.id, i18n.language)}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="end">
-                  <SelectItem value={UNSET}>{t('routingWizard.followDefault')}</SelectItem>
-                  <SelectItem value={DIRECT}>{t('routingWizard.direct')}</SelectItem>
-                  <SelectItem value={BLOCK}>{t('routingWizard.block')}</SelectItem>
-                  {groups.map((group) => (
-                    <SelectItem key={group} value={group}>
-                      {group}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                },
+                serviceLabel(service.id, i18n.language),
+              )}
             </div>
           )
         })}
+
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold">{t('routingWizard.customTitle')}</h3>
+              <p className="text-xs text-muted-foreground">{t('routingWizard.customHint')}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setCustom((previous) => [
+                  ...previous,
+                  { kind: 'domain-suffix', value: '', action: { kind: 'direct' } },
+                ])
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              {t('routingWizard.addRule')}
+            </Button>
+          </div>
+
+          {custom.length === 0
+            ? <p className="mt-3 text-xs text-muted-foreground">{t('routingWizard.customEmpty')}</p>
+            : null}
+
+          <div className="mt-3 flex flex-col gap-2">
+            {custom.map((rule, index) => (
+              <div key={`${rule.kind}:${rule.value}:${index}`} className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={rule.kind}
+                  onValueChange={(next: string) => updateRule(index, { kind: next as MatcherKind })}
+                >
+                  <SelectTrigger size="sm" className="w-40 shrink-0" aria-label={t('routingWizard.ruleKind')}>
+                    {/* 直接渲染标签：行是按 value 重建的，SelectValue 在这里会错配到别的项。 */}
+                    <span className="truncate">{t(`routingWizard.kind.${rule.kind}`)}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {KINDS.map((kind) => (
+                      <SelectItem key={kind} value={kind}>
+                        {t(`routingWizard.kind.${kind}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  className="min-w-0 flex-1"
+                  value={rule.value}
+                  placeholder={t('routingWizard.valuePlaceholder') as string}
+                  list={rule.kind === 'geosite' ? 'geosite-hints' : rule.kind === 'geoip' ? 'geoip-hints' : undefined}
+                  onChange={(event) => updateRule(index, { value: event.target.value })}
+                />
+                {targetSelect(
+                  valueOf(rule.action),
+                  (next) => updateRule(index, { action: actionOf(next) ?? { kind: 'direct' } }),
+                  t('routingWizard.ruleTarget') as string,
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t('routingWizard.removeRule') as string}
+                  onClick={() => {
+                    setCustom((previous) => previous.filter((_, at) => at !== index))
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <span className="w-full truncate text-xs text-muted-foreground">
+                  {matcherOf(rule.kind, rule.value) || '—'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <datalist id="geosite-hints">
+            {GEOSITE_HINTS.map((hint) => (
+              <option key={hint} value={hint} />
+            ))}
+          </datalist>
+          <datalist id="geoip-hints">
+            {GEOIP_HINTS.map((hint) => (
+              <option key={hint} value={hint} />
+            ))}
+          </datalist>
+          <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">{t('routingWizard.geositeWarn')}</p>
+        </div>
       </ScrollableDialogBody>
 
       <ScrollableDialogFooter className="flex items-center justify-between gap-2">
@@ -167,14 +284,14 @@ export function RoutingWizard({ text, groups, pending, onSave }: RoutingWizardPr
             })
           }}
         >
-          {t('routingWizard.sendAllToProxy', { group: defaultTarget })}
+          {t('routingWizard.sendAllToProxy', { group: defaultTarget || 'proxy' })}
         </Button>
         <Button
           size="sm"
           disabled={!changed || pending}
           onClick={() => {
-            const rules = [...draft.entries()].map(([service, action]) => ({ service, action }))
-            void onSave(writeServiceRules(text, rules))
+            const services = [...draft.entries()].map(([service, action]) => ({ service, action }))
+            void onSave(writeRules(text, services, custom))
           }}
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}

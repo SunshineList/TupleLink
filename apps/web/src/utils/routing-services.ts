@@ -227,3 +227,164 @@ export const DEFAULT_SERVICE_RULES: ServiceRule[] = [
   { service: 'lan', action: { kind: 'direct' } },
   { service: 'cn', action: { kind: 'direct' } },
 ]
+
+// ---------------------------------------------------------------------------
+// 自定义规则：geosite 分类 / geoip 国家 / 自定义域名 / IP / 端口
+// ---------------------------------------------------------------------------
+
+export type MatcherKind =
+  | 'domain-suffix'
+  | 'domain-keyword'
+  | 'domain-full'
+  | 'geosite'
+  | 'geoip'
+  | 'ip'
+  | 'port'
+
+export interface CustomRule {
+  kind: MatcherKind
+  value: string
+  action: RoutingAction
+}
+
+/** 常见 geosite 分类，只是输入提示；写错分类会让整张分流表加载失败。 */
+export const GEOSITE_HINTS = [
+  'cn',
+  'geolocation-!cn',
+  'ads',
+  'youtube',
+  'netflix',
+  'google',
+  'apple',
+  'amazon',
+  'microsoft',
+  'github',
+  'telegram',
+  'twitter',
+  'spotify',
+  'steam',
+  'epic',
+  'openai',
+  'anthropic',
+]
+
+/** 常见 geoip 国家代码，同样只是提示。 */
+export const GEOIP_HINTS = ['cn', 'us', 'jp', 'hk', 'tw', 'sg', 'kr', 'private']
+
+export function matcherOf(kind: MatcherKind, value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  switch (kind) {
+    case 'domain-suffix':
+      return `domain(suffix:${trimmed})`
+    case 'domain-keyword':
+      return `domain(keyword:${trimmed})`
+    case 'domain-full':
+      return `domain(full:${trimmed})`
+    case 'geosite':
+      return `domain(geosite:${trimmed})`
+    case 'geoip':
+      return `dip(geoip:${trimmed})`
+    case 'ip':
+      return `dip(${trimmed})`
+    case 'port':
+      return `l4proto(tcp) && dport(${trimmed})`
+  }
+}
+
+/** 认得出的自定义匹配器反解成结构；认不出返回 null，交给高级编辑器。 */
+export function customRuleOf(matcher: string, action: RoutingAction): CustomRule | null {
+  const text = matcher.trim()
+  const single = /^domain\((suffix|keyword|full|geosite):([^(),\s]+)\)$/.exec(text)
+  if (single) {
+    const kind = `domain-${single[1]}` as MatcherKind
+    return single[1] === 'geosite'
+      ? { kind: 'geosite', value: single[2], action }
+      : { kind, value: single[2], action }
+  }
+  const geoip = /^dip\(geoip:([^(),\s]+)\)$/.exec(text)
+  if (geoip) return { kind: 'geoip', value: geoip[1], action }
+  const port = /^l4proto\(tcp\)\s*&&\s*dport\(([^()]+)\)$/.exec(text)
+  if (port) return { kind: 'port', value: port[1], action }
+  const ip = /^dip\(([^()]+)\)$/.exec(text)
+  if (ip) return { kind: 'ip', value: ip[1], action }
+  return null
+}
+
+function actionOfTarget(target: string): RoutingAction {
+  if (target === 'direct' || target === 'must_direct') return { kind: 'direct' }
+  if (target === 'block') return { kind: 'block' }
+  return { kind: 'group', group: target }
+}
+
+/** 从文本里挑出向导能管理的自定义规则（服务预设之外的那些）。 */
+export function parseCustomRules(source: string): CustomRule[] {
+  const serviceMatchers = new Set(ROUTING_SERVICES.map((item) => item.matcher))
+  const rules: CustomRule[] = []
+  for (const raw of source.split('\n')) {
+    const line = raw.replace(/#.*$/, '').trim()
+    if (!line || /^fallback\s*:/.test(line)) continue
+    const parts = line.split(ARROW)
+    if (parts.length !== 2) continue
+    const matcher = parts[0].trim()
+    if (serviceMatchers.has(matcher)) continue
+    const rule = customRuleOf(matcher, actionOfTarget(parts[1].trim()))
+    if (rule) rules.push(rule)
+  }
+  return rules
+}
+
+/**
+ * 同时写服务规则与自定义规则。
+ *
+ * 顺序：自定义规则在前，服务预设在后——用户显式写的规则应该先匹配到。
+ * 认不出的行（含注释、`&&`/`||` 组合的复杂匹配器）一律原样保留。
+ */
+export function writeRules(source: string, services: ServiceRule[], custom: CustomRule[]): string {
+  const serviceMatchers = new Set(ROUTING_SERVICES.map((item) => item.matcher))
+  const wanted = new Map<ServiceId, RoutingAction>()
+  for (const rule of services) {
+    if (serviceById(rule.service)) wanted.set(rule.service, rule.action)
+  }
+
+  const kept: string[] = []
+  for (const raw of source.split('\n')) {
+    const trimmed = raw.trim()
+    if (!trimmed) {
+      if (kept.length && kept[kept.length - 1] !== '') kept.push('')
+      continue
+    }
+    if (trimmed.startsWith('#')) {
+      kept.push(raw.replace(/\s+$/, ''))
+      continue
+    }
+    const line = raw.replace(/#.*$/, '').trim()
+    if (!line) continue
+    const parts = line.split(ARROW)
+    const matcher = parts.length === 2 ? parts[0].trim() : ''
+    if (matcher && serviceMatchers.has(matcher)) continue
+    if (matcher && customRuleOf(matcher, { kind: 'direct' })) continue
+    kept.push(raw.replace(/\s+$/, ''))
+  }
+  while (kept.length && kept[kept.length - 1] === '') kept.pop()
+
+  const generated: string[] = []
+  const seen = new Set<string>()
+  for (const rule of custom) {
+    const matcher = matcherOf(rule.kind, rule.value)
+    if (!matcher || seen.has(matcher)) continue
+    seen.add(matcher)
+    generated.push(ruleLine(matcher, actionTarget(rule.action)))
+  }
+  for (const item of ROUTING_SERVICES) {
+    const action = wanted.get(item.id)
+    if (!action) continue
+    generated.push(ruleLine(item.matcher, actionTarget(action)))
+  }
+
+  const fallbackIndex = kept.findIndex((line) => /^\s*fallback\s*:/.test(line))
+  if (fallbackIndex < 0) {
+    return `${[...kept, ...generated].join('\n')}\n`
+  }
+  return `${[...kept.slice(0, fallbackIndex), ...generated, ...kept.slice(fallbackIndex)].join('\n')}\n`
+}

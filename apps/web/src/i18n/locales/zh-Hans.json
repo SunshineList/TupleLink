@@ -822,6 +822,24 @@
     "save": "保存分流",
     "sendAllToProxy": "全部走 {{group}}",
     "matcherHint": "匹配 {{matcher}}",
-    "saved": "分流已保存。"
+    "saved": "分流已保存。",
+    "customTitle": "自定义规则",
+    "customHint": "按 geosite 分类、geoip 国家、域名、IP 或端口匹配。",
+    "addRule": "加一条",
+    "customEmpty": "还没有自定义规则。",
+    "ruleKind": "匹配方式",
+    "ruleTarget": "转发到",
+    "removeRule": "删除这条",
+    "valuePlaceholder": "填值",
+    "geositeWarn": "分类名在 geosite.dat 里不存在时，整张分流表都会加载失败。",
+    "kind": {
+      "domain-suffix": "域名后缀",
+      "domain-keyword": "域名关键字",
+      "domain-full": "完整域名",
+      "geosite": "geosite 分类",
+      "geoip": "geoip 国家",
+      "ip": "IP 或网段",
+      "port": "TCP 端口范围"
+    }
   }
 }

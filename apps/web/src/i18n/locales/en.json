@@ -822,6 +822,24 @@
     "save": "Save rules",
     "sendAllToProxy": "Send all to {{group}}",
     "matcherHint": "Matched by {{matcher}}",
-    "saved": "Rules saved."
+    "saved": "Rules saved.",
+    "customTitle": "Custom rules",
+    "customHint": "Match by geosite category, geoip country, domain, IP or port.",
+    "addRule": "Add rule",
+    "customEmpty": "No custom rules yet.",
+    "ruleKind": "Match by",
+    "ruleTarget": "Send to",
+    "removeRule": "Remove rule",
+    "valuePlaceholder": "value",
+    "geositeWarn": "A category name that geosite.dat does not have makes the whole rule set fail to load.",
+    "kind": {
+      "domain-suffix": "Domain suffix",
+      "domain-keyword": "Domain keyword",
+      "domain-full": "Exact domain",
+      "geosite": "geosite category",
+      "geoip": "geoip country",
+      "ip": "IP or CIDR",
+      "port": "TCP port range"
+    }
   }
 }
