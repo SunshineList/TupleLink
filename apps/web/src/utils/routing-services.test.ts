@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { hasGeoIP, hasGeoSite } from './geodata-codes'
 import {
   actionEquals,
   actionTarget,
@@ -131,7 +132,7 @@ describe('routing services', () => {
     const text = writeServiceRules('dip(geoip:cn) -> direct\n', [
       { service: 'ads', action: { kind: 'block' } },
     ])
-    expect(text.trim().split('\n').at(-1)).toBe('domain(geosite:ads) -> block')
+    expect(text.trim().split('\n').at(-1)).toBe('domain(geosite:category-ads-all) -> block')
   })
 })
 
@@ -155,9 +156,9 @@ describe('自定义规则', () => {
   })
 
   it('认得出的匹配器能反解回结构', () => {
-    expect(customRuleOf('domain(geosite:ads)', { kind: 'block' })).toEqual({
+    expect(customRuleOf('domain(geosite:category-ads-all)', { kind: 'block' })).toEqual({
       kind: 'geosite',
-      value: 'ads',
+      value: 'category-ads-all',
       action: { kind: 'block' },
     })
     expect(customRuleOf('l4proto(tcp) && dport(6881-6999)', { kind: 'direct' })).toEqual({
@@ -196,14 +197,14 @@ describe('自定义规则', () => {
     const out = writeRules(
       text,
       [{ service: 'netflix', action: { kind: 'group', group: 'proxy' } }],
-      [{ kind: 'geosite', value: 'ads', action: { kind: 'block' } }],
+      [{ kind: 'geosite', value: 'category-ads-all', action: { kind: 'block' } }],
     )
     const lines = out.trim().split('\n')
     expect(lines[0]).toBe('# 我的备注')
-    expect(lines).toContain('domain(geosite:ads) -> block')
+    expect(lines).toContain('domain(geosite:category-ads-all) -> block')
     expect(lines).toContain('domain(geosite:netflix) -> proxy')
     expect(lines).toContain('someCustomMatcher(1) -> direct')
-    expect(lines.indexOf('domain(geosite:ads) -> block')).toBeLessThan(
+    expect(lines.indexOf('domain(geosite:category-ads-all) -> block')).toBeLessThan(
       lines.indexOf('domain(geosite:netflix) -> proxy'),
     )
     expect(lines.indexOf('domain(geosite:netflix) -> proxy')).toBeLessThan(lines.indexOf('fallback: proxy'))
@@ -216,5 +217,25 @@ describe('自定义规则', () => {
       { kind: 'geoip', value: 'jp', action: { kind: 'block' } },
     ])
     expect(out.split('\n').filter((line) => line.includes('geoip:jp'))).toHaveLength(1)
+  })
+})
+
+describe('geo 分类必须真实存在', () => {
+  // 写一个不存在的 geosite/geoip 分类，dae 会放弃整张分流表：
+  // ApplyRulesOptimizers error: code X not found。用户只会看到「分流全没了」，
+  // 很难联想到是一个分类名写错。这里把目录里所有引用都钉在真实分类表上。
+  const references = [
+    ...ROUTING_SERVICES.map((service) => ({ where: service.id, matcher: service.matcher })),
+  ]
+
+  it.each(references)('$where 引用的分类都在 geosite.dat / geoip.dat 里', ({ matcher }) => {
+    const geosite = [...matcher.matchAll(/geosite:([\w!-]+)/g)].map((item) => item[1])
+    const geoip = [...matcher.matchAll(/geoip:([\w!-]+)/g)].map((item) => item[1])
+    for (const code of geosite) {
+      expect(hasGeoSite(code), `geosite:${code} 不存在`).toBe(true)
+    }
+    for (const code of geoip) {
+      expect(hasGeoIP(code), `geoip:${code} 不存在`).toBe(true)
+    }
   })
 })

@@ -60,30 +60,25 @@ const service = (
   zh: string = en,
 ): RoutingService => ({ id, badge, label: { en, 'zh-Hans': zh }, matcher, proxyByDefault })
 
-/** 多个域名后缀拼成一个 domain 匹配器。 */
-const suffixes = (...domains: string[]): string =>
-  `domain(${domains.map((domain) => `suffix:${domain}`).join(', ')})`
-
 export const ROUTING_SERVICES: RoutingService[] = [
   service('youtube', 'YT', 'YouTube', 'domain(geosite:youtube)'),
   service('netflix', 'NF', 'Netflix', 'domain(geosite:netflix)'),
-  service('disney', 'D+', 'Disney+', suffixes('disneyplus.com', 'disney.com', 'dssott.com', 'bamgrid.com')),
-  service('spotify', 'SP', 'Spotify', suffixes('spotify.com', 'scdn.co', 'spotifycdn.com')),
-  service('tiktok', 'TT', 'TikTok', suffixes('tiktok.com', 'tiktokcdn.com', 'tiktokv.com', 'ibytedtos.com')),
-  // Telegram 只有 geoip 分类可靠；域名侧补上 telegram.org 与 t.me。
-  service('telegram', 'TG', 'Telegram', 'domain(suffix:telegram.org, suffix:t.me) || dip(geoip:telegram)'),
-  service('twitter', 'X', 'X (Twitter)', suffixes('twitter.com', 'x.com', 'twimg.com', 't.co'), true, 'X（推特）'),
-  service('github', 'GH', 'GitHub', suffixes('github.com', 'githubusercontent.com', 'githubassets.com', 'github.io')),
-  service('openai', 'AI', 'OpenAI / ChatGPT', suffixes('openai.com', 'chatgpt.com', 'oaistatic.com', 'oaiusercontent.com')),
-  service('anthropic', 'AN', 'Claude', suffixes('anthropic.com', 'claude.ai', 'claudeusercontent.com')),
+  service('disney', 'D+', 'Disney+', 'domain(geosite:disney)'),
+  service('spotify', 'SP', 'Spotify', 'domain(geosite:spotify)'),
+  service('tiktok', 'TT', 'TikTok', 'domain(geosite:tiktok)'),
+  service('telegram', 'TG', 'Telegram', 'domain(geosite:telegram) || dip(geoip:telegram)'),
+  service('twitter', 'X', 'X (Twitter)', 'domain(geosite:twitter)', true, 'X（推特）'),
+  service('github', 'GH', 'GitHub', 'domain(geosite:github)'),
+  service('openai', 'AI', 'OpenAI / ChatGPT', 'domain(geosite:openai)'),
+  service('anthropic', 'AN', 'Claude', 'domain(geosite:anthropic)'),
   service('google', 'G', 'Google', 'domain(geosite:google)'),
-  service('microsoft', 'MS', 'Microsoft', suffixes('microsoft.com', 'live.com', 'office.com', 'microsoftonline.com', 'windowsupdate.com'), true, '微软'),
+  service('microsoft', 'MS', 'Microsoft', 'domain(geosite:microsoft)', true, '微软'),
   service('apple', 'AP', 'Apple', 'domain(geosite:apple)', true, '苹果'),
   service('amazon', 'AZ', 'Amazon', 'domain(geosite:amazon)', true, '亚马逊'),
-  service('steam', 'ST', 'Steam', suffixes('steampowered.com', 'steamstatic.com', 'steamcommunity.com', 'steamusercontent.com')),
-  service('epic', 'EP', 'Epic Games', suffixes('epicgames.com', 'epicgames.dev', 'epicgamescdn.com', 'unrealengine.com'), true, 'Epic 游戏'),
+  service('steam', 'ST', 'Steam', 'domain(geosite:steam)'),
+  service('epic', 'EP', 'Epic Games', 'domain(geosite:epicgames)', true, 'Epic 游戏'),
   service('cn', 'CN', 'China mainland', 'domain(geosite:cn)', false, '中国大陆'),
-  service('ads', 'AD', 'Ads', 'domain(geosite:ads)', false, '广告域名'),
+  service('ads', 'AD', 'Ads', 'domain(geosite:category-ads-all)', false, '广告域名'),
   service('lan', 'LAN', 'Home network', 'dip(geoip:private)', false, '家庭内网'),
   // PT 站是私有 tracker（要邀请才能进），域名每家不同，向导里没法列举。
   // 按 BT 常用端口放行，比按域名猜更不容易误伤。

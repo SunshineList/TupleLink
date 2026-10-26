@@ -31,9 +31,9 @@ const preset = (id: RoutingRuleId, template: string[], needsProxyGroup = true): 
 
 export const ROUTING_RULE_PRESETS: RoutingRulePreset[] = [
   // 广告域名走拒绝，比直接 direct 更省事：dae 会把域名解析成黑洞地址。
-  preset('ad-block', ['domain(geosite:ads) -> must_direct'], false),
+  preset('ad-block', ['domain(geosite:category-ads-all) -> must_direct'], false),
   preset('netflix', ['domain(geosite:netflix) -> {{proxy}}']),
-  preset('disney', ['domain(suffix:disneyplus.com, suffix:dssott.com, suffix:bamgrid.com) -> {{proxy}}']),
+  preset('disney', ['domain(geosite:disney) -> {{proxy}}']),
   preset('youtube', ['domain(geosite:youtube) -> {{proxy}}']),
   preset('telegram', ['dip(geoip:telegram) -> {{proxy}}']),
   preset('ai', ['domain(suffix:openai.com, suffix:chatgpt.com, suffix:anthropic.com, suffix:claude.ai) -> {{proxy}}']),
