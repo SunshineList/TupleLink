@@ -1,6 +1,11 @@
+//go:build webassets
+
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestIsStaticPathOnlyClaimsBuildOutput(t *testing.T) {
 	static := []string{"", "/", "/index.html", "/favicon.ico", "/logo.webp", "/assets/index-BxMPL5Ql.js", "/assets/index-L9yh9e_i.css", "/assets/editor.worker-DQJwLooG.js"}
@@ -30,5 +35,21 @@ func TestContentTypeOfCoversBuildOutput(t *testing.T) {
 		if got := contentTypeOf(name); got != want {
 			t.Fatalf("%s: 期望 %q，得到 %q", name, want, got)
 		}
+	}
+}
+
+// 打包时的 web 目录必须真的进了二进制：这是「改界面只需重编网关」的前提。
+func TestEmbeddedWebCarriesThePanel(t *testing.T) {
+	data, encoding, err := readWebAsset("index.html")
+	if err != nil {
+		t.Fatalf("index.html 没嵌进来: %v", err)
+	}
+	// index.html 通常小于 Makefile 的 4 KiB 压缩阈值，所以允许以原文嵌入；
+	// 压缩过的资源就只校验非空。
+	if encoding == "" && !strings.Contains(string(data), "id=\"root\"") {
+		t.Fatalf("index.html 内容不对，前 80 字节：%q", string(data[:min(80, len(data))]))
+	}
+	if len(data) < 100 {
+		t.Fatalf("index.html 内容异常，只有 %d 字节", len(data))
 	}
 }
