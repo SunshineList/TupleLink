@@ -23,6 +23,7 @@ export function SimpleCard({
   onDuplicate,
   actions,
   children,
+  preview,
 }: {
   name: string
   selected: boolean
@@ -32,6 +33,8 @@ export function SimpleCard({
   onDuplicate?: () => void
   actions?: React.ReactNode
   children?: React.ReactNode
+  /** 卡片上直接可见的摘要；children 只会出现在详情弹窗里。 */
+  preview?: React.ReactNode
 }) {
   const { t } = useTranslation()
   const [openedDetailsModal, setOpenedDetailsModal] = useState(false)
@@ -179,6 +182,7 @@ export function SimpleCard({
             )}
           </div>
         </div>
+        {preview && <div className="border-t px-2 pb-2 pt-2 sm:px-3 sm:pb-3">{preview}</div>}
       </Card>
 
       <Dialog open={openedDetailsModal} onOpenChange={setOpenedDetailsModal}>

@@ -853,7 +853,7 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
         <div
           id="panel-advanced-content"
           hidden={area !== 'advanced' && !advancedOpen}
-          className="panel-advanced-grid grid grid-cols-1 gap-4 p-4 lg:grid-cols-3"
+          className="panel-advanced-grid grid grid-cols-1 items-start gap-4 p-4 lg:grid-cols-3"
         >
           {(area === 'advanced' || (area === 'all' && advancedOpen)) && (
             <>

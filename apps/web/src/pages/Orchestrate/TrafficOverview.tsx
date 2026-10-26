@@ -198,6 +198,10 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
     [chartWindowEnd, selectedWindow.seconds],
   )
 
+  // 短窗口里所有刻度都落在同一分钟内，只显示 HH:mm 会得到一排相同的标签
+  // （01:17 01:17 01:17），看不出趋势点，所以一分钟级窗口显示到秒。
+  const axisTimePattern = chartWindowEnd - chartWindowStart <= 30 * 60 * 1000 ? 'HH:mm:ss' : 'HH:mm'
+
   const latestSample = useMemo(
     () => ({
       uploadRate: runtimeOverview?.uploadRate ?? 0,
@@ -359,7 +363,7 @@ export function TrafficOverview({ compact = false }: { compact?: boolean }) {
                   height={30}
                   domain={[chartWindowStart, chartWindowEnd]}
                   allowDataOverflow
-                  tickFormatter={(value) => dayjs(value).format('HH:mm')}
+                  tickFormatter={(value) => dayjs(value).format(axisTimePattern)}
                 />
                 <YAxis
                   axisLine={false}

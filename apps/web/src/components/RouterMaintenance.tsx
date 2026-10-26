@@ -138,8 +138,8 @@ export function RouterGeodata() {
   }
   return (
     <section className="col-span-full rounded-xl border bg-card p-5" aria-label={t('maintenance.geodataRegion')}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+      <div className="min-w-0">
           <h3 className="text-base font-semibold">{t('maintenance.geodataTitle')}</h3>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t('maintenance.geodataHint')}</p>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -148,12 +148,12 @@ export function RouterGeodata() {
             })}
           </p>
         </div>
+      <div className="flex flex-col gap-3 lg:border-l lg:border-border lg:pl-5">
         <Button className="min-h-11" disabled={busy || query.isError} onClick={() => mutation.mutate('geodata')}>
           <RefreshCw className={busy ? 'animate-spin' : ''} aria-hidden="true" />
           {t('maintenance.geodataUpdate')}
         </Button>
-      </div>
-      <form className="mt-6 border-t border-border pt-5" onSubmit={saveMirror}>
+      <form onSubmit={saveMirror}>
         <label className="block text-sm font-medium" htmlFor="github-mirror">
           {t('maintenance.mirrorTitle')}
         </label>
@@ -178,6 +178,8 @@ export function RouterGeodata() {
           </p>
         )}
       </form>
+      </div>
+      </div>
       <div className="mt-3">
         <MaintenanceProgress type="geodata" />
       </div>
