@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,6 +201,8 @@ func geodataFixture(t *testing.T, m *maintenanceManager) map[string][]byte {
 		files[base+name+".sha256sum"] = []byte(hex.EncodeToString(hash[:]) + "  " + name + "\n")
 	}
 	m.fetch = fixtureFetch(files)
+	// 发布标签走跳转接口，不打桩就会去连真实网络。
+	m.tag = func(context.Context, string) (string, error) { return "20261025", nil }
 	return files
 }
 
@@ -344,5 +347,108 @@ func TestMaintenancePublishedGeodata(t *testing.T) {
 		if err = validateGeodata(filepath.Join(directory, name), name); err != nil {
 			t.Fatalf("upstream %s: %v", name, err)
 		}
+	}
+}
+
+func TestMaintenanceLatestTagSurvivesAnExhaustedAPIBudget(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+
+	var asked []string
+	http.DefaultTransport = maintenanceTransport(func(r *http.Request) (*http.Response, error) {
+		asked = append(asked, r.URL.Host+r.URL.Path)
+		if r.URL.Host == "api.github.com" {
+			return &http.Response{
+				StatusCode: 403,
+				Header:     http.Header{},
+				Body:       io.NopCloser(strings.NewReader(`{"message":"API rate limit exceeded"}`)),
+				Request:    r,
+			}, nil
+		}
+		if r.URL.Path == "/Loyalsoldier/v2ray-rules-dat/releases/latest" {
+			return &http.Response{
+				StatusCode: 302,
+				Header:     http.Header{"Location": []string{"https://github.com/Loyalsoldier/v2ray-rules-dat/releases/tag/202610262220"}},
+				Body:       io.NopCloser(strings.NewReader("")),
+				Request:    r,
+			}, nil
+		}
+		return &http.Response{StatusCode: 404, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("")), Request: r}, nil
+	})
+
+	manager := &maintenanceManager{stateDir: t.TempDir()}
+	tag, err := manager.latestTag(context.Background(), "Loyalsoldier/v2ray-rules-dat")
+	if err != nil {
+		t.Fatalf("latest tag: %v", err)
+	}
+	if tag != "202610262220" {
+		t.Fatalf("latest tag = %q, want the redirect target", tag)
+	}
+	if len(asked) != 1 || !strings.Contains(asked[0], "releases/latest") {
+		t.Fatalf("expected one redirect probe, got %v", asked)
+	}
+}
+
+func TestMaintenanceLatestTagRejectsUnsafeRedirects(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	http.DefaultTransport = maintenanceTransport(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: 302,
+			Header:     http.Header{"Location": []string{"https://evil.test/Loyalsoldier/v2ray-rules-dat/releases/tag/1"}},
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    r,
+		}, nil
+	})
+	manager := &maintenanceManager{stateDir: t.TempDir()}
+	if _, err := manager.latestTag(context.Background(), "Loyalsoldier/v2ray-rules-dat"); err == nil {
+		t.Fatal("redirect to a foreign host must not become a release tag")
+	}
+}
+
+func TestMaintenanceMirrorRewritesRequestsAndUnwrapsRedirects(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	const mirror = "https://mirror.test"
+	var asked []string
+	http.DefaultTransport = maintenanceTransport(func(r *http.Request) (*http.Response, error) {
+		asked = append(asked, r.URL.String())
+		// 实测镜像把跳转目标写成相对路径 /https://github.com/... 的形式。
+		return &http.Response{
+			StatusCode: 302,
+			Header:     http.Header{"Location": []string{"/https://github.com/Loyalsoldier/v2ray-rules-dat/releases/tag/202610262220"}},
+			Body:       io.NopCloser(strings.NewReader("")),
+			Request:    r,
+		}, nil
+	})
+	manager := &maintenanceManager{stateDir: t.TempDir(), mirror: mirror}
+	tag, err := manager.latestTag(context.Background(), "Loyalsoldier/v2ray-rules-dat")
+	if err != nil {
+		t.Fatalf("latest tag through the mirror: %v", err)
+	}
+	if tag != "202610262220" {
+		t.Fatalf("latest tag = %q, want the redirect target", tag)
+	}
+	if len(asked) != 1 || asked[0] != mirror+"/https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest" {
+		t.Fatalf("expected the request to be rewritten through the mirror, got %v", asked)
+	}
+}
+
+func TestMaintenanceMirrorMustNotWidenTheAllowedHosts(t *testing.T) {
+	for _, value := range []string{"http://mirror.test", "https://mirror.test?x=1", "ftp://mirror.test", "not a url", "https://"} {
+		if got := normaliseMirror(value); got != "" {
+			t.Fatalf("normaliseMirror(%q) = %q, want empty", value, got)
+		}
+	}
+	if got := normaliseMirror("https://mirror.test/"); got != "https://mirror.test" {
+		t.Fatalf("trailing slash must be dropped, got %q", got)
+	}
+	// 镜像只作为前缀出现，原始主机仍要过白名单。
+	if allowedRedirect(&url.URL{Scheme: "https", Host: "evil.test"}, "https://mirror.test") {
+		t.Fatal("a redirect to a foreign host must stay rejected even with a mirror")
+	}
+	rewritten, err := url.Parse("https://mirror.test/https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.32/SHA256SUMS")
+	if err != nil || !allowedRedirect(rewritten, "https://mirror.test") {
+		t.Fatal("a mirror-rewritten github URL must be allowed")
 	}
 }

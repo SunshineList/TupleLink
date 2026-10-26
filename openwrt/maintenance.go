@@ -29,6 +29,11 @@ import (
 var releaseTag = regexp.MustCompile(`^openwrt-v([0-9]+\.[0-9]+\.[0-9]+)$`)
 var dataTag = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$`)
 
+// releases/latest 会把标签塞进跳转地址，这条正则从地址尾部把标签抠出来。
+// 走它是因为 api.github.com 对未认证请求按出口 IP 限流（每小时 60 次），
+// 家用宽带很容易被别人用光，而 github.com 网页跳转不吃这个配额。
+var latestTagPath = regexp.MustCompile(`/releases/tag/([^/?#]+)$`)
+
 type maintenanceJob struct {
 	ID      string `json:"id"`
 	Action  string `json:"action"`
@@ -51,21 +56,54 @@ type maintenanceStatus struct {
 	Latest  *releaseInfo    `json:"latest,omitempty"`
 	Job     *maintenanceJob `json:"job,omitempty"`
 	Geodata *releaseInfo    `json:"geodata,omitempty"`
+	// Mirror 是当前生效的 GitHub 代理；空串表示直连。
+	Mirror string `json:"mirror,omitempty"`
 }
 type maintenanceManager struct {
 	stateDir, configDir, versionFile, lockFile, installLock, initScript string
+	mirror                                                              string
 	fetch                                                               func(context.Context, string, string, int64) error
 	run                                                                 func(context.Context, ...string) ([]byte, error)
 	graph                                                               func(context.Context, string, any) error
+	tag                                                                 func(context.Context, string) (string, error)
 	now                                                                 func() time.Time
+}
+
+// 读取 uci daed.main.github_mirror。留空表示直连 github.com。
+func readMirror(configDir string) string {
+	output, err := exec.Command("uci", "-q", "get", "daed.main.github_mirror").Output()
+	if err != nil {
+		return ""
+	}
+	return normaliseMirror(strings.TrimSpace(string(output)))
+}
+
+// normaliseMirror 只接受 https 前缀，去掉结尾斜杠。任何解析不了的输入都当没配，
+// 免得一个手滑的配置把所有下载都引到别处。
+func normaliseMirror(value string) string {
+	if value == "" {
+		return ""
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+		return ""
+	}
+	if parsed.RawQuery != "" || parsed.Fragment != "" {
+		return ""
+	}
+	return strings.TrimSuffix(parsed.Scheme+"://"+parsed.Host+parsed.Path, "/")
 }
 
 func newMaintenance(configDir string) *maintenanceManager {
 	m := &maintenanceManager{stateDir: "/var/run/daed-maintenance", configDir: configDir,
 		versionFile: "/usr/share/daed-router/version", lockFile: "/var/lock/daed-maintenance.lock",
 		installLock: "/var/lock/daed-install.lock", initScript: "/usr/libexec/daed/nailink-maintenance", now: time.Now,
-		fetch: maintenanceDownload, run: maintenanceCommand}
+		mirror: readMirror(configDir), run: maintenanceCommand}
+	m.fetch = func(ctx context.Context, address, destination string, limit int64) error {
+		return maintenanceDownloadVia(ctx, address, destination, limit, m.mirror)
+	}
 	m.graph = m.graphQL
+	m.tag = m.latestTag
 	return m
 }
 
@@ -182,7 +220,7 @@ func (m *maintenanceManager) current() string {
 	return value
 }
 func (m *maintenanceManager) status() maintenanceStatus {
-	s := maintenanceStatus{Success: true, Current: m.current()}
+	s := maintenanceStatus{Success: true, Current: m.current(), Mirror: m.mirror}
 	var latest releaseInfo
 	if readMaintenanceJSON(filepath.Join(m.stateDir, "latest.json"), &latest) == nil && releaseTag.MatchString(latest.Tag) {
 		s.Latest = &latest
@@ -329,10 +367,79 @@ func (m *maintenanceManager) getJSON(ctx context.Context, address string, value 
 	}
 	return nil
 }
+
+// latestTag 不去查 api.github.com，而是读 releases/latest 的跳转地址。
+// 出口 IP 的 API 配额被用光时，这是唯一还能拿到最新标签的路子。
+func (m *maintenanceManager) latestTag(ctx context.Context, repository string) (string, error) {
+	var tag string
+	err := m.follow(ctx, "https://github.com/"+repository+"/releases/latest", func(request *http.Request) error {
+		request.Header.Set("User-Agent", "NaiLink-maintenance")
+		return nil
+	}, func(response *http.Response) error {
+		if response.StatusCode < 300 || response.StatusCode >= 400 {
+			return errors.New("invalid_release")
+		}
+		// 跳转目标必须落在同一个发布仓库里，否则任意跳转都能伪造一个版本号。
+		// 镜像会把 Location 改写成 /https://github.com/...，先还原再校验。
+		location, err := url.Parse(m.unwrapMirror(response.Header.Get("Location")))
+		if err != nil || !maintenanceHostAllowed(location) {
+			return errors.New("invalid_release")
+		}
+		matched := latestTagPath.FindStringSubmatch(location.Path)
+		if matched == nil || location.Path != "/"+repository+"/releases/tag/"+matched[1] {
+			return errors.New("invalid_release")
+		}
+		tag = matched[1]
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return tag, nil
+}
+
+// assetsPresent 逐个探测发布资产是否存在。下载通道只认 GET，所以用 GET 拿
+// 状态码就断开，不读正文，代价只有一次请求头往返。
+func (m *maintenanceManager) assetsPresent(ctx context.Context, tag string) bool {
+	for _, name := range []string{"install.sh", "SHA256SUMS", "manifest.tsv"} {
+		ok := false
+		err := m.follow(ctx, "https://github.com/slobys/NaiLink/releases/download/"+tag+"/"+name,
+			func(request *http.Request) error {
+				request.Header.Set("User-Agent", "NaiLink-maintenance")
+				return nil
+			},
+			func(response *http.Response) error {
+				if response.StatusCode != 200 {
+					return errors.New("download_failed")
+				}
+				ok = true
+				return nil
+			})
+		if err != nil || !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (m *maintenanceManager) checkRelease(ctx context.Context, job *maintenanceJob) error {
 	var releases []githubRelease
 	if err := m.getJSON(ctx, "https://api.github.com/repos/slobys/NaiLink/releases?per_page=10", &releases); err != nil {
-		return err
+		// 出口 IP 的 API 配额被用光时退回跳转标签；资产是否齐全交给
+		// 下面按名探测，探测不到就当没有这个版本，不猜。
+		tag, fallback := m.tag(ctx, "slobys/NaiLink")
+		if fallback != nil {
+			return err
+		}
+		latest := releaseInfo{}
+		if match := releaseTag.FindStringSubmatch(tag); match != nil && m.assetsPresent(ctx, tag) {
+			latest = releaseInfo{match[1], tag, m.now().Unix()}
+		}
+		if latest.Version == "" {
+			return errors.New("invalid_release")
+		}
+		job.Target = latest.Tag
+		return writeMaintenanceJSON(filepath.Join(m.stateDir, "latest.json"), latest)
 	}
 	var latest releaseInfo
 	for _, release := range releases {
@@ -449,20 +556,119 @@ func (m *maintenanceManager) installUpdate(ctx context.Context, job *maintenance
 	return nil
 }
 
-func maintenanceDownload(ctx context.Context, address, destination string, limit int64) error {
-	allowed := func(u *url.URL) bool {
-		if u.Scheme != "https" || u.User != nil || u.Port() != "" && u.Port() != "443" {
-			return false
-		}
-		switch u.Hostname() {
-		case "github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com":
-			return true
-		}
+// 维护通道只认这几个发布主机，跳转也只能停留在这几个主机上。
+func maintenanceHostAllowed(u *url.URL) bool {
+	if u.Scheme != "https" || u.User != nil || u.Port() != "" && u.Port() != "443" {
 		return false
 	}
+	switch u.Hostname() {
+	case "github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com":
+		return true
+	}
+	return false
+}
+
+// allowedRedirect 判断跳转目标是否可以跟随。没有镜像时只认原始主机；
+// 有镜像时还要接受镜像前缀 + 原始地址这种改写形式。
+func allowedRedirect(target *url.URL, mirror string) bool {
+	if maintenanceHostAllowed(target) {
+		return true
+	}
+	if mirror == "" {
+		return false
+	}
+	prefix := mirror + "/"
+	if !strings.HasPrefix(target.String(), prefix) {
+		return false
+	}
+	rest, err := url.Parse(strings.TrimPrefix(target.String(), prefix))
+	return err == nil && maintenanceHostAllowed(rest)
+}
+
+// 复刻 maintenanceDownload 的传输层设置，但不需要正文，只让调用方看响应头。
+func maintenanceRoundTripper() (http.RoundTripper, func()) {
+	transport := http.DefaultTransport
+	if base, ok := transport.(*http.Transport); ok {
+		copied := base.Clone()
+		copied.Proxy = nil
+		copied.ResponseHeaderTimeout = 20 * time.Second
+		copied.TLSHandshakeTimeout = 10 * time.Second
+		return copied, copied.CloseIdleConnections
+	}
+	return transport, func() {}
+}
+
+// 把原始地址改写成镜像地址。镜像按「前缀 + 完整原始 URL」转发，
+// 例如 https://mirror.example/https://github.com/owner/repo/releases/download/v1/x。
+func (m *maintenanceManager) mirrorURL(address string) string {
+	if m.mirror == "" {
+		return address
+	}
+	return m.mirror + "/" + address
+}
+
+// unwrapMirror 把镜像改写过的跳转目标还原成原始地址。实测镜像把 Location
+// 写成相对路径 /https://github.com/...，也可能写成完整前缀形式或原样透传，
+// 三种都要能还原，否则合法的发布跳转会被当成伪造而拒绝。
+func (m *maintenanceManager) unwrapMirror(location string) string {
+	if m.mirror == "" {
+		return location
+	}
+	if rest, ok := strings.CutPrefix(location, m.mirror+"/"); ok {
+		return rest
+	}
+	// 相对路径：去掉开头的斜杠后若本身就是一个 https 地址，那就是被改写的原始目标。
+	if rest, ok := strings.CutPrefix(location, "/"); ok && strings.HasPrefix(rest, "https://") {
+		return rest
+	}
+	return location
+}
+
+// follow 发一次请求并把响应头和状态码交给 inspect，但不跟随跳转、不读正文。
+func (m *maintenanceManager) follow(ctx context.Context, address string, prepare func(*http.Request) error, inspect func(*http.Response) error) error {
+	parsed, err := url.Parse(address)
+	if err != nil || !maintenanceHostAllowed(parsed) {
+		return errors.New("download_failed")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	transport, closeIdle := maintenanceRoundTripper()
+	defer closeIdle()
+	client := &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+		// 要的就是这第一条跳转，别的都不要跟。
+		return http.ErrUseLastResponse
+	}}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, m.mirrorURL(address), nil)
+	if err != nil {
+		return err
+	}
+	if err = prepare(request); err != nil {
+		return err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	return inspect(response)
+}
+
+func maintenanceDownload(ctx context.Context, address, destination string, limit int64) error {
+	return maintenanceDownloadVia(ctx, address, destination, limit, "")
+}
+
+// maintenanceDownloadVia 与 maintenanceDownload 相同，但可经镜像转发。
+// 校验始终针对原始 github 地址，镜像只作为请求前缀出现，
+// 这样镜像站换域名也不会放宽真正允许下载的主机集合。
+func maintenanceDownloadVia(ctx context.Context, address, destination string, limit int64, mirror string) error {
+	allowed := maintenanceHostAllowed
 	parsed, err := url.Parse(address)
 	if err != nil || !allowed(parsed) {
 		return errors.New("download_failed")
+	}
+	target := address
+	if mirror != "" {
+		target = mirror + "/" + address
 	}
 	ctx, cancel := context.WithTimeout(ctx, 180*time.Second)
 	defer cancel()
@@ -476,12 +682,12 @@ func maintenanceDownload(ctx context.Context, address, destination string, limit
 		defer copy.CloseIdleConnections()
 	}
 	client := &http.Client{Transport: transport, Timeout: 180 * time.Second, CheckRedirect: func(r *http.Request, via []*http.Request) error {
-		if len(via) > 5 || !allowed(r.URL) {
+		if len(via) > 5 || !allowedRedirect(r.URL, mirror) {
 			return errors.New("redirect_rejected")
 		}
 		return nil
 	}}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return err
 	}
@@ -600,7 +806,9 @@ func maintenanceCLI(command, configDir, jobID string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 		defer cancel()
 		if err := manager.worker(ctx, jobID); err != nil {
-			fmt.Fprintln(os.Stderr, "NaiLink maintenance worker stopped")
+			// 错误码是脱敏后给 UI 的；具体原因只写进 root 可读的日志，
+			// 否则用户看到 download_failed 之后完全无从下手。
+			fmt.Fprintln(os.Stderr, "NaiLink maintenance worker stopped:", err)
 		}
 	default:
 		json.NewEncoder(os.Stdout).Encode(maintenanceStatus{Code: "invalid_action"})

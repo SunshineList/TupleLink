@@ -143,22 +143,21 @@ func (m *maintenanceManager) updateGeodata(ctx context.Context, job *maintenance
 	} else if !os.IsNotExist(e) {
 		return errors.New("unsafe_state")
 	}
-	var release githubRelease
-	if err = m.getJSON(ctx, "https://api.github.com/repos/Loyalsoldier/v2ray-rules-dat/releases/latest", &release); err != nil {
-		return err
+	// 优先读 releases/latest 的跳转标签：它不吃 api.github.com 的配额，
+	// 也不会在配额耗尽时卡满 20 秒响应超时。资产是否齐全不靠 API 列表判断，
+	// 下面按固定文件名下载并用同批下发的 sha256sum 校验，缺文件自然报错。
+	tag, err := m.tag(ctx, "Loyalsoldier/v2ray-rules-dat")
+	if err != nil {
+		var release githubRelease
+		if err = m.getJSON(ctx, "https://api.github.com/repos/Loyalsoldier/v2ray-rules-dat/releases/latest", &release); err != nil {
+			return err
+		}
+		tag = release.Tag
 	}
-	if release.Draft || !dataTag.MatchString(release.Tag) {
+	if !dataTag.MatchString(tag) {
 		return errors.New("invalid_release")
 	}
-	assets := map[string]bool{}
-	for _, asset := range release.Assets {
-		assets[asset.Name] = true
-	}
-	for _, name := range []string{"geoip.dat", "geosite.dat", "geoip.dat.sha256sum", "geosite.dat.sha256sum"} {
-		if !assets[name] {
-			return errors.New("invalid_release")
-		}
-	}
+	release := githubRelease{Tag: tag}
 	var currentVersion releaseInfo
 	if readMaintenanceJSON(filepath.Join(directory, "current", "version.json"), &currentVersion) == nil && currentVersion.Tag == release.Tag {
 		valid := true
