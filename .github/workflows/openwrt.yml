@@ -368,7 +368,9 @@ jobs:
           path: .build/kernel-vm/*.log
 
   assemble:
-    needs: [packages, kernel-preflight]
+    # 只等 packages：kernel-preflight 是内核兼容性的验证任务，不产出任何
+    # 打进包里的东西，串在这里会让组装白等它跑完。
+    needs: packages
     runs-on: ubuntu-24.04
     env:
       VERSION: ${{ inputs.version }}
