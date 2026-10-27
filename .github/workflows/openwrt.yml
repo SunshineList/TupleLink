@@ -89,8 +89,37 @@ jobs:
           name: openwrt-web
           path: apps/web/dist-openwrt/
 
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      backend: ${{ steps.scope.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: scope
+        # 后端回归（eBPF 构建、协议互通、并发、事务）一次要四分多钟，
+        # 而只改面板时这些代码一行没动。这里判断改动是否触及后端：
+        # 碰过 Go 源码、依赖或构建脚本才跑，纯前端提交直接跳过。
+        # 手动触发一律跑全套，避免发版时漏测。
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ] || ! git cat-file -e "$base" 2>/dev/null; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD | grep -qE '^(wing/|openwrt/.*\.go$|openwrt/Makefile|go\.(mod|sum)$|tests/openwrt/.*\.py$)'; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+          fi
+
   runtime:
-    needs: web
+    needs: [web, changes]
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -139,7 +168,7 @@ jobs:
           (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/btf-probe.go)
           (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/luci-proxy.go ../openwrt/maintenance.go ../openwrt/maintenance-geodata.go ../openwrt/webassets_stub.go)
       - name: BTF parser tests
-        if: matrix.cpu == 'x86_64'
+        if: matrix.cpu == 'x86_64' && needs.changes.outputs.backend == 'true'
         run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
       - name: Foreign architecture SQLite and API smoke test
         if: matrix.cpu == 'armv7' || matrix.cpu == 'mips' || matrix.cpu == 'mipsle'
@@ -148,16 +177,16 @@ jobs:
           python3 tests/openwrt/architecture_smoke.py --cpu '${{ matrix.cpu }}' --binary .build/runtime/daed
           python3 tests/openwrt/architecture_regression.py --cpu '${{ matrix.cpu }}' --wing wing
       - name: Live TCP and UDP runtime overview regression
-        if: matrix.cpu == 'x86_64'
+        if: matrix.cpu == 'x86_64' && needs.changes.outputs.backend == 'true'
         run: |
           (cd wing && go test -count=1 -v -tags daed_runtime_test ./cmd ./dae ./graphql/service/general)
           (cd wing/dae-core && go test -count=1 ./control -run 'Runtime|RelayTCP|Tracked|ActiveTCP')
           (cd wing/dae-core && go test -count=1 ./control -run '^TestRouterDNS|^TestRouterConnection|^TestRouteDial|^TestDnsForwarder')
       - name: Transaction, node cancellation, subscription cron and failure preservation tests
-        if: matrix.cpu == 'x86_64'
+        if: matrix.cpu == 'x86_64' && needs.changes.outputs.backend == 'true'
         run: cd wing && go test -count=1 -v ./graphql ./graphql/service/node ./graphql/service/subscription ./webrender
       - name: Backend concurrency regression
-        if: matrix.cpu == 'x86_64'
+        if: matrix.cpu == 'x86_64' && needs.changes.outputs.backend == 'true'
         run: |
           cd wing
           CGO_ENABLED=1 go test -race -count=1 ./graphql ./graphql/service/node ./graphql/service/subscription ./cmd ./dae ./webrender
@@ -165,7 +194,7 @@ jobs:
           CGO_ENABLED=1 go test -race -count=1 github.com/daeuniverse/dae/control -run '^TestRouterDNS|^TestRouterConnection|^TestRouteDial|^TestDnsForwarder'
           CGO_ENABLED=1 go test -race -count=1 github.com/daeuniverse/dae/component/outbound/dialer -run '^TestRouter(ProtocolURIOptions|SSClose)'
       - name: Independent protocol HTTP and UDP regression
-        if: matrix.cpu == 'x86_64'
+        if: matrix.cpu == 'x86_64' && needs.changes.outputs.backend == 'true'
         run: |
           mkdir -p /tmp/nailink-protocol-servers
           curl -fL --proto '=https' -o /tmp/nailink-protocol-servers/sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/v1.14.3/sing-box-1.14.3-linux-amd64.tar.gz
@@ -177,7 +206,7 @@ jobs:
           chmod +x /tmp/nailink-protocol-servers/juicity/juicity-server
           sudo env "PATH=$PATH" "GOCACHE=$(go env GOCACHE)" "GOMODCACHE=$(go env GOMODCACHE)" python3 tests/openwrt/protocol_interop.py --wing wing --sing-box /tmp/nailink-protocol-servers/sing-box-1.14.3-linux-amd64/sing-box --juicity-server /tmp/nailink-protocol-servers/juicity/juicity-server
       - name: LuCI gateway authentication and upgrade tests
-        if: matrix.cpu == 'x86_64'
+        if: matrix.cpu == 'x86_64' && needs.changes.outputs.backend == 'true'
         run: |
           # luci-proxy 现在通过 webassets.go 提供面板前端，编译它必需
           # serveWebAsset 有定义。这里刻意用 webassets_stub.go 而不是
