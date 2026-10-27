@@ -72,7 +72,7 @@ jobs:
           shellcheck -s sh -e SC1091 openwrt/install.sh openwrt/files/nailink openwrt/files/daed-check openwrt/files/rpcd-daed openwrt/files/subscription-proxy openwrt/subscription-check.sh openwrt/network-check.sh
           shellcheck -s sh -e SC1091,SC2034,SC3043 openwrt/files/daed.init openwrt/files/maintenance.init
           node --test tests/openwrt/ui.test.cjs
-          [ -s /tmp/daed-rootfs.tar.gz ] || curl -fL --proto '=https' --timeout 120 -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
+          [ -s /tmp/daed-rootfs.tar.gz ] || curl -fL --proto '=https' --max-time 300 -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
           echo 'e7f8ab84eef55c7eb23492de7b0517dbc23fbedaa4abbb680fe64720c309dc03  /tmp/daed-rootfs.tar.gz' | sha256sum -c -
           mkdir -p /tmp/daed-rootfs
           sudo tar -xzf /tmp/daed-rootfs.tar.gz -C /tmp/daed-rootfs
@@ -317,7 +317,7 @@ jobs:
         if: matrix.target == 'apk-x86_64'
         run: |
           # 缓存命中时不重复下载。
-          [ -s /tmp/daed-rootfs.tar.gz ] || curl -fL --proto '=https' --timeout 120 -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
+          [ -s /tmp/daed-rootfs.tar.gz ] || curl -fL --proto '=https' --max-time 300 -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
           echo 'e7f8ab84eef55c7eb23492de7b0517dbc23fbedaa4abbb680fe64720c309dc03  /tmp/daed-rootfs.tar.gz' | sha256sum -c -
           mkdir /tmp/daed-rootfs
           sudo tar -xzf /tmp/daed-rootfs.tar.gz -C /tmp/daed-rootfs
