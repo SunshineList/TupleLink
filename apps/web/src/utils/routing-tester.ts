@@ -7,16 +7,16 @@
  *
  * ## 一个必须说清楚的能力边界
  *
- * 判断 `domain(geosite:youtube)` 是否匹配 `youtube.com`，需要 geosite.dat
- * 里的域名清单，那是一份几十兆的数据文件，只存在于路由器上，前端拿不到。
+ * 判断 `domain(geosite:youtube)` 是否匹配 `youtube.com`，需要该分类的
+ * 域名清单。这份清单从 geosite.dat 解析后裁剪到 16 个常用分类（见
+ * geosite-domains.ts），覆盖向导里可选的全部服务。
  *
- * 所以这里把规则分成两类：
- *   能判定  —— domain(suffix:/full:/keyword:)、dip(IP/CIDR)、dport、geosite 的服务目录反查
- *   判不了  —— 纯 geosite 分类（除非该分类来自向导的服务预设，见下）
- *
- * 判不了的必须如实标成「无法判定」，绝不能猜「不匹配」：那会让用户
- * 以为规则白写了，去删一条其实有效的规则。
+ * 仍然判不了的情况（不在裁剪名单里的分类、geoip 国家段），必须如实标成
+ * 「无法判定」，绝不能猜「不匹配」：那会让用户以为规则白写了，
+ * 去删一条其实有效的规则。
  */
+
+import { GEOSITE_DOMAINS } from './geosite-domains'
 
 export type MatchVerdict = 'match' | 'no-match' | 'unknown'
 
@@ -169,14 +169,47 @@ export function evaluateRule(
   const matcher = rule.matcher
   const clauses = matcher.split('&&').map((item) => item.trim())
   let sawUnknown = false
+  let unknownReason = 'geosite'
 
   for (const clause of clauses) {
     const result = evaluateClause(clause, domain, port)
     if (result.verdict === 'no-match') return result
-    if (result.verdict === 'unknown') sawUnknown = true
+    if (result.verdict === 'unknown' && !sawUnknown) {
+      sawUnknown = true
+      // 保留第一条 unknown 子句的真实原因，别一律报成 geosite：
+      // 「分类不在数据里」和「port 没填」对用户是两件不同的事。
+      unknownReason = result.reason
+    }
   }
-  if (sawUnknown) return { verdict: 'unknown', reason: 'geosite' }
+  if (sawUnknown) return { verdict: 'unknown', reason: unknownReason }
   return { verdict: 'match', reason: 'matched' }
+}
+
+/**
+ * 判断域名是否属于某个 geosite 分类。
+ *
+ * 分类名大小写不敏感（dae 加载时会统一转大写）。不在裁剪名单里的分类
+ * 返回 unknown——那是工具的数据边界，不是规则错误。
+ *
+ * suffix 型按「等于该域名或以 .该域名 结尾」判断，与 dae 语义一致：
+ * suffix:google.com 命中 google.com 和 mail.google.com，但不命中 notgoogle.com。
+ */
+function matchGeosite(code: string, domain: string): { verdict: MatchVerdict; reason: string } {
+  const entry = GEOSITE_DOMAINS[code.toUpperCase()]
+  if (!entry) {
+    // 数据里没有这个分类：地理分类、广告列表或用户自建的。
+    return { verdict: 'unknown', reason: 'geosite-missing' }
+  }
+  for (const suffix of entry.s) {
+    if (domain === suffix || domain.endsWith(`.${suffix}`)) {
+      return { verdict: 'match', reason: 'geosite' }
+    }
+  }
+  for (const full of entry.f) {
+    if (domain === full) return { verdict: 'match', reason: 'geosite' }
+  }
+  // 清单来自 geosite.dat，完整的，所以不在里面就是确定不命中。
+  return { verdict: 'no-match', reason: 'geosite' }
 }
 
 function evaluateClause(
@@ -189,9 +222,7 @@ function evaluateClause(
   if (domainCall) {
     const inner = domainCall[1].trim()
     if (/^geosite:/i.test(inner)) {
-      // geosite 分类的域名清单不在前端，无法判定。这是工具的限制，
-      // 不是规则错误——必须如实说明，不能当成不匹配。
-      return { verdict: 'unknown', reason: 'geosite' }
+      return matchGeosite(inner.replace(/^geosite:/i, ''), domain)
     }
     // 多个值用逗号分隔，任一命中即可。
     const items = inner

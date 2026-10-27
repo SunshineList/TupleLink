@@ -96,11 +96,22 @@ describe('单条规则判定', () => {
     expect(evaluateRule(rule('domain(suffix:a.com,b.com)'), 'b.com', null).verdict).toBe('match')
   })
 
-  it('geosite 分类判不了，如实标 unknown', () => {
-    // 这是工具的能力边界：分类清单在 geosite.dat 里，前端没有。
-    const result = evaluateRule(rule('domain(geosite:youtube)'), 'youtube.com', null)
+  it('geosite 分类现在能真的判定', () => {
+    // 域清单已经从 geosite.dat 解析进来（见 geosite-domains.ts）。
+    expect(evaluateRule(rule('domain(geosite:youtube)'), 'youtube.com', null).verdict).toBe('match')
+    expect(evaluateRule(rule('domain(geosite:youtube)'), 'www.youtube.com', null).verdict).toBe('match')
+    expect(evaluateRule(rule('domain(geosite:youtube)'), 'example.com', null).verdict).toBe('no-match')
+  })
+
+  it('geosite 分类名大小写不敏感', () => {
+    expect(evaluateRule(rule('domain(geosite:YouTube)'), 'youtube.com', null).verdict).toBe('match')
+  })
+
+  it('不在裁剪名单里的分类仍标 unknown', () => {
+    // 数据边界：只保留了 16 个常用分类，其余（尤其 geoip 国家段）判不了。
+    const result = evaluateRule(rule('domain(geosite:somethingelse)'), 'a.com', null)
     expect(result.verdict).toBe('unknown')
-    expect(result.reason).toBe('geosite')
+    expect(result.reason).toBe('geosite-missing')
   })
 
   it('geoip 同样判不了', () => {
@@ -170,7 +181,8 @@ describe('完整测试', () => {
   })
 
   it('前面的规则判不了时继续往下找', () => {
-    // geosite 那条判不了，不能当成命中，也不能当成不命中。
+    // geosite:cn 不在裁剪名单里（11 万条，体积不成比例），所以判不了。
+    // 判不了不等于不命中，要继续往下走到 fallback。
     const result = testRouting(DEFAULT_ROUTING, 'youtube.com')
     expect(result.hit?.isFallback).toBe(true)
     expect(result.action).toBe('proxy')
