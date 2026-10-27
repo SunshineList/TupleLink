@@ -265,7 +265,9 @@ jobs:
       fail-fast: false
       matrix:
         # 手动触发时才出全架构 ipk+apk；push 只出本机构建和测试用的 x86_64 ipk。
-        include: ${{ fromJSON(inputs.all_architectures && '[{"target":"ipk-x86_64","cpu":"x86_64"},{"target":"ipk-arm64","cpu":"arm64"},{"target":"apk-x86_64","cpu":"x86_64"},{"target":"apk-arm64","cpu":"arm64"},{"target":"ipk-armv7","cpu":"armv7"},{"target":"apk-armv7","cpu":"armv7"},{"target":"ipk-mips","cpu":"mips"},{"target":"apk-mips","cpu":"mips"},{"target":"ipk-mipsle","cpu":"mipsle"},{"target":"apk-mipsle","cpu":"mipsle"}]' || '[{"target":"ipk-x86_64","cpu":"x86_64"}]') }}
+        # sdk-matrix 里 x86_64 同时有 ipk 和 apk 两个 target，清单校验会
+        # 两个都要，所以默认也得把 apk-x86_64 打出来，不然 assemble 缺包。
+        include: ${{ fromJSON(inputs.all_architectures && '[{"target":"ipk-x86_64","cpu":"x86_64"},{"target":"ipk-arm64","cpu":"arm64"},{"target":"apk-x86_64","cpu":"x86_64"},{"target":"apk-arm64","cpu":"arm64"},{"target":"ipk-armv7","cpu":"armv7"},{"target":"apk-armv7","cpu":"armv7"},{"target":"ipk-mips","cpu":"mips"},{"target":"apk-mips","cpu":"mips"},{"target":"ipk-mipsle","cpu":"mipsle"},{"target":"apk-mipsle","cpu":"mipsle"}]' || '[{"target":"ipk-x86_64","cpu":"x86_64"},{"target":"apk-x86_64","cpu":"x86_64"}]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
