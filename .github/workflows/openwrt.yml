@@ -25,6 +25,10 @@ on:
         description: 'Build every architecture (arm64/armv7/mips/mipsle). Leave off for x86_64 only'
         type: boolean
         default: false
+      skip_backend_tests:
+        description: 'Skip backend regressions when only the panel changed (saves ~4 min)'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -103,8 +107,14 @@ jobs:
         # 碰过 Go 源码、依赖或构建脚本才跑，纯前端提交直接跳过。
         # 手动触发一律跑全套，避免发版时漏测。
         run: |
+          # 手动触发时让调用方决定：改了后端的人会把 skip_backend_tests 关掉，
+          # 只改面板时保持默认，省下的四分半比漏测风险更值。
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "backend=true" >> "$GITHUB_OUTPUT"
+            if [ "${{ inputs.skip_backend_tests }}" = "true" ]; then
+              echo "backend=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "backend=true" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
