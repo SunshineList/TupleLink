@@ -349,7 +349,13 @@ jobs:
       - run: |
           cp .build/source/daed-openwrt-source.tar.gz .build/source/SOURCE_*.txt .build/release/
           cp openwrt/README.md openwrt/VALIDATION.md .build/release/
-          python3 openwrt/manifest.py .build/release --version "$VERSION"
+          # 只编了 x86_64 时，清单也只能要求这一个架构，否则会因为
+          # 找不到 aarch64/mips 的包直接失败。
+          if [ "${{ inputs.all_architectures }}" = "true" ]; then
+            python3 openwrt/manifest.py .build/release --version "$VERSION"
+          else
+            python3 openwrt/manifest.py .build/release --version "$VERSION" --only x86_64
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: daed-openwrt-${{ inputs.version }}

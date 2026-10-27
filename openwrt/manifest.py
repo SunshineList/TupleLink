@@ -14,6 +14,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     parser.add_argument("--version", required=True)
+    parser.add_argument(
+        "--only",
+        default="",
+        help="Comma separated package architectures to require, e.g. x86_64. "
+        "Empty means every architecture in sdk-matrix.json.",
+    )
     args = parser.parse_args()
     if not re.fullmatch(r"\d+\.\d+\.\d+", args.version):
         parser.error("version must be X.Y.Z")
@@ -40,16 +46,25 @@ def main():
             if hashlib.sha256((args.directory / name).read_bytes()).hexdigest() != digest:
                 raise ValueError("Package checksum mismatch")
             rows.append(row)
+    # 只编部分架构时（日常改面板），不能用全量清单去要求缺失的包，
+    # 否则 assemble 会因为「找不到 aarch64 的包」而失败。
+    wanted = {item.strip() for item in args.only.split(",") if item.strip()}
     for target in json.loads((HERE / "sdk-matrix.json").read_text()):
         expected = [(arch, "daed-router") for arch in target["architectures"]]
         expected.append(("all", "luci-app-daed-router"))
         for arch, package in expected:
+            # luci-app 是架构无关的，任何一次构建都该有。
+            if arch != "all" and wanted and arch not in wanted:
+                continue
             if (target["format"], arch, package) not in seen:
                 raise ValueError(f"Missing mandatory package: {target['format']}/{arch}/{package}")
     checker = args.directory / "daed-check"
     shutil.copyfile(HERE / "files" / "daed-check", checker)
     rows.append(["support", "all", "check", checker.name, hashlib.sha256(checker.read_bytes()).hexdigest(), args.version])
-    for cpu in sorted({target["cpu"] for target in json.loads((HERE / "sdk-matrix.json").read_text())}):
+    for target in json.loads((HERE / "sdk-matrix.json").read_text()):
+        cpu = target["cpu"]
+        if wanted and cpu not in wanted:
+            continue
         probe = args.directory / ("btf-probe-" + cpu)
         rows.append(["support", cpu, "btf-probe", probe.name, hashlib.sha256(probe.read_bytes()).hexdigest(), args.version])
     installer = (HERE / "install.sh").read_text(encoding="utf-8")
