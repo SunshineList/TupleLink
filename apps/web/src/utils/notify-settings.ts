@@ -38,7 +38,7 @@ const EMPTY: NotifySettings = { enabled: false, tokenSet: false, chat: '' }
 
 function rpcHost() {
   const host = window.parent as Window & {
-    L?: { require: (name: string) => Promise<{ declare: (spec: object) => (arg?: unknown) => Promise<unknown> }> }
+    L?: { require: (name: string) => Promise<{ declare: (spec: object) => (...args: unknown[]) => Promise<unknown> }> }
   }
   if (host === window || !host.L?.require) throw new Error('LuCI host unavailable')
   return host.L.require('rpc')
@@ -63,18 +63,24 @@ export async function readNotifySettings(): Promise<NotifySettings> {
 
 export async function saveNotifySettings(input: NotifySaveInput): Promise<void> {
   const rpc = await rpcHost()
+  // LuCI 的 rpc.declare 按 params 名组装载荷：
+  //   params[options.params[i]] = args[i]
+  // 所以参数名必须与 rpcd 脚本里 json_get_var 读的字段名一致。
+  // 之前声明成 params: ['input'] 却让脚本读顶层的 enabled/token，
+  // 载荷被包进 input 这一层，脚本全部取空 —— 保存等于什么都没写。
+  // undefined 用空串代替：脚本把空串当作「不修改」。
   const result = (await rpc.declare({
     object: 'daed-router',
     method: 'notifysave',
-    params: ['input'],
+    params: ['enabled', 'token', 'chat', 'clear_token'],
     expect: {},
     raise: true,
-  })({
-    enabled: input.enabled === undefined ? undefined : input.enabled ? 1 : 0,
-    token: input.token || undefined,
-    chat: input.chat || undefined,
-    clear_token: input.clearToken ? 1 : undefined,
-  })) as { success?: boolean; code?: string } | undefined
+  })(
+    input.enabled === undefined ? '' : input.enabled ? 1 : 0,
+    input.token || '',
+    input.chat || '',
+    input.clearToken ? 1 : '',
+  )) as { success?: boolean; code?: string } | undefined
   if (!result?.success) {
     throw new Error(result?.code || 'state_failed')
   }

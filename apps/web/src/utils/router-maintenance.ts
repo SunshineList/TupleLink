@@ -86,9 +86,11 @@ async function maintenanceRPC(method: 'maintenance' | 'maintain', action?: strin
   })(...(action ? [action] : []))
   if (!result || typeof result.success !== 'boolean') throw new Error(i18n.t('maintenance.bridgeUnavailable'))
   if (!result.success)
-    throw new Error(i18n.t(maintenanceMessages[result.code || ''] || maintenanceMessages.operation_failed, {
-      defaultValue: i18n.t('maintenance.operation_failed'),
-    }))
+    throw new Error(
+      i18n.t(maintenanceMessages[result.code || ''] || maintenanceMessages.operation_failed, {
+        defaultValue: i18n.t('maintenance.operation_failed'),
+      }),
+    )
   return result
 }
 export const readMaintenance = () => maintenanceRPC('maintenance')
@@ -99,15 +101,25 @@ export const startMaintenance = (action: 'check' | 'update' | 'geodata') => main
 export async function setMaintenanceMirror(url: string): Promise<void> {
   const host = window.parent as Window & {
     L?: {
-      require: (name: string) => Promise<{ declare: (spec: object) => (params: object) => Promise<{ success?: boolean; code?: string }> }>
+      require: (
+        name: string,
+      ) => Promise<{ declare: (spec: object) => (...args: string[]) => Promise<{ success?: boolean; code?: string }> }>
     }
   }
   if (host === window || !host.L?.require) throw new Error(i18n.t('maintenance.hostUnavailable'))
   const rpc = await host.L.require('rpc')
-  const result = await rpc.declare({ object: 'daed-router', method: 'mirror', params: ['url'], expect: {} })({ url })
+  // 参数名与 rpcd 里 json_get_var url url 对齐，按位置传标量。
+  const result = await rpc.declare({
+    object: 'daed-router',
+    method: 'mirror',
+    params: ['url'],
+    expect: {},
+  })(url)
   if (!result?.success) {
-    throw new Error(i18n.t(maintenanceMessages[result?.code || ''] || maintenanceMessages.operation_failed, {
-      defaultValue: i18n.t('maintenance.operation_failed'),
-    }))
+    throw new Error(
+      i18n.t(maintenanceMessages[result?.code || ''] || maintenanceMessages.operation_failed, {
+        defaultValue: i18n.t('maintenance.operation_failed'),
+      }),
+    )
   }
 }
