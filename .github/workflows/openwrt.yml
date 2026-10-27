@@ -123,14 +123,15 @@ jobs:
           # vet the real packages in the backend module, then the helpers in
           # the same file groups runtime.py hands to go build: luci-proxy
           # needs maintenance.go next to it or maintenanceCLI is undefined,
-          # and since the panel is embedded in the gateway it also needs
-          # webassets.go with the matching build tag — runtime.py builds it
-          # with -tags webassets, so vet has to use the same set or
-          # serveWebAsset/embeddedFiles stay undefined.
+          # and since the panel is embedded in the gateway it also needs a
+          # serveWebAsset definition. Use webassets_stub.go rather than
+          # webassets.go: the latter //go:embed web, and web/ only exists
+          # after runtime.py stages it, so it cannot compile from a bare
+          # checkout. The real embed is exercised by the actual runtime build.
           # Running the two helpers together still fails, both are package main.
           (cd wing && GOOS=linux GOARCH=amd64 go vet -tags daed_stub_ebpf ./...)
           (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/btf-probe.go)
-          (cd wing && GOOS=linux GOARCH=amd64 go vet -tags webassets ../openwrt/luci-proxy.go ../openwrt/maintenance.go ../openwrt/maintenance-geodata.go ../openwrt/webassets.go)
+          (cd wing && GOOS=linux GOARCH=amd64 go vet ../openwrt/luci-proxy.go ../openwrt/maintenance.go ../openwrt/maintenance-geodata.go ../openwrt/webassets_stub.go)
       - name: BTF parser tests
         if: matrix.cpu == 'x86_64'
         run: cd wing && go test ../openwrt/btf-probe.go ../openwrt/btf-probe_test.go
@@ -172,7 +173,12 @@ jobs:
       - name: LuCI gateway authentication and upgrade tests
         if: matrix.cpu == 'x86_64'
         run: |
-          (cd wing && go test ../openwrt/luci-proxy.go ../openwrt/luci-proxy_test.go ../openwrt/maintenance.go ../openwrt/maintenance-geodata.go ../openwrt/maintenance_test.go)
+          # luci-proxy 现在通过 webassets.go 提供面板前端，编译它必需
+          # serveWebAsset 有定义。这里刻意用 webassets_stub.go 而不是
+          # webassets.go：后者 //go:embed web，而 web/ 是 runtime.py 在
+          # 打包时才铺出来的目录，仓库里没有，直接编译会失败。
+          # 网关测试只关心认证和升级路径，不需要真的嵌入前端。
+          (cd wing && go test ../openwrt/luci-proxy.go ../openwrt/webassets_stub.go ../openwrt/luci-proxy_test.go ../openwrt/maintenance.go ../openwrt/maintenance-geodata.go ../openwrt/maintenance_test.go)
           curl -fL --proto '=https' -o /tmp/luci-rootfs-25.tar.gz https://downloads.openwrt.org/releases/25.12.4/targets/x86/64/openwrt-25.12.4-x86-64-rootfs.tar.gz
           echo '0b80f307a5383a0c2c08712c500a4351f7b7cad0a6c2963e02a74db4e6831bf4  /tmp/luci-rootfs-25.tar.gz' | sha256sum -c -
           mkdir /tmp/luci-rootfs-25
