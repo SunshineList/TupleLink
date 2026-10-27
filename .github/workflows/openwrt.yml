@@ -274,6 +274,15 @@ jobs:
         with:
           name: openwrt-runtime-${{ matrix.cpu }}
           path: .build/runtime/
+      - name: Cache the pinned OpenWrt SDK tarball
+        # build.py 每个 target 都要一套独立 SDK，解包加 feeds 就要好几分钟。
+        # 缓存的是下载好的压缩包（约 1.4 GB），build.py 自己按 sha256 校验，
+        # 校验不过会重新下，所以缓存过期不会让构建变脆。
+        # 每个 target 分开缓存：ipk 和 apk 用的是不同的 SDK。
+        uses: actions/cache@v5
+        with:
+          path: /tmp/daed-sdk/${{ matrix.target }}.tar.zst
+          key: openwrt-sdk-${{ matrix.target }}-${{ hashFiles('openwrt/sdk-matrix.json') }}
       - name: Build native packages with pinned SDK
         run: |
           sudo apt-get update -qq
