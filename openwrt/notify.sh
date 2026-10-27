@@ -37,15 +37,21 @@ cfg() {
 	uci -q get "$CONF.notify.$1" 2>/dev/null
 }
 
+# test 是用户主动触发的配置验证，不受 enabled 开关限制。
+# 用户在打开推送之前要先确认 token/chat 是否正确，此时被「未启用」挡住
+# 会让人以为配置坏了。
+event_arg=${1:-''}
 enabled=$(cfg enabled)
-[ "$enabled" = "1" ] || emit disabled
+if [ "$event_arg" != "test" ] && [ "$enabled" != "1" ]; then
+	emit disabled
+fi
 
 token=$(cfg token)
 chat=$(cfg chat)
 [ -n "$token" ] || emit not_configured
 [ -n "$chat" ] || emit not_configured
 
-event=${1:-''}
+event=$event_arg
 [ -n "$event" ] || emit bad_args
 detail=${2:-''}
 

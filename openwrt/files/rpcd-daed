@@ -130,6 +130,13 @@ call)
 	notify)
 		# 读取通知配置。token 永远不回传明文：面板只需要知道「填没填」，
 		# 一旦回传，它就会出现在浏览器历史、前端状态树和任何截图里。
+		#
+		# 老配置升级上来时没有 notify 段，这里补一个，
+		# 否则下面的 uci get 全部落空，界面会显示成未配置。
+		if ! uci -q get daed.notify >/dev/null 2>&1; then
+			uci -q set daed.notify=notify || :
+			uci -q commit daed || :
+		fi
 		json_init
 		json_add_boolean enabled "$([ "$(uci -q get daed.notify.enabled)" = 1 ] && echo 1 || echo 0)"
 		json_add_boolean token_set "$([ -n "$(uci -q get daed.notify.token)" ] && echo 1 || echo 0)"
@@ -142,6 +149,14 @@ call)
 		# 不能把 token 冲掉。要清空就传 clear_token。
 		input=''; read -r input || :
 		json_load "${input:-\{\}}" || exit 1
+
+		# 老版本升级时 /etc/config/daed 会被 conffiles 保留，里面没有 notify 段。
+		# 此时 uci set daed.notify.xxx 会写进一个匿名段，之后 uci get 读不到，
+		# 表现在界面上就是「开关打开了但测试说没启用」。先确保具名段存在。
+		if ! uci -q get daed.notify >/dev/null 2>&1; then
+			uci -q set daed.notify=notify || :
+		fi
+
 		_enabled=''; json_get_var _enabled enabled >/dev/null 2>&1 || _enabled=''
 		_token=''; json_get_var _token token >/dev/null 2>&1 || _token=''
 		_chat=''; json_get_var _chat chat >/dev/null 2>&1 || _chat=''

@@ -746,8 +746,22 @@ form {
 /* LuCI owns page navigation; each embedded page has a single task. */
 .panel-workspace[data-workspace='dashboard'] {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(360px, 1fr);
+  /* 左列放监控和群组，右列只放两张状态卡。右列定宽而不是按比例，
+     免得空出来大片留白。 */
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr);
   align-items: start;
+}
+/* 右列容器自己纵向排列。两张卡片各自保持内容高度，不互相拉伸。 */
+.panel-workspace[data-workspace='dashboard'] .panel-dashboard-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+/* 群组列表落在左列第一行下方，跟监控对齐。 */
+.panel-workspace[data-workspace='dashboard'] #panel-common {
+  grid-column: 1;
+  min-width: 0;
 }
 .panel-workspace[data-workspace='dashboard'] #panel-monitor {
   min-width: 0;
@@ -784,6 +798,20 @@ form {
 }
 .panel-workspace[data-workspace='advanced'] .panel-advanced-grid {
   padding: 0;
+}
+/* 宽卡片横跨三列，两栏并排。它内部两张卡高度不一也不留空白，
+   因为容器是 flex 行，各自按内容撑开。 */
+.panel-workspace[data-workspace='advanced'] .panel-advanced-wide {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 900px) {
+  .panel-workspace[data-workspace='advanced'] .panel-advanced-wide {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: start;
+  }
 }
 @media (max-width: 899px) {
   .panel-workspace[data-workspace='dashboard'] {

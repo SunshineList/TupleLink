@@ -683,9 +683,12 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
           <section id="panel-monitor">
             <TrafficOverview compact />
           </section>
-          {/* 看过速度就想知道流量从哪出去，以及当前在用哪个节点。 */}
-          <ExitIPCheck />
-          <GroupCandidates />
+          {/* 两张卡片包在一个容器里，作为栅格右列的单一项目：
+              否则它们会被自动填进不同格子，右列空一大片。 */}
+          <div className="panel-dashboard-side">
+            <ExitIPCheck />
+            <GroupCandidates />
+          </div>
         </>
       )}
       {area === 'all' && (
@@ -868,9 +871,14 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
               <Config />
               <DNS />
               <Routing />
-              {area === 'advanced' && <RouterGeodata />}
-              {/* 通知属于「高级设置」：一次性配好就不动了，和规则库同一层。 */}
-              {area === 'advanced' && <NotifySettings />}
+              {area === 'advanced' && (
+                /* 规则库和通知横跨整行：它们内容宽、高度也不固定，
+                   塞进三列会留出一整列空白。 */
+                <div className="panel-advanced-wide">
+                  <RouterGeodata />
+                  <NotifySettings />
+                </div>
+              )}
             </>
           )}
         </div>
