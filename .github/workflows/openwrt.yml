@@ -73,7 +73,8 @@ jobs:
           sudo env DAED_TEST_ROOTFS=/tmp/daed-rootfs python3 -m unittest discover -s tests/openwrt -v
 
   web:
-    needs: test
+    # 不依赖 test：shell 与 rootfs 测试跟前端构建是两条独立的线，
+    # 串起来会让前端多等一分多钟。两者都失败时仍然都会报出来。
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -130,6 +131,9 @@ jobs:
 
   runtime:
     needs: [web, changes]
+    # test 失败不该阻塞产物构建：构建出的包仍要看得到，
+    # 否则 shell 测试挂一次就得从头等一遍。
+    if: always() && needs.web.result == 'success' && needs.changes.result == 'success'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
