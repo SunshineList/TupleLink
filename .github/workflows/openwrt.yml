@@ -58,6 +58,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
+      - name: Cache the test rootfs
+        # test 和 packages 都用同一个 rootfs，缓存共用一份。
+        uses: actions/cache@v5
+        with:
+          path: /tmp/daed-rootfs.tar.gz
+          key: openwrt-test-rootfs-24.10.4-x86-64
       - name: Shell, UI and isolated OpenWrt tests
         run: |
           python3 -m unittest discover -s tests/repository -v
@@ -66,9 +72,9 @@ jobs:
           shellcheck -s sh -e SC1091 openwrt/install.sh openwrt/files/nailink openwrt/files/daed-check openwrt/files/rpcd-daed openwrt/files/subscription-proxy openwrt/subscription-check.sh openwrt/network-check.sh
           shellcheck -s sh -e SC1091,SC2034,SC3043 openwrt/files/daed.init openwrt/files/maintenance.init
           node --test tests/openwrt/ui.test.cjs
-          curl -fL --proto '=https' -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
+          [ -s /tmp/daed-rootfs.tar.gz ] || curl -fL --proto '=https' --timeout 120 -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
           echo 'e7f8ab84eef55c7eb23492de7b0517dbc23fbedaa4abbb680fe64720c309dc03  /tmp/daed-rootfs.tar.gz' | sha256sum -c -
-          mkdir /tmp/daed-rootfs
+          mkdir -p /tmp/daed-rootfs
           sudo tar -xzf /tmp/daed-rootfs.tar.gz -C /tmp/daed-rootfs
           sudo env DAED_TEST_ROOTFS=/tmp/daed-rootfs python3 -m unittest discover -s tests/openwrt -v
 
@@ -287,15 +293,31 @@ jobs:
         with:
           path: /tmp/daed-sdk/${{ matrix.target }}.tar.zst
           key: openwrt-sdk-${{ matrix.target }}-${{ hashFiles('openwrt/sdk-matrix.json') }}
+      - name: Cache apt archives
+        # apt-get update + 装依赖每次要 80 多秒，而这一组包在镜像里几乎不变。
+        # 只缓存 .deb 归档，不碰 apt 索引，装完跑一次 clean 就恢复干净状态。
+        uses: actions/cache@v5
+        with:
+          path: /var/cache/apt/archives
+          key: apt-openwrt-build-${{ runner.os }}-${{ hashFiles('openwrt/sdk-matrix.json') }}
       - name: Build native packages with pinned SDK
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends build-essential gawk gettext libncurses-dev libssl-dev python3 rsync unzip zstd
           python3 openwrt/build.py --target '${{ matrix.target }}' --binary .build/runtime/daed --btf-probe .build/runtime/btf-probe --luci-proxy .build/runtime/luci-proxy --version "$VERSION" --work /tmp/daed-sdk --output .build/packages
+      - name: Cache the test rootfs
+        if: matrix.target == 'apk-x86_64'
+        # 这个 rootfs 只是拿来跑安装/卸载测试的固定文件，每次重新下一遍
+        # 要 77 秒，缓存住即可。SHA256 校验在下一步，缓存坏了会当场报错。
+        uses: actions/cache@v5
+        with:
+          path: /tmp/daed-rootfs.tar.gz
+          key: openwrt-test-rootfs-24.10.4-x86-64
       - name: Real APK architecture, preflight and uninstall tests
         if: matrix.target == 'apk-x86_64'
         run: |
-          curl -fL --proto '=https' -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
+          # 缓存命中时不重复下载。
+          [ -s /tmp/daed-rootfs.tar.gz ] || curl -fL --proto '=https' --timeout 120 -o /tmp/daed-rootfs.tar.gz https://downloads.openwrt.org/releases/24.10.4/targets/x86/64/openwrt-24.10.4-x86-64-rootfs.tar.gz
           echo 'e7f8ab84eef55c7eb23492de7b0517dbc23fbedaa4abbb680fe64720c309dc03  /tmp/daed-rootfs.tar.gz' | sha256sum -c -
           mkdir /tmp/daed-rootfs
           sudo tar -xzf /tmp/daed-rootfs.tar.gz -C /tmp/daed-rootfs
