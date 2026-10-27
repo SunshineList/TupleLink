@@ -822,5 +822,27 @@
     "privateRule": "{{cidrs}} 属于私网地址，会被分流表里的 dip(geoip:private) -> direct 判成直连。请把 WireGuard 网段的规则写到那条规则之前，否则即使绑定接口，流量仍然不会走代理。",
     "privateOrderTitle": "WireGuard 网段会被判成直连",
     "privateOrder": "分流表第 {{line}} 行的 dip(geoip:private) -> direct 会先命中 WireGuard 的私网地址。把 WireGuard 网段的规则写到它上面，否则从外面连回来仍走直连。"
+  },
+  "exitIP": {
+    "title": "出口 IP 自检",
+    "description": "从直连和日常两条路径各探一次，看流量到底从哪出去。",
+    "check": "开始检测",
+    "checking": "检测中…",
+    "idle": "点「开始检测」对比两个出口。",
+    "direct": "直连出口",
+    "proxied": "当前出口",
+    "different": "两个出口不同：流量确实走了代理。",
+    "same": "两个出口相同：没有走代理，或代理落地与家宽恰好同一出口。",
+    "unknown": "至少一侧探测失败，无法判断。请检查路由器自身能否访问外网。",
+    "failedTitle": "检测失败",
+    "failed": "读取出口 IP 失败。确认面板登录状态，以及路由器能否访问外网。"
+  },
+  "groupCandidates": {
+    "title": "群组当前出口",
+    "description": "内核当前实际选中的节点，随线路波动自动更新。",
+    "members": "{{count}} 个节点",
+    "random": "随机策略 · 无固定出口",
+    "none": "尚未选出节点",
+    "unavailable": "读不到群组状态。确认面板登录状态，或代理服务是否已启动。"
   }
 }

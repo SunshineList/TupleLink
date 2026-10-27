@@ -17,7 +17,12 @@ async function readRouterLogs() {
   }
   if (host === window || !host.L?.require) throw new Error('LuCI host unavailable')
   const rpc = await host.L.require('rpc')
-  return rpc.declare({ object: 'daed-router', method: 'logs', expect: {} })()
+  const result = await rpc.declare({ object: 'daed-router', method: 'logs', expect: {}, reject: true, raise: true })()
+  // 有些 LuCI 版本会把非零的 RPC 结果强制转成空对象。空日志字符串是合法的，
+  // 但载荷缺失必须当成失败——否则一次 RPC 抖动就会把已有日志清空，
+  // 用户看到的是「突然没日志了」，而不是「读取失败」。
+  if (!result || typeof result.logs !== 'string') throw new Error('LuCI RPC unavailable')
+  return result
 }
 
 // Only the severity that changes what a reader should do gets a colour; info and

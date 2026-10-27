@@ -5,11 +5,75 @@ set -e
 
 case "${1:-}" in
 list)
-	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"maintenance":{},"maintain":{"action":""},"mirror":{"url":""},"action":{"action":""}}'
+	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"exitip":{},"groups":{},"maintenance":{},"maintain":{"action":""},"mirror":{"url":""},"action":{"action":""}}'
 	;;
 call)
 	case "${2:-}" in
 	status) /usr/libexec/daed/check ;;
+	groups)
+		# /health/ready 只接受 loopback 访问，iframe 里的面板够不着，
+		# 所以由这里代取。它只返回群组名、策略和「当前选中的节点名」，
+		# 不含任何链接或凭据；节点名为空表示该群组还没选出稳定候选。
+		listen=$(/usr/libexec/daed/check --listen 2>/dev/null) || listen=''
+		json_init
+		json_add_array groups
+		if [ -n "$listen" ] && command -v uclient-fetch >/dev/null 2>&1; then
+			raw=$(uclient-fetch -q -T 3 -O - "http://$listen/health/ready?details=1" 2>/dev/null) || raw='{}'
+			if printf '%s' "$raw" | jsonfilter -e '@.groups' >/dev/null 2>&1; then
+				# 上限 64 与后端一致；超出部分不显示，避免异常配置撑爆回复。
+				index=0
+				while [ "$index" -lt 64 ]; do
+					name=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].name" 2>/dev/null) || break
+					[ -n "$name" ] || break
+					policy=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].policy" 2>/dev/null) || policy=''
+					v4=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].candidate_ipv4" 2>/dev/null) || v4=''
+					v6=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].candidate_ipv6" 2>/dev/null) || v6=''
+					members=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].members" 2>/dev/null) || members=''
+					json_add_object
+					json_add_string name "$name"
+					json_add_string policy "$policy"
+					json_add_string candidate_ipv4 "$v4"
+					json_add_string candidate_ipv6 "$v6"
+					json_add_string members "$members"
+					json_close_object
+					index=$((index + 1))
+				done
+			fi
+		fi
+		json_close_array
+		json_dump
+		;;
+	exitip)
+		# 只读：从直连和日常两条路径各探一次出口 IP，回答「分流有没有生效」。
+		# 这是唯一会主动发起外网请求的只读接口，所以三层保护：
+		# exit-ip 自己每个探测 4 秒超时，这里再加 15 秒整体兜底，
+		# 最后校验输出确实是 JSON——脚本被 kill 时可能留下半截。
+		tmp=$(mktemp /tmp/daed-exitip.XXXXXX) || { json_init; json_add_string verdict unknown; json_dump; exit 0; }
+		/usr/libexec/daed/exit-ip >"$tmp" 2>/dev/null &
+		pid=$!
+		(
+			remaining=15
+			while [ "$remaining" -gt 0 ]; do
+				kill -0 "$pid" 2>/dev/null || exit 0
+				sleep 1
+				remaining=$((remaining - 1))
+			done
+			kill -TERM "$pid" 2>/dev/null || :
+		) >/dev/null 2>&1 &
+		watchdog=$!
+		wait "$pid" 2>/dev/null || :
+		kill -TERM "$watchdog" 2>/dev/null || :
+		wait "$watchdog" 2>/dev/null || :
+		# jsonfilter 走一遍，半截 JSON 在这里就被挡住，不会发给前端。
+		if [ -s "$tmp" ] && jsonfilter -i "$tmp" -e '@.verdict' >/dev/null 2>&1; then
+			cat "$tmp"
+		else
+			json_init
+			json_add_string verdict unknown
+			json_dump
+		fi
+		rm -f "$tmp"
+		;;
 	network)
 		# The panel can only reach this script, so the diagnostic that explains a
 		# broken datapath used to be SSH-only. It is read-only by design: it never
@@ -69,16 +133,21 @@ call)
 	logs)
 		json_init
 		# 一条 dae 记录可能跨几十行：候选列表写在 msg 的引号里，中位数 46 行。
-		# 按物理行取 120 行只剩几十条记录，所以这里按「记录」回数 120 条。
+		# 按物理行取行数只剩几十条记录，所以这里按「记录」计数。
+		#
+		# 这些上限是为 debug 级别排障定的：一次刷网页能写出几十 KB，
+		# 窗口太小的话面板上的分流视图永远是空的，等于没有。
+		# 同时它们也挡住 busybox awk 的内存：400 条 × 十几行仍在可控范围，
+		# 真正超长的候选列表只在 daed.log 里保留原文，面板按需展开头部。
 		# 每条记录保留头 12 行和最后一行，中间换成计数标记：
 		# 末行带着收尾引号和 group=/dialer= 等字段，丢了它 msg 就不闭合，
 		# 整条记录会退化成无法解析的孤立行。完整列表在面板里可以展开。
 		# LC_ALL=C 是必需的：busybox awk 在 UTF-8 locale 下遇到候选名里的
 		# 非 ASCII 字节会直接 towc 失败退出。
-		logs=$(LC_ALL=C tail -c 262144 /var/log/daed/daed.log 2>/dev/null | LC_ALL=C awk '
+		logs=$(LC_ALL=C tail -c 1048576 /var/log/daed/daed.log 2>/dev/null | LC_ALL=C awk '
 			function emit(   i) {
 				if (!body) return
-				slot = (slot + 1) % 120
+				slot = (slot + 1) % 400
 				n[slot] = ""
 				if (body <= 13) {
 					for (i = 1; i <= body; i++) n[slot] = n[slot] "\n" buf[i]
@@ -88,16 +157,16 @@ call)
 					n[slot] = n[slot] "\n" buf[body]
 				}
 				body = 0
-				if (total < 120) total++
+				if (total < 400) total++
 			}
 			/^(time=|\{|\[(trace|debug|info|warn|warning|error|fatal|panic)\])/ { emit() }
 			{ buf[++body] = $0 }
 			END {
 				emit()
-				from = (total < 120) ? 0 : (slot + 1) % 120
-				for (k = 0; k < total; k++) printf "%s\n", substr(n[(from + k) % 120], 2)
+				from = (total < 400) ? 0 : (slot + 1) % 400
+				for (k = 0; k < total; k++) printf "%s\n", substr(n[(from + k) % 400], 2)
 			}
-		' | tail -c 32768 | \
+		' | tail -c 131072 | \
 			sed -E 's#[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]"<>]+#[URL REDACTED]#g; s/([Tt]oken|[Pp]assword|[Aa]uthorization)([=: ]+)[^, ]+/\1\2[REDACTED]/g') || logs=''
 		json_add_string logs "$logs"
 		json_dump

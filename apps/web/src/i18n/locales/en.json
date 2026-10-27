@@ -822,5 +822,27 @@
     "privateRule": "{{cidrs}} is a private range, so the routing table rule dip(geoip:private) -> direct sends it straight out. Put the WireGuard range before that rule, otherwise binding the interface alone will not route it through the proxy.",
     "privateOrderTitle": "WireGuard traffic is routed direct",
     "privateOrder": "Line {{line}} of the routing table matches dip(geoip:private) -> direct before anything else, so WireGuard private addresses go straight out. Put the WireGuard range above that line, otherwise remote clients still bypass the proxy."
+  },
+  "exitIP": {
+    "title": "Exit IP check",
+    "description": "Probe twice — direct and along the normal path — to see where traffic actually leaves.",
+    "check": "Run check",
+    "checking": "Checking…",
+    "idle": "Run the check to compare both exits.",
+    "direct": "Direct exit",
+    "proxied": "Current exit",
+    "different": "The two exits differ: traffic really is going through the proxy.",
+    "same": "Both exits match: no proxy in use, or the proxy lands on the same exit as your ISP.",
+    "unknown": "At least one probe failed, so nothing can be concluded. Check whether the router itself can reach the internet.",
+    "failedTitle": "Check failed",
+    "failed": "Could not read the exit IP. Check your LuCI session and whether the router can reach the internet."
+  },
+  "groupCandidates": {
+    "title": "Current group exits",
+    "description": "The node the core is actually using right now; updates as the line shifts.",
+    "members": "{{count}} nodes",
+    "random": "Random policy · no fixed exit",
+    "none": "No node selected yet",
+    "unavailable": "Could not read group state. Check your LuCI session and whether the proxy service is running."
   }
 }

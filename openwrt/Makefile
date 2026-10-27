@@ -52,6 +52,7 @@ endef
 define Package/daed-router/install
 	$(INSTALL_DIR) $(1)/usr/libexec/daed
 	$(INSTALL_BIN) ./network-check.sh $(1)/usr/libexec/daed/network-check
+	$(INSTALL_BIN) ./exit-ip.sh $(1)/usr/libexec/daed/exit-ip
 	$(INSTALL_DIR) $(1)/usr/bin $(1)/etc/init.d $(1)/etc/config
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/daed $(1)/usr/bin/daed
 	$(INSTALL_DIR) $(1)/usr/sbin

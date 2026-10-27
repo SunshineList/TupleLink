@@ -27,6 +27,7 @@ import {
 import { useGQLQueryClient } from '~/contexts'
 import { isMockMode, MOCK_DEFAULT_IDS } from '~/mocks'
 import { defaultResourcesAtom, modeAtom } from '~/store'
+import { isWireGuard } from '~/utils/wireguard-check'
 
 export function useInitialize() {
   const createConfigMutation = useCreateConfigMutation()
@@ -54,8 +55,12 @@ export function useInitialize() {
     const { defaultConfigID, defaultRoutingID, defaultDNSID, defaultGroupID } = defaults
 
     if (!defaultConfigID) {
+      // 只取「持有默认路由」的接口是不够的：dae 只接管 LAN 接口列表里的
+      // 网卡，而 WireGuard 隧道（wg0 等）永远不带默认路由，于是从外面连
+      // 回来的流量会完全绕过代理——面板看起来一切正常，人却在外面连不上网。
+      // 这里把 wg* 接口一并纳入默认值；真正的开关仍在配置页，用户可改。
       const lanInterfaces = (await getInterfaces()).general.interfaces
-        .filter(({ flag }) => !!flag.default)
+        .filter(({ flag, name }) => !!flag.default || isWireGuard(name))
         .map(({ name }) => name)
       const {
         createConfig: { id },

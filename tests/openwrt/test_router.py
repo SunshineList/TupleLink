@@ -509,7 +509,9 @@ echo 'marker reached' >> /tmp/network-check-calls''')
         self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)
         self.write("/var/log/daed/daed.log", "x" * (1024 * 1024))
         result = self.run_router("/usr/libexec/rpcd/daed-router", "call", "logs")
-        self.assertLessEqual(len(json.loads(result.stdout)["logs"]), 32768)
+        # 上限是 128 KiB：debug 级别下窗口太小会让分流视图全空，
+        # 但请求仍然要有界，不能把整份日志塞进 JSON 回复。
+        self.assertLessEqual(len(json.loads(result.stdout)["logs"]), 131072)
 
     def legacy(self):
         self.write("/tmp/installed-daed", "1")

@@ -30,6 +30,8 @@ import { appStateAtom, groupSortOrdersAtom } from '~/store'
 import { deriveTime } from '~/utils'
 import { groupColumnBase, groupColumnLocations } from '~/utils/group-columns'
 import { useLatencyTests } from '~/hooks/useLatencyTests'
+import { ExitIPCheck } from '~/components/ExitIPCheck'
+import { GroupCandidates } from '~/components/GroupCandidates'
 import { RouterLogs } from '~/pages/RouterLogs'
 import { RouterGeodata } from '~/components/RouterMaintenance'
 import { Config } from './Config'
@@ -676,9 +678,14 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
     <div className="panel-workspace flex flex-col gap-5" data-workspace={area}>
       {area === 'logs' && <RouterLogs />}
       {area === 'dashboard' && (
-        <section id="panel-monitor">
-          <TrafficOverview compact />
-        </section>
+        <>
+          <section id="panel-monitor">
+            <TrafficOverview compact />
+          </section>
+          {/* 看过速度就想知道流量从哪出去，以及当前在用哪个节点。 */}
+          <ExitIPCheck />
+          <GroupCandidates />
+        </>
       )}
       {area === 'all' && (
         <nav className="flex gap-5 overflow-x-auto border-b text-sm" aria-label={t('panel.title')}>
