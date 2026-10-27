@@ -634,7 +634,18 @@
     "search": "Search the log",
     "searchPlaceholder": "Filter lines…",
     "count": "{{count}} entries",
-    "countFiltered": "{{shown}} of {{total}} entries"
+    "countFiltered": "{{shown}} of {{total}} entries",
+    "viewDecisions": "Routing",
+    "decisionsTitle": "Recent routing decisions",
+    "decisionsEmpty": "No routing records in this log window yet.",
+    "decisionsNeedDebug": "Routing decisions are not logged: set the log level to debug in Advanced settings, then load the site again.",
+    "decisionsColumnDomain": "Domain / target",
+    "decisionsColumnExit": "Exit",
+    "decisionsColumnTime": "Time",
+    "decisionsHint": "Summarised from routing records in the log; each domain shows its latest decision only.",
+    "exitProxy": "Proxy",
+    "exitDirect": "Direct",
+    "exitBlock": "Blocked"
   },
   "shell": {
     "sessionExpired": "The router session expired. Reload the LuCI page to sign in again.",
@@ -803,5 +814,13 @@
       "port": "TCP port range"
     },
     "invalidCode": "These categories do not exist: {{codes}}. Saving them would disable the whole routing table."
+  },
+  "wireGuard": {
+    "notBoundTitle": "WireGuard interface is not bound to LAN interfaces",
+    "notBound": "Found {{interfaces}}, but it is not in the LAN interface list. dae only intercepts interfaces in that list, so traffic coming back in over WireGuard bypasses the proxy entirely — connections work but the internet does not.",
+    "bindNow": "Add {{interfaces}} to LAN interfaces",
+    "privateRule": "{{cidrs}} is a private range, so the routing table rule dip(geoip:private) -> direct sends it straight out. Put the WireGuard range before that rule, otherwise binding the interface alone will not route it through the proxy.",
+    "privateOrderTitle": "WireGuard traffic is routed direct",
+    "privateOrder": "Line {{line}} of the routing table matches dip(geoip:private) -> direct before anything else, so WireGuard private addresses go straight out. Put the WireGuard range above that line, otherwise remote clients still bypass the proxy."
   }
 }

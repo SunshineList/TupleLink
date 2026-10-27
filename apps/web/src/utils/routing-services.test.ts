@@ -5,6 +5,8 @@ import {
   actionTarget,
   customRuleOf,
   DEFAULT_SERVICE_RULES,
+  GEOIP_HINTS,
+  GEOSITE_HINTS,
   matcherOf,
   parseCustomRules,
   parseServiceRules,
@@ -73,9 +75,7 @@ describe('routing services', () => {
   })
 
   it('writes new rules above the fallback line', () => {
-    const text = writeServiceRules(BASE, [
-      { service: 'youtube', action: { kind: 'group', group: 'us' } },
-    ])
+    const text = writeServiceRules(BASE, [{ service: 'youtube', action: { kind: 'group', group: 'us' } }])
     const lines = text.trim().split('\n')
     expect(lines[lines.length - 2]).toBe('domain(geosite:youtube) -> us')
     expect(lines[lines.length - 1]).toBe('fallback: proxy')
@@ -83,9 +83,7 @@ describe('routing services', () => {
 
   it('replaces an existing service line instead of duplicating it', () => {
     const source = `${BASE}\ndomain(geosite:youtube) -> proxy\n`
-    const text = writeServiceRules(source, [
-      { service: 'youtube', action: { kind: 'group', group: 'us' } },
-    ])
+    const text = writeServiceRules(source, [{ service: 'youtube', action: { kind: 'group', group: 'us' } }])
     expect(text.match(/domain\(geosite:youtube\)/g)).toHaveLength(1)
     expect(text).toContain('domain(geosite:youtube) -> us')
     expect(text).not.toContain('domain(geosite:youtube) -> proxy')
@@ -99,15 +97,8 @@ describe('routing services', () => {
   })
 
   it('keeps hand written rules and comments in place', () => {
-    const source = [
-      '# 我自己的备注',
-      'domain(suffix:internal.example) -> direct',
-      'fallback: proxy',
-      '',
-    ].join('\n')
-    const text = writeServiceRules(source, [
-      { service: 'lan', action: { kind: 'direct' } },
-    ])
+    const source = ['# 我自己的备注', 'domain(suffix:internal.example) -> direct', 'fallback: proxy', ''].join('\n')
+    const text = writeServiceRules(source, [{ service: 'lan', action: { kind: 'direct' } }])
     expect(text).toContain('# 我自己的备注')
     expect(text).toContain('domain(suffix:internal.example) -> direct')
     expect(text).toContain('dip(geoip:private) -> direct')
@@ -129,9 +120,7 @@ describe('routing services', () => {
   })
 
   it('appends when the source has no fallback line', () => {
-    const text = writeServiceRules('dip(geoip:cn) -> direct\n', [
-      { service: 'ads', action: { kind: 'block' } },
-    ])
+    const text = writeServiceRules('dip(geoip:cn) -> direct\n', [{ service: 'ads', action: { kind: 'block' } }])
     expect(text.trim().split('\n').at(-1)).toBe('domain(geosite:category-ads-all) -> block')
   })
 })
@@ -212,10 +201,14 @@ describe('自定义规则', () => {
   })
 
   it('重复的自定义规则只写一次', () => {
-    const out = writeRules('fallback: proxy', [], [
-      { kind: 'geoip', value: 'jp', action: { kind: 'direct' } },
-      { kind: 'geoip', value: 'jp', action: { kind: 'block' } },
-    ])
+    const out = writeRules(
+      'fallback: proxy',
+      [],
+      [
+        { kind: 'geoip', value: 'jp', action: { kind: 'direct' } },
+        { kind: 'geoip', value: 'jp', action: { kind: 'block' } },
+      ],
+    )
     expect(out.split('\n').filter((line) => line.includes('geoip:jp'))).toHaveLength(1)
   })
 })
@@ -224,9 +217,7 @@ describe('geo 分类必须真实存在', () => {
   // 写一个不存在的 geosite/geoip 分类，dae 会放弃整张分流表：
   // ApplyRulesOptimizers error: code X not found。用户只会看到「分流全没了」，
   // 很难联想到是一个分类名写错。这里把目录里所有引用都钉在真实分类表上。
-  const references = [
-    ...ROUTING_SERVICES.map((service) => ({ where: service.id, matcher: service.matcher })),
-  ]
+  const references = [...ROUTING_SERVICES.map((service) => ({ where: service.id, matcher: service.matcher }))]
 
   it.each(references)('$where 引用的分类都在 geosite.dat / geoip.dat 里', ({ matcher }) => {
     const geosite = [...matcher.matchAll(/geosite:([\w!-]+)/g)].map((item) => item[1])
@@ -237,5 +228,29 @@ describe('geo 分类必须真实存在', () => {
     for (const code of geoip) {
       expect(hasGeoIP(code), `geoip:${code} 不存在`).toBe(true)
     }
+  })
+
+  // 提示列表比服务目录更危险：服务目录是我们自己写死的，提示是给用户点的。
+  // 早先这里列着 `ads` 和 `epic`，点一下生成的规则就会让整张表加载失败。
+  // 现在两个列表都先过 white list，这里断言筛选后仍然非空，
+  // 免得白名单变动把整个下拉筛空了却没人发现。
+  it('geosite 提示列表全部真实存在且非空', () => {
+    expect(GEOSITE_HINTS.length).toBeGreaterThan(0)
+    for (const code of GEOSITE_HINTS) {
+      expect(hasGeoSite(code), `提示里的 geosite:${code} 不存在`).toBe(true)
+    }
+  })
+
+  it('geoip 提示列表全部真实存在且非空', () => {
+    expect(GEOIP_HINTS.length).toBeGreaterThan(0)
+    for (const code of GEOIP_HINTS) {
+      expect(hasGeoIP(code), `提示里的 geoip:${code} 不存在`).toBe(true)
+    }
+  })
+
+  it('提示里不会出现 geosite.dat 里没有的写法', () => {
+    // 这两个是历史遗留的错误名字，正确写法是 category-ads-all / epicgames。
+    expect(GEOSITE_HINTS).not.toContain('ads')
+    expect(GEOSITE_HINTS).not.toContain('epic')
   })
 })

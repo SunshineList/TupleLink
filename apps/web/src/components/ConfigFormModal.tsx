@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { useCreateConfigMutation, useGeneralQuery, useUpdateConfigMutation } from '~/apis'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '~/components/ui/accordion'
+import { AlertBanner } from '~/components/ui/alert-banner'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Dialog, DialogTitle } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
@@ -51,6 +52,7 @@ import {
   UTLSImitate,
 } from '~/constants'
 import { useSetValue } from '~/hooks/useSetValue'
+import { checkWireGuard } from '~/utils/wireguard-check'
 
 import { FormActions } from './FormActions'
 
@@ -217,6 +219,14 @@ export function ConfigFormDrawer({
     return []
   }, [generalQuery?.general.interfaces])
 
+  // WireGuard 接入检查：dae 只接管 lan_interface 里的接口，
+  // wg 接口不在其中时，从外面连回来的流量会完全绕过代理，
+  // 现象是「连上了但上不了外网」，而家里设备一切正常。
+  const wireGuard = useMemo(
+    () => checkWireGuard(generalQuery?.general.interfaces ?? [], formValues.lanInterface ?? []),
+    [generalQuery?.general.interfaces, formValues.lanInterface],
+  )
+
   const logLevelSteps = GET_LOG_LEVEL_STEPS(t)
 
   const createConfigMutation = useCreateConfigMutation()
@@ -353,6 +363,26 @@ export function ConfigFormDrawer({
                         values={formValues.lanInterface || []}
                         onChange={(vals) => setValue('lanInterface', vals)}
                       />
+
+                      {wireGuard.message === 'wireguardNotBound' && (
+                        <AlertBanner
+                          tone="warning"
+                          title={t('wireGuard.notBoundTitle')}
+                          action={{
+                            label: t('wireGuard.bindNow', { interfaces: wireGuard.suggestion.join('、') }),
+                            onClick: () =>
+                              setValue('lanInterface', [...(formValues.lanInterface || []), ...wireGuard.suggestion]),
+                          }}
+                        >
+                          {t('wireGuard.notBound', { interfaces: wireGuard.uncovered.join('、') })}
+                        </AlertBanner>
+                      )}
+
+                      {wireGuard.message === 'wireguardPrivateRule' && (
+                        <AlertBanner tone="info">
+                          {t('wireGuard.privateRule', { cidrs: wireGuard.privateCidrs.join('、') })}
+                        </AlertBanner>
+                      )}
 
                       <MultiSelect
                         label={t('wanInterface')}

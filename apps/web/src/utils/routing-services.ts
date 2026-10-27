@@ -1,12 +1,18 @@
 // 分流「服务」目录：把「我想让这个服务走哪个节点」变成一行合法的 routingA。
 //
-// 为什么用 domain(suffix:...) 而不是 geosite 分类：
 // 分类名由 geosite.dat 提供，不同发行版（v2fly / Loyalsoldier / 自建）名字不一样，
-// 写错一个分类会让整张分流表加载失败（wing/dae-core/component/routing/optimizer.go
-// 里任一 loadGeoSite 出错就中断全部规则）。域名后缀不依赖数据文件，永远成立。
+// 写错一个分类会让整张分流表加载失败：dae-core 的 DatReaderOptimizer.Optimize
+// 一次吃整张规则表，任一 loadGeoSite 出错就整体返回错误，用户看到的是「所有分流突然失效」。
 //
-// 只有在本机 geosite.dat 里实测存在的分类才用 geosite：cn / ads / netflix / youtube /
-// google / apple / amazon / epic。其余一律走 suffix。
+// 所以本文件引用的每个分类名都必须能在 geodata-codes.ts 的白名单里查到：
+//   - ROUTING_SERVICES 用到的分类全部实测存在；
+//   - GEOSITE_HINTS 是自定义规则的输入提示，同样只列存在的名字，
+//     否则用户点一下就会生成一条必炸的规则。
+//
+// 新增分类的规矩：先确认它在本机 geosite.dat / geoip.dat 里存在再加，
+// 拿不准就用 domain(suffix:...) / domain(full:...)，域名不依赖数据文件。
+
+import { hasGeoIP, hasGeoSite } from './geodata-codes'
 
 export interface ServiceLabel {
   en: string
@@ -101,10 +107,7 @@ export function serviceLabel(id: ServiceId, language: string): string {
 }
 
 /** 目标动作：走某个群组，或者直连/阻断。 */
-export type RoutingAction =
-  | { kind: 'group', group: string }
-  | { kind: 'direct' }
-  | { kind: 'block' }
+export type RoutingAction = { kind: 'group'; group: string } | { kind: 'direct' } | { kind: 'block' }
 
 export function actionTarget(action: RoutingAction): string {
   if (action.kind === 'group') return action.group
@@ -227,14 +230,7 @@ export const DEFAULT_SERVICE_RULES: ServiceRule[] = [
 // 自定义规则：geosite 分类 / geoip 国家 / 自定义域名 / IP / 端口
 // ---------------------------------------------------------------------------
 
-export type MatcherKind =
-  | 'domain-suffix'
-  | 'domain-keyword'
-  | 'domain-full'
-  | 'geosite'
-  | 'geoip'
-  | 'ip'
-  | 'port'
+export type MatcherKind = 'domain-suffix' | 'domain-keyword' | 'domain-full' | 'geosite' | 'geoip' | 'ip' | 'port'
 
 export interface CustomRule {
   kind: MatcherKind
@@ -242,11 +238,20 @@ export interface CustomRule {
   action: RoutingAction
 }
 
-/** 常见 geosite 分类，只是输入提示；写错分类会让整张分流表加载失败。 */
-export const GEOSITE_HINTS = [
+/**
+ * 常见 geosite 分类，只是输入提示。
+ *
+ * 这里的每一项都会被用户点一下写进分流表，所以必须真实存在：
+ * 早先这里有 `ads` 和 `epic`，但 geosite.dat 里叫 `category-ads-all` / `epicgames`，
+ * 点了就生成一条让整张规则表加载失败的规则，只能靠保存时的校验兜住。
+ *
+ * 下面两组提示都由 geodata-codes 的白名单筛选一遍，白名单里查不到的名字
+ * 不会出现在下拉里，从源头杜绝「提示给出一个不存在的分类」。
+ */
+const GEOSITE_WANTED = [
   'cn',
   'geolocation-!cn',
-  'ads',
+  'category-ads-all',
   'youtube',
   'netflix',
   'google',
@@ -258,13 +263,17 @@ export const GEOSITE_HINTS = [
   'twitter',
   'spotify',
   'steam',
-  'epic',
+  'epicgames',
   'openai',
   'anthropic',
 ]
 
-/** 常见 geoip 国家代码，同样只是提示。 */
-export const GEOIP_HINTS = ['cn', 'us', 'jp', 'hk', 'tw', 'sg', 'kr', 'private']
+export const GEOSITE_HINTS: readonly string[] = GEOSITE_WANTED.filter(hasGeoSite)
+
+/** 常见 geoip 国家代码，同样只是提示，同样先过一遍白名单。 */
+const GEOIP_WANTED = ['cn', 'us', 'jp', 'hk', 'tw', 'sg', 'kr', 'private']
+
+export const GEOIP_HINTS: readonly string[] = GEOIP_WANTED.filter(hasGeoIP)
 
 export function matcherOf(kind: MatcherKind, value: string): string {
   const trimmed = value.trim()
@@ -293,9 +302,7 @@ export function customRuleOf(matcher: string, action: RoutingAction): CustomRule
   const single = /^domain\((suffix|keyword|full|geosite):([^(),\s]+)\)$/.exec(text)
   if (single) {
     const kind = `domain-${single[1]}` as MatcherKind
-    return single[1] === 'geosite'
-      ? { kind: 'geosite', value: single[2], action }
-      : { kind, value: single[2], action }
+    return single[1] === 'geosite' ? { kind: 'geosite', value: single[2], action } : { kind, value: single[2], action }
   }
   const geoip = /^dip\(geoip:([^(),\s]+)\)$/.exec(text)
   if (geoip) return { kind: 'geoip', value: geoip[1], action }

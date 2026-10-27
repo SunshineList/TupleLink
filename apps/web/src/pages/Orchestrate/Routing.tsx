@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
   useCreateRoutingMutation,
+  useGeneralQuery,
   useGroupsQuery,
   useRemoveRoutingMutation,
   useRenameRoutingMutation,
@@ -18,6 +19,7 @@ import { RoutingFormModal } from '~/components/RoutingFormModal'
 import { RoutingWizard } from '~/components/RoutingWizard'
 import { Section } from '~/components/Section'
 import { SimpleCard } from '~/components/SimpleCard'
+import { AlertBanner } from '~/components/ui/alert-banner'
 import { Button } from '~/components/ui/button'
 import { Dialog } from '~/components/ui/dialog'
 import { SimpleTooltip } from '~/components/ui/tooltip'
@@ -26,6 +28,7 @@ import { useDisclosure } from '~/hooks'
 import { defaultResourcesAtom } from '~/store'
 import { createGroupCompletionItems, setDynamicCompletionItems } from '~/utils/editor-completions'
 import { describeInvalidCode, invalidCodes } from '~/utils/routing-validate'
+import { findPrivateRule, isWireGuard } from '~/utils/wireguard-check'
 
 /** 卡片摘要只显示前几条规则，避免长规则表把卡片撑爆。 */
 function previewRules(source: string): string {
@@ -42,6 +45,7 @@ export function Routing() {
   const { defaultRoutingID, defaultGroupID } = useStore(defaultResourcesAtom)
   const { data: routingsQuery } = useRoutingsQuery()
   const { data: groupsQuery } = useGroupsQuery()
+  const { data: generalQuery } = useGeneralQuery()
   const selectRoutingMutation = useSelectRoutingMutation()
   const removeRoutingMutation = useRemoveRoutingMutation()
   const renameRoutingMutation = useRenameRoutingMutation()
@@ -77,6 +81,20 @@ export function Routing() {
     return false
   }
 
+  // 私网直连规则会把 WireGuard 网段一起判成直连：那些地址从外面连回来时
+  // 内网能访问，但上不了外网，而家里设备完全正常，很容易被误判成节点坏了。
+  // 这里只在「确实存在 wg 接口」时提示，没装 WireGuard 的人不该看到这条。
+  const wireGuardHint = useMemo(() => {
+    const hasWireGuard = (generalQuery?.general.interfaces ?? []).some((item) => isWireGuard(item.name))
+    if (!hasWireGuard) return null
+    const selected = routingsQuery?.routings.find((item) => item.selected) ?? routingsQuery?.routings[0]
+    const source = selected?.routing.string
+    if (!source) return null
+    const issue = findPrivateRule(source)
+    if (!issue || !issue.isDirect || issue.hasEarlierWireGuardRule) return null
+    return issue
+  }, [generalQuery?.general.interfaces, routingsQuery?.routings])
+
   const [openedWizard, { open: openWizard, close: closeWizard }] = useDisclosure(false)
   const [openedCreateRoutingFormModal, { open: openCreateRoutingFormModal, close: closeCreateRoutingFormModal }] =
     useDisclosure(false)
@@ -105,6 +123,11 @@ export function Routing() {
       }
       bordered
     >
+      {wireGuardHint && (
+        <AlertBanner tone="warning" title={t('wireGuard.privateOrderTitle')} className="mb-3">
+          {t('wireGuard.privateOrder', { line: wireGuardHint.privateRuleLine + 1 })}
+        </AlertBanner>
+      )}
       {routingsQuery?.routings.map((routing: RoutingsQuery['routings'][number]) => (
         <SimpleCard
           key={routing.id}

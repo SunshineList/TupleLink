@@ -634,7 +634,18 @@
     "search": "搜索日志",
     "searchPlaceholder": "过滤行…",
     "count": "共 {{count}} 条",
-    "countFiltered": "{{shown}} / {{total}} 条"
+    "countFiltered": "{{shown}} / {{total}} 条",
+    "viewDecisions": "分流",
+    "decisionsTitle": "最近的分流决定",
+    "decisionsEmpty": "这段日志里还没有路由记录。",
+    "decisionsNeedDebug": "看不到分流情况：请在高级设置里把日志级别改成调试（debug），再访问一次网站。",
+    "decisionsColumnDomain": "域名 / 目标",
+    "decisionsColumnExit": "出口",
+    "decisionsColumnTime": "时间",
+    "decisionsHint": "由日志里的路由记录汇总，同一域名只显示最近一次。",
+    "exitProxy": "代理",
+    "exitDirect": "直连",
+    "exitBlock": "阻断"
   },
   "shell": {
     "sessionExpired": "路由器登录已失效，请刷新后台页面重新登录。",
@@ -803,5 +814,13 @@
       "port": "TCP 端口范围"
     },
     "invalidCode": "这些分类不存在：{{codes}}。写进去会让整张分流表失效。"
+  },
+  "wireGuard": {
+    "notBoundTitle": "WireGuard 接口没有绑进 LAN 接口",
+    "notBound": "检测到 {{interfaces}}，但它不在 LAN 接口列表里。dae 只接管这个列表中的接口，从外面通过 WireGuard 连回来的流量会完全绕过代理，表现为「连得上但上不了外网」。",
+    "bindNow": "把 {{interfaces}} 加进 LAN 接口",
+    "privateRule": "{{cidrs}} 属于私网地址，会被分流表里的 dip(geoip:private) -> direct 判成直连。请把 WireGuard 网段的规则写到那条规则之前，否则即使绑定接口，流量仍然不会走代理。",
+    "privateOrderTitle": "WireGuard 网段会被判成直连",
+    "privateOrder": "分流表第 {{line}} 行的 dip(geoip:private) -> direct 会先命中 WireGuard 的私网地址。把 WireGuard 网段的规则写到它上面，否则从外面连回来仍走直连。"
   }
 }
