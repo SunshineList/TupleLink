@@ -5,7 +5,7 @@ set -eu
 umask 077
 
 REPOSITORY=SunshineList/TupleLink
-release=openwrt-v0.6.33
+release=openwrt-v0.6.34
 asset_dir=''
 mode=install
 action=install
