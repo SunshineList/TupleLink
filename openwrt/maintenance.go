@@ -27,6 +27,14 @@ import (
 )
 
 var releaseTag = regexp.MustCompile(`^openwrt-v([0-9]+\.[0-9]+\.[0-9]+)$`)
+
+// updateRepository 是检查更新与下载安装包时用的仓库。
+//
+// 这是二次开发分支：面板的「检查更新」必须指向自己的发布页，
+// 否则会去拉上游 slobys/NaiLink 的包，把本地改动整个覆盖掉。
+// 换仓库时只改这一处，下面的 URL 都由它拼出来。
+const updateRepository = "SunshineList/TupleLink"
+
 var dataTag = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$`)
 
 // releases/latest 会把标签塞进跳转地址，这条正则从地址尾部把标签抠出来。
@@ -403,7 +411,7 @@ func (m *maintenanceManager) latestTag(ctx context.Context, repository string) (
 func (m *maintenanceManager) assetsPresent(ctx context.Context, tag string) bool {
 	for _, name := range []string{"install.sh", "SHA256SUMS", "manifest.tsv"} {
 		ok := false
-		err := m.follow(ctx, "https://github.com/slobys/NaiLink/releases/download/"+tag+"/"+name,
+		err := m.follow(ctx, "https://github.com/"+updateRepository+"/releases/download/"+tag+"/"+name,
 			func(request *http.Request) error {
 				request.Header.Set("User-Agent", "NaiLink-maintenance")
 				return nil
@@ -424,10 +432,10 @@ func (m *maintenanceManager) assetsPresent(ctx context.Context, tag string) bool
 
 func (m *maintenanceManager) checkRelease(ctx context.Context, job *maintenanceJob) error {
 	var releases []githubRelease
-	if err := m.getJSON(ctx, "https://api.github.com/repos/slobys/NaiLink/releases?per_page=10", &releases); err != nil {
+	if err := m.getJSON(ctx, "https://api.github.com/repos/"+updateRepository+"/releases?per_page=10", &releases); err != nil {
 		// 出口 IP 的 API 配额被用光时退回跳转标签；资产是否齐全交给
 		// 下面按名探测，探测不到就当没有这个版本，不猜。
-		tag, fallback := m.tag(ctx, "slobys/NaiLink")
+		tag, fallback := m.tag(ctx, updateRepository)
 		if fallback != nil {
 			return err
 		}
@@ -508,7 +516,7 @@ func (m *maintenanceManager) installUpdate(ctx context.Context, job *maintenance
 	if err = m.save(job, "downloading"); err != nil {
 		return errors.New("state_failed")
 	}
-	base := "https://github.com/slobys/NaiLink/releases/download/" + job.Target + "/"
+	base := "https://github.com/" + updateRepository + "/releases/download/" + job.Target + "/"
 	for _, name := range []string{"SHA256SUMS", "install.sh"} {
 		if err = m.fetch(ctx, base+name, filepath.Join(stage, name), 512<<10); err != nil {
 			return errors.New("download_failed")

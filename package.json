@@ -9,8 +9,8 @@
     "name": "daeuniverse"
   },
   "license": "MIT",
-  "homepage": "https://github.com/slobys/NaiLink#readme",
-  "repository": "https://github.com/slobys/NaiLink",
+  "homepage": "https://github.com/SunshineList/TupleLink#readme",
+  "repository": "https://github.com/SunshineList/TupleLink",
   "engines": {
     "node": ">=22.0.0",
     "pnpm": ">=10.24.0"

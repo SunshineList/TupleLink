@@ -68,7 +68,7 @@ func runFixtureJob(t *testing.T, m *maintenanceManager, action string) maintenan
 func TestMaintenanceVersionSelectionAndPersistentJob(t *testing.T) {
 	m := maintenanceFixture(t)
 	data, _ := json.Marshal([]any{releaseFixture("openwrt-v9.0.0", true), releaseFixture("other-v10", false), releaseFixture("openwrt-v0.6.33", false), releaseFixture("openwrt-v0.6.9", false)})
-	m.fetch = fixtureFetch(map[string][]byte{"https://api.github.com/repos/slobys/NaiLink/releases?per_page=10": data})
+	m.fetch = fixtureFetch(map[string][]byte{"https://api.github.com/repos/"+updateRepository+"/releases?per_page=10": data})
 	result := runFixtureJob(t, m, "check")
 	if result.Latest == nil || result.Latest.Version != "0.6.33" || result.Job.State != "success" {
 		t.Fatalf("%+v", result)
@@ -141,7 +141,7 @@ func TestMaintenanceInstallerChecksumAndPreservedData(t *testing.T) {
 			if corrupt {
 				script = append(script, []byte("# corrupted")...)
 			}
-			base := "https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.33/"
+			base := "https://github.com/"+updateRepository+"/releases/download/openwrt-v0.6.33/"
 			m.fetch = fixtureFetch(map[string][]byte{base + "install.sh": script, base + "SHA256SUMS": sums})
 			result := runFixtureJob(t, m, "update")
 			if corrupt {
@@ -447,7 +447,7 @@ func TestMaintenanceMirrorMustNotWidenTheAllowedHosts(t *testing.T) {
 	if allowedRedirect(&url.URL{Scheme: "https", Host: "evil.test"}, "https://mirror.test") {
 		t.Fatal("a redirect to a foreign host must stay rejected even with a mirror")
 	}
-	rewritten, err := url.Parse("https://mirror.test/https://github.com/slobys/NaiLink/releases/download/openwrt-v0.6.32/SHA256SUMS")
+	rewritten, err := url.Parse("https://mirror.test/https://github.com/"+updateRepository+"/releases/download/openwrt-v0.6.32/SHA256SUMS")
 	if err != nil || !allowedRedirect(rewritten, "https://mirror.test") {
 		t.Fatal("a mirror-rewritten github URL must be allowed")
 	}
