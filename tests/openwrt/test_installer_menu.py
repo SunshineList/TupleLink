@@ -193,8 +193,8 @@ while [ "$#" -gt 0 ]; do
 done
 printf '%s\\n' "$url" >> /tmp/download-urls
 case "$url" in
- https://raw.githubusercontent.com/slobys/NaiLink/main/openwrt/install.sh) cp /fixtures/latest-installer "$output" ;;
- https://github.com/slobys/NaiLink/releases/download/openwrt-v0.7.99/*) cp "/assets/${url##*/}" "$output" ;;
+ https://raw.githubusercontent.com/SunshineList/TupleLink/main/openwrt/install.sh) cp /fixtures/latest-installer "$output" ;;
+ https://github.com/SunshineList/TupleLink/releases/download/openwrt-v0.7.99/*) cp "/assets/${url##*/}" "$output" ;;
  *) exit 44 ;;
 esac''')
         result = self.menu('1\n')
@@ -236,12 +236,12 @@ done
 printf '%s %s\\n' "''' + client + '''" "$url" >> /tmp/download-urls
 [ "$url" != http://127.0.0.1:2023/ ] || exit 0
 ''' + ('printf partial > "$output"; exit 6\n' if all_failure else '') + '''case "$url" in
- https://raw.githubusercontent.com/slobys/NaiLink/main/openwrt/install.sh)
+ https://raw.githubusercontent.com/SunshineList/TupleLink/main/openwrt/install.sh)
  ''' + ('exit 6' if raw_failure else 'cp /fixtures/latest-installer "$output"') + ''' ;;
- 'https://api.github.com/repos/slobys/NaiLink/contents/openwrt/install.sh?ref=main')
+ 'https://api.github.com/repos/SunshineList/TupleLink/contents/openwrt/install.sh?ref=main')
  [ "$accept" = 'Accept: application/vnd.github.raw+json' ] || exit 45
  cp /fixtures/latest-installer "$output" ;;
- https://github.com/slobys/NaiLink/releases/download/openwrt-v0.7.99/*) cp "/assets/${url##*/}" "$output" ;;
+ https://github.com/SunshineList/TupleLink/releases/download/openwrt-v0.7.99/*) cp "/assets/${url##*/}" "$output" ;;
  *) exit 44 ;;
 esac''')
 
@@ -258,7 +258,7 @@ esac''')
         self.downloader('uclient-fetch', all_failure=True)
         result = self.menu('1\n')
         self.assert_network_update_preserved_data(result)
-        self.assertIn('api.github.com/repos/slobys/NaiLink/contents/openwrt/install.sh?ref=main', (self.router.root / 'tmp/download-urls').read_text())
+        self.assertIn('api.github.com/repos/SunshineList/TupleLink/contents/openwrt/install.sh?ref=main', (self.router.root / 'tmp/download-urls').read_text())
 
     def test_curl_failure_uses_firmware_downloader_for_installer_and_assets(self):
         self.prepare_network_update()

@@ -37,11 +37,11 @@ class MaintenanceFixture:
                     assets[name] = data
                     assets[name + ".sha256sum"] = (hashlib.sha256(data).hexdigest() + "  " + name + "\n").encode()
                 if outer.state["fail"] == "checksum": assets["geosite.dat"] += b"corrupt"
-                if path == "/repos/slobys/NaiLink/releases":
+                if path == "/repos/SunshineList/TupleLink/releases":
                     data = json.dumps([{"tag_name": tag, "draft": False, "assets": [{"name": name} for name in ("install.sh", "SHA256SUMS", "manifest.tsv")]}]).encode()
                 elif path == "/repos/Loyalsoldier/v2ray-rules-dat/releases/latest":
                     data = json.dumps({"tag_name": outer.state["geo"], "draft": False, "assets": [{"name": name} for name in ("geoip.dat", "geosite.dat", "geoip.dat.sha256sum", "geosite.dat.sha256sum")]}).encode()
-                elif path.startswith("/slobys/NaiLink/releases/download/" + tag + "/") or path.startswith("/Loyalsoldier/v2ray-rules-dat/releases/download/" + outer.state["geo"] + "/"):
+                elif path.startswith("/SunshineList/TupleLink/releases/download/" + tag + "/") or path.startswith("/Loyalsoldier/v2ray-rules-dat/releases/download/" + outer.state["geo"] + "/"):
                     data = assets.get(path.rsplit("/", 1)[-1])
                     if data is None: self.send_error(404); return
                 else:

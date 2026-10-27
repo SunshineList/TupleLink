@@ -71,7 +71,7 @@ class ReleaseSafetyTest(unittest.TestCase):
 
     def publish(self):
         with patch.object(release.subprocess, "run", self.fake_gh), contextlib.redirect_stdout(io.StringIO()):
-            release.publish(self.directory, VERSION, SHA, "slobys/NaiLink")
+            release.publish(self.directory, VERSION, SHA, "SunshineList/TupleLink")
 
     def mutations(self):
         return [c for c in self.calls if c[1:3] in (["release", "create"], ["release", "upload"])]
@@ -212,7 +212,7 @@ class ReleaseSafetyTest(unittest.TestCase):
     def test_new_release_checks_missing_ref_instead_of_invalid_commit_name(self):
         self.publish()
         queries = [call[2] for call in self.calls if call[1] == "api"]
-        self.assertEqual(queries, ["repos/slobys/NaiLink/git/ref/tags/openwrt-v" + VERSION])
+        self.assertEqual(queries, ["repos/SunshineList/TupleLink/git/ref/tags/openwrt-v" + VERSION])
 
     def test_annotated_tag_is_compared_using_its_resolved_commit(self):
         def responses(args, **kwargs):
@@ -222,7 +222,7 @@ class ReleaseSafetyTest(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, value, "")
             return self.fake_gh(args, **kwargs)
         with patch.object(release.subprocess, "run", responses), contextlib.redirect_stdout(io.StringIO()):
-            release.publish(self.directory, VERSION, SHA, "slobys/NaiLink")
+            release.publish(self.directory, VERSION, SHA, "SunshineList/TupleLink")
         self.assertEqual(len(self.mutations()), 2)
 
     def test_retry_only_same_commit_draft(self):
@@ -234,4 +234,4 @@ class ReleaseSafetyTest(unittest.TestCase):
         failed = subprocess.CompletedProcess([], 1, "", "HTTP 403: denied")
         with patch.object(release.subprocess, "run", return_value=failed):
             with self.assertRaisesRegex(RuntimeError, "403"):
-                release.publish(self.directory, VERSION, SHA, "slobys/NaiLink")
+                release.publish(self.directory, VERSION, SHA, "SunshineList/TupleLink")

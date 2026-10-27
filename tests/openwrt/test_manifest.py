@@ -22,7 +22,7 @@ class ManifestTests(unittest.TestCase):
         self.assertIn("default: '" + version + "'", (OPENWRT.parent / ".github/workflows/openwrt.yml").read_text())
         readme = (OPENWRT.parent / "README.md").read_text(encoding="utf-8")
         self.assertIn("/releases/tag/openwrt-v" + version, readme)
-        self.assertIn("https://github.com/slobys/NaiLink/releases/download/openwrt-v" + version + "/install.sh", readme)
+        self.assertIn("https://github.com/SunshineList/TupleLink/releases/download/openwrt-v" + version + "/install.sh", readme)
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
