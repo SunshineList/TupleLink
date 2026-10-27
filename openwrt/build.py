@@ -139,10 +139,12 @@ def verify_package(path, architecture, package, cpu, sdk, version):
             expected["usr/libexec/daed/subscription-proxy"] = "files/subscription-proxy"
             expected["usr/sbin/nailink"] = "files/nailink"
             expected["usr/libexec/daed/network-check"] = "network-check.sh"
+            expected["usr/libexec/daed/exit-ip"] = "exit-ip.sh"
             verify_elf(root / "usr/libexec/daed/btf-probe", cpu)
             verify_elf(root / "usr/libexec/daed/luci-proxy", cpu)
             executables = ["usr/bin/daed", "etc/init.d/daed", "usr/libexec/daed/check", "usr/libexec/daed/btf-probe", "usr/libexec/daed/luci-proxy"]
             executables.append("usr/libexec/daed/subscription-proxy")
+            executables.append("usr/libexec/daed/exit-ip")
             installer = (HERE / "install.sh").read_text()
             installer = re.sub(r"^release=openwrt-v\d+\.\d+\.\d+$", "release=openwrt-v" + version, installer, flags=re.MULTILINE)
             if (root / "usr/sbin/daed-router-setup").read_text() != installer:
@@ -207,6 +209,7 @@ def main():
     package.mkdir(parents=True, exist_ok=True)
     shutil.copy2(HERE / "Makefile", package)
     shutil.copy2(HERE / "network-check.sh", package)
+    shutil.copy2(HERE / "exit-ip.sh", package)
     installer = (HERE / "install.sh").read_text()
     installer = re.sub(r"^release=openwrt-v\d+\.\d+\.\d+$", "release=openwrt-v" + args.version, installer, flags=re.MULTILINE)
     (package / "install.sh").write_text(installer)
