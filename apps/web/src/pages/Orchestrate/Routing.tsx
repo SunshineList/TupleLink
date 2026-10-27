@@ -16,6 +16,7 @@ import {
   useUpdateRoutingMutation,
 } from '~/apis'
 import { RoutingFormModal } from '~/components/RoutingFormModal'
+import { RoutingTester } from '~/components/RoutingTester'
 import { RoutingWizard } from '~/components/RoutingWizard'
 import { Section } from '~/components/Section'
 import { SimpleCard } from '~/components/SimpleCard'
@@ -127,6 +128,15 @@ export function Routing() {
         <AlertBanner tone="warning" title={t('wireGuard.privateOrderTitle')} className="mb-3">
           {t('wireGuard.privateOrder', { line: wireGuardHint.privateRuleLine + 1 })}
         </AlertBanner>
+      )}
+      {/* 测试器放在规则列表上方：配完规则最常问的就是「这样写对不对」。 */}
+      {selectedRouting && (
+        <div className="mb-3">
+          <RoutingTester
+            source={selectedRouting.routing.string}
+            groups={(groupsQuery?.groups ?? []).map((group) => group.name)}
+          />
+        </div>
       )}
       {routingsQuery?.routings.map((routing: RoutingsQuery['routings'][number]) => (
         <SimpleCard

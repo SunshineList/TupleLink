@@ -870,5 +870,24 @@
     "testFailedTitle": "Send failed",
     "testFailed": "Could not send. Check the token, the chat ID, and whether the router can reach api.telegram.org.",
     "testNoClient": "This firmware has no uclient-fetch, so nothing can be sent."
+  },
+  "routingTester": {
+    "title": "Rule tester",
+    "description": "Enter a domain to see which rule catches it and where it goes.",
+    "domain": "Domain",
+    "port": "Port",
+    "run": "Test",
+    "hitRule": "Matched rule",
+    "viaProxy": "via proxy",
+    "viaDirect": "direct",
+    "viaBlock": "blocked",
+    "noMatch": "No rule matched and there is no fallback — this traffic is not intercepted.",
+    "invalidDomain": "Domain looks invalid. You can paste a full URL; the host is extracted.",
+    "emptyRouting": "The routing table is empty, so there is nothing to test.",
+    "groupMissing": "“{{group}}” is not an existing group, so this rule points at a missing exit.",
+    "shadowedTitle": "These rules never run",
+    "shadowed": "Lines {{lines}} sit after the matching rule above, so they are unreachable.",
+    "trace": "Step by step ({{count}} rules)",
+    "legend": "✓ matched · ✗ definitely not · ? cannot tell (geosite domain lists are not available in the panel)"
   }
 }

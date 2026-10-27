@@ -870,5 +870,24 @@
     "testFailedTitle": "发送失败",
     "testFailed": "发不出去。确认 token 正确、chat_id 对得上，以及路由器本身能访问 api.telegram.org。",
     "testNoClient": "固件缺少 uclient-fetch，无法发送。"
+  },
+  "routingTester": {
+    "title": "规则测试",
+    "description": "输入域名，看它会命中哪条规则、走哪个出口。",
+    "domain": "域名",
+    "port": "端口",
+    "run": "测试",
+    "hitRule": "命中规则",
+    "viaProxy": "走代理",
+    "viaDirect": "直连",
+    "viaBlock": "阻断",
+    "noMatch": "没有规则命中，也没有 fallback —— 这条流量不会被接管。",
+    "invalidDomain": "域名格式不对。可以粘贴完整网址，会自动取出主机名。",
+    "emptyRouting": "当前分流表是空的，没有可测的规则。",
+    "groupMissing": "「{{group}}」不是现有群组名，这条规则指向了一个不存在的出口。",
+    "shadowedTitle": "这些规则不会生效",
+    "shadowed": "第 {{lines}} 行排在上方命中规则之后，永远轮不到执行。",
+    "trace": "逐条判定（{{count}} 条）",
+    "legend": "✓ 命中 · ✗ 确定不命中 · ? 无法判定（geosite 分类的域名清单不在面板里）"
   }
 }

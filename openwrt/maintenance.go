@@ -261,6 +261,7 @@ func (m *maintenanceManager) save(job *maintenanceJob, phase string) error {
 	job.Updated = m.now().Unix()
 	return writeMaintenanceJSON(filepath.Join(m.stateDir, "job.json"), job)
 }
+
 func (m *maintenanceManager) start(action string) maintenanceStatus {
 	if action != "check" && action != "update" && action != "geodata" {
 		return maintenanceStatus{Code: "invalid_action"}
@@ -346,26 +347,27 @@ func (m *maintenanceManager) worker(ctx context.Context, expectedID string) erro
 // 只推「用户需要知道结果」的任务：更新和规则库更新都是后台异步跑的，
 // 跑完人可能已经离开页面；check 只是查版本，没有推送价值。
 //
-// 推送在独立进程里跑，失败绝不影响任务结果落盘。消息里只放动作、
-// 结局和错误分类码——不放 URL、节点名或任何凭据。
+// 详情只给错误分类码，不给 URL 或异常原文——那些可能带凭据。
+// 版式由 notify.sh 统一处理，这里只负责「哪个事件、什么细节」。
+//
+// 推送在独立进程里跑，失败绝不影响任务结果落盘。
 func (m *maintenanceManager) notifyJob(job maintenanceJob) {
 	if job.Action != "update" && job.Action != "geodata" {
 		return
 	}
-	// 环境变量里带 notify 脚本路径，测试时可以不配，避免在单测里真的发请求。
+	// 测试时可以不配，免得单测真的往 Telegram 发请求。
 	binary := os.Getenv("DAED_NOTIFY_BIN")
 	if binary == "" {
 		binary = "/usr/libexec/daed/notify"
 	}
-	body := "维护任务：" + job.Action
-	if job.State == "success" {
-		body += " 完成"
-	} else {
-		body += " 失败（" + job.Code + "）"
+	event := job.Action + "_" + job.State
+	detail := ""
+	if job.State != "success" && job.Code != "" {
+		detail = job.Code
 	}
 	// 用 Background 而不是任务自己的 ctx：任务结束后 ctx 会被取消，
-	// 通知正好是在那个时刻发出的。
-	cmd := exec.Command(binary, job.Action+"_"+job.State, body)
+	// 而通知正好是在那个时刻发出的。
+	cmd := exec.Command(binary, event, detail)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	// 不等待：通知是尽力而为，卡住 8 秒不能拖住任务收尾。
@@ -373,6 +375,91 @@ func (m *maintenanceManager) notifyJob(job maintenanceJob) {
 		go func() { _ = cmd.Wait() }()
 	}
 }
+func (m *maintenanceManager) save(job *maintenanceJob, phase string) error {
+	job.Phase = phase
+	job.Updated = m.now().Unix()
+	return writeMaintenanceJSON(filepath.Join(m.stateDir, "job.json"), job)
+}
+func (m *maintenanceManager) start(action string) maintenanceStatus {
+	if action != "check" && action != "update" && action != "geodata" {
+		return maintenanceStatus{Code: "invalid_action"}
+	}
+	lock, err := maintenanceLock(m.lockFile, false)
+	if err != nil {
+		return maintenanceStatus{Code: "busy"}
+	}
+	defer lock.Close()
+	if err = privateDirectory(m.stateDir); err != nil {
+		return maintenanceStatus{Code: "unsafe_state"}
+	}
+	var previous maintenanceJob
+	if readMaintenanceJSON(filepath.Join(m.stateDir, "job.json"), &previous) == nil && previous.State == "queued" && m.now().Unix()-previous.Updated < 30 {
+		return maintenanceStatus{Code: "busy"}
+	}
+	job := maintenanceJob{Action: action, State: "queued", Phase: "queued", Started: m.now().Unix()}
+	if action == "update" {
+		var latest releaseInfo
+		if readMaintenanceJSON(filepath.Join(m.stateDir, "latest.json"), &latest) != nil || !releaseTag.MatchString(latest.Tag) || m.now().Unix()-latest.Checked > 3600 || latest.Checked > m.now().Unix()+60 {
+			return maintenanceStatus{Code: "check_required"}
+		}
+		if !versionNewer(latest.Version, m.current()) {
+			return maintenanceStatus{Code: "already_latest"}
+		}
+		if strings.TrimPrefix(latest.Tag, "openwrt-v") != latest.Version {
+			return maintenanceStatus{Code: "check_required"}
+		}
+		job.Target = latest.Tag
+	}
+	id := make([]byte, 12)
+	if _, err = rand.Read(id); err != nil {
+		return maintenanceStatus{Code: "state_failed"}
+	}
+	job.ID = hex.EncodeToString(id)
+	if err = m.save(&job, "queued"); err != nil {
+		return maintenanceStatus{Code: "state_failed"}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err = m.run(ctx, m.initScript, "start", job.ID); err != nil {
+		job.State, job.Code = "error", "worker_unavailable"
+		_ = m.save(&job, "finished")
+		return maintenanceStatus{Code: "worker_unavailable"}
+	}
+	return maintenanceStatus{Success: true, Current: m.current(), Job: &job}
+}
+func (m *maintenanceManager) worker(ctx context.Context, expectedID string) error {
+	lock, err := maintenanceLock(m.lockFile, true)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	var job maintenanceJob
+	if err = readMaintenanceJSON(filepath.Join(m.stateDir, "job.json"), &job); err != nil || job.State != "queued" || job.ID != expectedID {
+		return errors.New("no_queued_job")
+	}
+	job.State = "running"
+	if err = m.save(&job, "checking"); err != nil {
+		return err
+	}
+	switch job.Action {
+	case "check":
+		err = m.checkRelease(ctx, &job)
+	case "update":
+		err = m.installUpdate(ctx, &job)
+	case "geodata":
+		err = m.updateGeodata(ctx, &job)
+	default:
+		err = errors.New("invalid_action")
+	}
+	job.State = "success"
+	if err != nil {
+		job.State = "error"
+		job.Code = maintenanceCode(err)
+	}
+	m.notifyJob(job)
+	return m.save(&job, "finished")
+}
+
 func maintenanceCode(err error) string {
 	// Only stable codes cross the UI boundary; network/installer errors may
 	// contain full URLs, query strings or configuration paths.
