@@ -21,6 +21,10 @@ on:
         description: 'After all checks, upload to a release draft (main only)'
         type: boolean
         default: false
+      all_architectures:
+        description: 'Build every architecture (arm64/armv7/mips/mipsle). Leave off for x86_64 only'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -92,8 +96,10 @@ jobs:
       fail-fast: false
       matrix:
         # push 只编译 x86_64，别让一次提交等五个架构的 SDK 全下完；
-        # 全架构矩阵和 apk 打包留给手动触发与发版。
-        cpu: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["x86_64","arm64","armv7","mips","mipsle"]' || '["x86_64"]') }}
+        # 默认只编 x86_64：五个架构各下一套 SDK 再各编一遍，光排队就六分钟，
+        # 而绝大多数改动（面板、前端、网关）根本与架构无关。
+        # 真要发全平台时在手动触发里勾上 all_architectures。
+        cpu: ${{ fromJSON(inputs.all_architectures && '["x86_64","arm64","armv7","mips","mipsle"]' || '["x86_64"]') }}
     env:
       GOOS: linux
       CGO_ENABLED: '0'
@@ -220,7 +226,7 @@ jobs:
       fail-fast: false
       matrix:
         # 手动触发时才出全架构 ipk+apk；push 只出本机构建和测试用的 x86_64 ipk。
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '[{"target":"ipk-x86_64","cpu":"x86_64"},{"target":"ipk-arm64","cpu":"arm64"},{"target":"apk-x86_64","cpu":"x86_64"},{"target":"apk-arm64","cpu":"arm64"},{"target":"ipk-armv7","cpu":"armv7"},{"target":"apk-armv7","cpu":"armv7"},{"target":"ipk-mips","cpu":"mips"},{"target":"apk-mips","cpu":"mips"},{"target":"ipk-mipsle","cpu":"mipsle"},{"target":"apk-mipsle","cpu":"mipsle"}]' || '[{"target":"ipk-x86_64","cpu":"x86_64"}]') }}
+        include: ${{ fromJSON(inputs.all_architectures && '[{"target":"ipk-x86_64","cpu":"x86_64"},{"target":"ipk-arm64","cpu":"arm64"},{"target":"apk-x86_64","cpu":"x86_64"},{"target":"apk-arm64","cpu":"arm64"},{"target":"ipk-armv7","cpu":"armv7"},{"target":"apk-armv7","cpu":"armv7"},{"target":"ipk-mips","cpu":"mips"},{"target":"apk-mips","cpu":"mips"},{"target":"ipk-mipsle","cpu":"mipsle"},{"target":"apk-mipsle","cpu":"mipsle"}]' || '[{"target":"ipk-x86_64","cpu":"x86_64"}]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
@@ -251,9 +257,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # QEMU 起虚拟机是最慢的一环：push 只验证 x86_64 这条真内核路径，
-        # 其余架构的「预期不兼容」结论留给手动触发确认。
-        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '[{"cpu":"x86_64","goarch":"amd64","qemu_package":"qemu-system-x86","qemu":"qemu-system-x86_64","expect":"success"},{"cpu":"armv7","goarch":"arm","qemu_package":"qemu-system-arm","qemu":"qemu-system-arm","expect":"failure"},{"cpu":"mips","goarch":"mips","qemu_package":"qemu-system-mips","qemu":"qemu-system-mips","expect":"failure"},{"cpu":"mipsle","goarch":"mipsle","qemu_package":"qemu-system-mips","qemu":"qemu-system-mipsel","expect":"failure"}]' || '[{"cpu":"x86_64","goarch":"amd64","qemu_package":"qemu-system-x86","qemu":"qemu-system-x86_64","expect":"success"}]') }}
+        # QEMU 起虚拟机是最慢的一环：默认只验证 x86_64 这条真内核路径，
+        # 其余架构的「预期不兼容」结论留给勾上 all_architectures 时确认。
+        include: ${{ fromJSON(inputs.all_architectures && '[{"cpu":"x86_64","goarch":"amd64","qemu_package":"qemu-system-x86","qemu":"qemu-system-x86_64","expect":"success"},{"cpu":"armv7","goarch":"arm","qemu_package":"qemu-system-arm","qemu":"qemu-system-arm","expect":"failure"},{"cpu":"mips","goarch":"mips","qemu_package":"qemu-system-mips","qemu":"qemu-system-mips","expect":"failure"},{"cpu":"mipsle","goarch":"mipsle","qemu_package":"qemu-system-mips","qemu":"qemu-system-mipsel","expect":"failure"}]' || '[{"cpu":"x86_64","goarch":"amd64","qemu_package":"qemu-system-x86","qemu":"qemu-system-x86_64","expect":"success"}]') }}
     steps:
       - uses: actions/checkout@v7
         with:
