@@ -337,7 +337,41 @@ func (m *maintenanceManager) worker(ctx context.Context, expectedID string) erro
 		job.State = "error"
 		job.Code = maintenanceCode(err)
 	}
+	m.notifyJob(job)
 	return m.save(&job, "finished")
+}
+
+// notifyJob 把维护任务的结局推给用户。
+//
+// 只推「用户需要知道结果」的任务：更新和规则库更新都是后台异步跑的，
+// 跑完人可能已经离开页面；check 只是查版本，没有推送价值。
+//
+// 推送在独立进程里跑，失败绝不影响任务结果落盘。消息里只放动作、
+// 结局和错误分类码——不放 URL、节点名或任何凭据。
+func (m *maintenanceManager) notifyJob(job maintenanceJob) {
+	if job.Action != "update" && job.Action != "geodata" {
+		return
+	}
+	// 环境变量里带 notify 脚本路径，测试时可以不配，避免在单测里真的发请求。
+	binary := os.Getenv("DAED_NOTIFY_BIN")
+	if binary == "" {
+		binary = "/usr/libexec/daed/notify"
+	}
+	body := "维护任务：" + job.Action
+	if job.State == "success" {
+		body += " 完成"
+	} else {
+		body += " 失败（" + job.Code + "）"
+	}
+	// 用 Background 而不是任务自己的 ctx：任务结束后 ctx 会被取消，
+	// 通知正好是在那个时刻发出的。
+	cmd := exec.Command(binary, job.Action+"_"+job.State, body)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	// 不等待：通知是尽力而为，卡住 8 秒不能拖住任务收尾。
+	if err := cmd.Start(); err == nil {
+		go func() { _ = cmd.Wait() }()
+	}
 }
 func maintenanceCode(err error) string {
 	// Only stable codes cross the UI boundary; network/installer errors may

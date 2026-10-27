@@ -844,5 +844,31 @@
     "random": "Random policy · no fixed exit",
     "none": "No node selected yet",
     "unavailable": "Could not read group state. Check your LuCI session and whether the proxy service is running."
+  },
+  "notify": {
+    "title": "Telegram notifications",
+    "description": "Push important events to Telegram: update results, rule data, service failures, subscription errors.",
+    "enable": "Enable notifications",
+    "enableHint": "Nothing is sent while this is off.",
+    "token": "Bot token",
+    "tokenHint": "Get one from @BotFather; looks like 123456789:AAH…",
+    "tokenKept": "Configured · leave blank to keep",
+    "tokenSetHint": "Saved. To change it, paste the whole token again — the stored value is never shown.",
+    "chat": "Chat ID",
+    "chatHint": "User ids are numbers, groups are negative, channels can be @channelname.",
+    "save": "Save",
+    "test": "Send test",
+    "loading": "Reading notification settings…",
+    "loadFailed": "Could not read notification settings.",
+    "saveFailed": "Save failed. Check that you are still signed in to LuCI.",
+    "errorTitle": "Not saved",
+    "invalidToken": "Bot token format is wrong: expected number:letters/digits. Do not paste a whole URL.",
+    "invalidChat": "Chat ID format is wrong: expected a number, a negative group id, or @channelname.",
+    "testSent": "Test message sent. Check Telegram.",
+    "testNotConfigured": "Token or chat ID is still empty.",
+    "testDisabled": "Notifications are off. Turn them on first.",
+    "testFailedTitle": "Send failed",
+    "testFailed": "Could not send. Check the token, the chat ID, and whether the router can reach api.telegram.org.",
+    "testNoClient": "This firmware has no uclient-fetch, so nothing can be sent."
   }
 }

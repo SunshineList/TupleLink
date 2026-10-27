@@ -33,6 +33,7 @@ import { useLatencyTests } from '~/hooks/useLatencyTests'
 import { ExitIPCheck } from '~/components/ExitIPCheck'
 import { GroupCandidates } from '~/components/GroupCandidates'
 import { RouterLogs } from '~/pages/RouterLogs'
+import { NotifySettings } from '~/components/NotifySettings'
 import { RouterGeodata } from '~/components/RouterMaintenance'
 import { Config } from './Config'
 import { DNS } from './DNS'
@@ -868,6 +869,8 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
               <DNS />
               <Routing />
               {area === 'advanced' && <RouterGeodata />}
+              {/* 通知属于「高级设置」：一次性配好就不动了，和规则库同一层。 */}
+              {area === 'advanced' && <NotifySettings />}
             </>
           )}
         </div>

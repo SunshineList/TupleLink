@@ -844,5 +844,31 @@
     "random": "随机策略 · 无固定出口",
     "none": "尚未选出节点",
     "unavailable": "读不到群组状态。确认面板登录状态，或代理服务是否已启动。"
+  },
+  "notify": {
+    "title": "Telegram 通知",
+    "description": "把重要事件推到 Telegram：更新结果、规则库、服务异常、订阅失败。",
+    "enable": "启用推送",
+    "enableHint": "关闭时不会发送任何消息。",
+    "token": "Bot Token",
+    "tokenHint": "在 @BotFather 创建机器人后拿到，形如 123456789:AAH…",
+    "tokenKept": "已配置 · 留空则不修改",
+    "tokenSetHint": "已保存。要更换请整段重填 —— 出于安全考虑，已保存的 token 不会显示。",
+    "chat": "Chat ID",
+    "chatHint": "用户 id 是纯数字；群组是负数；频道可以填 @channelname。",
+    "save": "保存",
+    "test": "发送测试",
+    "loading": "正在读取通知设置…",
+    "loadFailed": "读取通知设置失败。",
+    "saveFailed": "保存失败，请检查后台登录状态。",
+    "errorTitle": "设置未保存",
+    "invalidToken": "Bot Token 格式不对：应为「数字:字母数字下划线连字符」，不要粘贴整段 URL。",
+    "invalidChat": "Chat ID 格式不对：应为纯数字、负数组，或 @channelname。",
+    "testSent": "测试消息已发送，去 Telegram 看看。",
+    "testNotConfigured": "Token 或 Chat ID 还没填。",
+    "testDisabled": "推送当前是关闭状态，先打开再测试。",
+    "testFailedTitle": "发送失败",
+    "testFailed": "发不出去。确认 token 正确、chat_id 对得上，以及路由器本身能访问 api.telegram.org。",
+    "testNoClient": "固件缺少 uclient-fetch，无法发送。"
   }
 }
