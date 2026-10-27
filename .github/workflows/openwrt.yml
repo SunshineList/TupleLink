@@ -416,4 +416,10 @@ jobs:
           name: daed-openwrt-${{ inputs.version }}
           path: .build/release/
       - name: Verify checksums, matching source and immutable release before upload
-        run: python3 scripts/publish-openwrt.py publish .build/release --version "$VERSION" --sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY"
+        run: |
+          # 只编 x86_64 时，发布校验也只能要求这一个架构。
+          if [ "${{ inputs.all_architectures }}" = "true" ]; then
+            python3 scripts/publish-openwrt.py publish .build/release --version "$VERSION" --sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY"
+          else
+            python3 scripts/publish-openwrt.py publish .build/release --version "$VERSION" --sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" --only x86_64
+          fi

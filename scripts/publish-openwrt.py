@@ -35,7 +35,7 @@ def check_version(version):
         raise ValueError("Workflow version input differs from source")
 
 
-def validate_assets(directory, version, sha):
+def validate_assets(directory, version, sha, only=""):
     check_version(version)
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("Release requires an exact commit SHA")
@@ -78,14 +78,24 @@ def validate_assets(directory, version, sha):
     allowed = listed | required | {"README.md", "VALIDATION.md"} | {target["name"] + ".tsv" for target in targets}
     if assets.keys() - allowed:
         raise ValueError("Unexpected unreviewed release assets")
+    # 只编部分架构时（日常改面板），不能拿全量矩阵去要求缺失的包。
+    # wanted 为空表示发全平台，此时保持原来的严格校验。
+    wanted = {item.strip() for item in only.split(",") if item.strip()}
+    probed = set()
     for target in targets:
+        if wanted and not (set(target["architectures"]) & wanted):
+            continue
         for arch in target["architectures"]:
+            if wanted and arch not in wanted:
+                continue
             if (target["format"], arch, "daed-router") not in seen:
                 raise ValueError("Missing runtime target: " + target["name"])
         if (target["format"], "all", "luci-app-daed-router") not in seen:
             raise ValueError("Missing LuCI target: " + target["name"])
-        if ("support", target["cpu"], "btf-probe") not in seen:
-            raise ValueError("Missing CPU probe: " + target["cpu"])
+        if target["cpu"] not in probed:
+            probed.add(target["cpu"])
+            if ("support", target["cpu"], "btf-probe") not in seen:
+                raise ValueError("Missing CPU probe: " + target["cpu"])
     if ("support", "all", "check") not in seen:
         raise ValueError("Missing compatibility checker")
     return [directory / name for name in sorted(assets)] + [directory / "SHA256SUMS"]
@@ -100,8 +110,8 @@ def gh(*args, missing_ok=False):
     return result.stdout
 
 
-def publish(directory, version, sha, repository):
-    assets = validate_assets(directory, version, sha)
+def publish(directory, version, sha, repository, only=""):
+    assets = validate_assets(directory, version, sha, only)
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         raise ValueError("Invalid repository")
     tag = "openwrt-v" + version
@@ -142,8 +152,13 @@ if __name__ == "__main__":
     release.add_argument("--version", required=True)
     release.add_argument("--sha", required=True)
     release.add_argument("--repository", required=True)
+    release.add_argument(
+        "--only",
+        default="",
+        help="Comma separated architectures built this run. Empty means all of sdk-matrix.",
+    )
     args = parser.parse_args()
     if args.command == "check-version":
         check_version(args.version)
     else:
-        publish(args.directory, args.version, args.sha, args.repository)
+        publish(args.directory, args.version, args.sha, args.repository, args.only)
