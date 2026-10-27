@@ -61,10 +61,10 @@ def main():
     checker = args.directory / "daed-check"
     shutil.copyfile(HERE / "files" / "daed-check", checker)
     rows.append(["support", "all", "check", checker.name, hashlib.sha256(checker.read_bytes()).hexdigest(), args.version])
-    for target in json.loads((HERE / "sdk-matrix.json").read_text()):
-        cpu = target["cpu"]
-        if wanted and cpu not in wanted:
-            continue
+    # 按 cpu 去重：同一个 cpu 在 sdk-matrix 里有 ipk 和 apk 两条记录，
+    # 而 btf-probe 是按 cpu 产出的唯一文件，遍历记录会让它出现两次。
+    all_cpus = {target["cpu"] for target in json.loads((HERE / "sdk-matrix.json").read_text())}
+    for cpu in sorted(all_cpus if not wanted else all_cpus & wanted):
         probe = args.directory / ("btf-probe-" + cpu)
         rows.append(["support", cpu, "btf-probe", probe.name, hashlib.sha256(probe.read_bytes()).hexdigest(), args.version])
     installer = (HERE / "install.sh").read_text(encoding="utf-8")

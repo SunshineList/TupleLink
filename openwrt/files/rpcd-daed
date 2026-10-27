@@ -21,9 +21,13 @@ call)
 			raw=$(uclient-fetch -q -T 3 -O - "http://$listen/health/ready?details=1" 2>/dev/null) || raw='{}'
 			if printf '%s' "$raw" | jsonfilter -e '@.groups' >/dev/null 2>&1; then
 				# 上限 64 与后端一致；超出部分不显示，避免异常配置撑爆回复。
+				#
+				# 用「取到的名字是否为空」判断结束，不看 jsonfilter 的退出码：
+				# 字段不存在、类型不符都会让 jsonfilter 返回非零，但它们都是
+				# 正常情况（比如随机策略没有 candidate_*），不该中断遍历。
 				index=0
 				while [ "$index" -lt 64 ]; do
-					name=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].name" 2>/dev/null) || break
+					name=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].name" 2>/dev/null) || name=''
 					[ -n "$name" ] || break
 					policy=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].policy" 2>/dev/null) || policy=''
 					v4=$(printf '%s' "$raw" | jsonfilter -e "@.groups[$index].candidate_ipv4" 2>/dev/null) || v4=''

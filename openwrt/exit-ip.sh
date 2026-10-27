@@ -17,6 +17,10 @@
 
 set +x
 
+# json_init / json_add_string / json_dump 都来自 jshn，不 source 会直接报
+# command not found。rpcd-daed 里也有一句同样的加载。
+. /usr/share/libubox/jshn.sh
+
 # 单个探测最多等 4 秒；三个候选接口轮一遍也就在十秒内结束，
 # 不会把 rpcd worker 拖住。
 BOUND=4
