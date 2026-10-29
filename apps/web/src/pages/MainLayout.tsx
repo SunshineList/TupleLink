@@ -8,6 +8,7 @@ import { HeaderWithActions } from '~/components/Header'
 import { PanelErrorBoundary } from '~/components/PanelErrorBoundary'
 import { RouterHeader } from '~/components/RouterHeader'
 import { QUERY_KEY_GENERAL } from '~/constants'
+import { useUnsavedSettingsGuard } from '~/hooks/useUnsavedSettings'
 import { useInitialize } from '~/initialize'
 import { isMockMode } from '~/mocks'
 import { endpointURLAtom, tokenAtom } from '~/store'
@@ -16,6 +17,7 @@ import { routerMode } from '~/utils/router-mode'
 import { bindRouterNavigation } from '~/utils/router-navigation'
 
 export function MainLayout() {
+  useUnsavedSettingsGuard()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const token = useStore(tokenAtom)

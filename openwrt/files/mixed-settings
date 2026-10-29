@@ -1,0 +1,91 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -e
+. /usr/share/libubox/jshn.sh
+lan_host() {
+ network=$(uci -q get daed.main.lan_network) || network=lan
+ ubus call "network.interface.$network" status 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address'
+}
+if [ "${1:-}" = --host ]; then
+ lan_host
+ exit $?
+fi
+if [ "${1:-}" = save ]; then
+ input=''; read -r input || :
+ json_load "${input:-\{\}}" || exit 1
+ enabled=0; port=7893; lan=0
+ json_get_var enabled enabled || :
+ json_get_var port port || :
+ json_get_var lan lan || :
+ case "$enabled:$lan" in 0:0|0:1|1:0|1:1) ;; *) printf '%s\n' '{"success":false,"code":"invalid_settings"}'; exit 0 ;; esac
+ case "$port" in ''|*[!0-9]*) printf '%s\n' '{"success":false,"code":"invalid_port"}'; exit 0 ;; esac
+ if [ "${#port}" -gt 5 ] || [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ] || [ "$port" = "$(uci -q get daed.main.listen_port)" ]; then
+  printf '%s\n' '{"success":false,"code":"invalid_port"}'; exit 0
+ fi
+ mkdir -p /var/lock
+ exec 9>/var/lock/daed-install.lock
+ if ! flock -n 9; then printf '%s\n' '{"success":false,"code":"busy"}'; exit 0; fi
+ if ! uci -q set daed.main.mixed_enabled="$enabled" || ! uci -q set daed.main.mixed_port="$port" || ! uci -q set daed.main.mixed_lan="$lan" || ! uci -q commit daed; then
+  printf '%s\n' '{"success":false,"code":"state_failed"}'; exit 0
+ fi
+ # Apply through procd; the RPC response does not wait for eBPF initialization.
+ if [ "$(uci -q get daed.main.enabled)" = 1 ]; then
+  (/etc/init.d/daed restart) </dev/null >/dev/null 2>&1 &
+ fi
+ printf '%s\n' '{"success":true}'
+else
+ enabled=$(uci -q get daed.main.mixed_enabled) || enabled=0
+ port=$(uci -q get daed.main.mixed_port) || port=7893
+ lan=$(uci -q get daed.main.mixed_lan) || lan=0
+ host=$(lan_host) || host=''
+ core_enabled=$(uci -q get daed.main.enabled) || core_enabled=0
+ state=disabled; address=''
+ expected="127.0.0.1:$port"
+ [ "$lan" != 1 ] || expected="$host:$port"
+ if [ "$enabled" = 1 ] && [ "$core_enabled" != 1 ]; then
+  state=service_stopped
+ elif [ "$core_enabled" = 1 ]; then
+  listen=$(/usr/libexec/daed/check --listen 2>/dev/null) || listen=''
+  raw=''
+  [ -z "$listen" ] || raw=$(uclient-fetch -q -T 2 -O - "http://$listen/health/ready" 2>/dev/null) || raw=''
+  actual=$(printf '%s' "$raw" | jsonfilter -e '@.mixed.enabled' 2>/dev/null) || actual=''
+  address=$(printf '%s' "$raw" | jsonfilter -e '@.mixed.address' 2>/dev/null) || address=''
+  code=$(printf '%s' "$raw" | jsonfilter -e '@.mixed.code' 2>/dev/null) || code=''
+  listening=$(printf '%s' "$raw" | jsonfilter -e '@.mixed.listening' 2>/dev/null) || listening=''
+  ready=$(printf '%s' "$raw" | jsonfilter -e '@.mixed.core_ready' 2>/dev/null) || ready=''
+  if [ -z "$actual" ]; then
+   [ "$enabled" != 1 ] || state=core_unavailable
+   if [ -n "$raw" ] && [ "$enabled" = 1 ]; then state=runtime_unavailable; fi
+  elif [ "$enabled" != 1 ]; then
+   [ "$actual" != true ] || state=pending
+  elif [ "$actual" != true ]; then
+   state=pending
+  elif [ "$lan" = 1 ] && [ -z "$host" ]; then
+   state=lan_unavailable
+  elif [ -n "$address" ] && [ "$address" != "$expected" ]; then
+   state=pending
+  elif [ -n "$code" ]; then
+   case "$code" in port_in_use|lan_unavailable|bind_failed|invalid_port|listener_failed|listener_stopped) state=$code ;; *) state=runtime_unavailable ;; esac
+  elif [ "$address" != "$expected" ]; then
+   state=pending
+  elif [ "$listening" = true ] && [ "$ready" = true ]; then
+   state=listening
+  else
+   state=core_starting
+  fi
+ fi
+ json_init
+ json_add_boolean enabled "$([ "$enabled" = 1 ] && echo 1 || echo 0)"
+ display_port=$port
+ case "$display_port" in ''|*[!0-9]*) display_port=0 ;; esac
+ [ "${#display_port}" -le 5 ] || display_port=0
+ while [ "${display_port#0}" != "$display_port" ]; do display_port=${display_port#0}; done
+ json_add_int port "${display_port:-0}"
+ json_add_boolean lan "$([ "$lan" = 1 ] && echo 1 || echo 0)"
+ json_add_string host "$host"
+ json_add_object runtime
+ json_add_string state "$state"
+ json_add_string address "$address"
+ json_close_object
+ json_dump
+fi

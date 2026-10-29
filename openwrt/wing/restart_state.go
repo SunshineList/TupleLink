@@ -230,17 +230,18 @@ func routerCloseControlPlane(plane *control.ControlPlane) error {
 }
 
 type RouterReadiness struct {
-	Phase      string `json:"phase"`
-	Ready      bool   `json:"ready"`
-	Configured bool   `json:"configured"`
-	Listening  bool   `json:"listening"`
+	Mixed      RouterMixedStatus `json:"mixed"`
+	Phase      string            `json:"phase"`
+	Ready      bool              `json:"ready"`
+	Configured bool              `json:"configured"`
+	Listening  bool              `json:"listening"`
 	control.RouterDataplaneStatus
 	RestartDNS  string `json:"restart_dns"`
 	RestoredDNS int    `json:"restored_dns_entries"`
 }
 
 func ReadRouterReadiness(details bool) RouterReadiness {
-	result := RouterReadiness{Phase: "starting"}
+	result := RouterReadiness{Phase: "starting", Mixed: routerMixedRuntimeState.snapshot()}
 	if !routerLifecycleMu.TryRLock() {
 		return result
 	}
@@ -268,5 +269,6 @@ func ReadRouterReadiness(details bool) RouterReadiness {
 		result.Phase = "ready"
 		result.Ready = true
 	}
+	result.Mixed.CoreReady = result.Ready && result.Configured
 	return result
 }

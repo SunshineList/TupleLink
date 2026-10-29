@@ -107,6 +107,9 @@ func TestRouterRestartPrivateFileAndConfigurationMatch(t *testing.T) {
 }
 
 func TestRouterReadinessIgnoresRetiredGeneration(t *testing.T) {
+	mixedBefore := routerMixedRuntimeState.snapshot()
+	defer routerMixedRuntimeState.publish(mixedBefore)
+	routerMixedRuntimeState.publish(RouterMixedStatus{Enabled: true, Code: "port_in_use"})
 	defer func() { currentControlPlane.Store(nil); routerServingPlane = nil; routerConfigured = false }()
 	old, next := new(control.ControlPlane), new(control.ControlPlane)
 	routerPublishControlPlane(old, &daeConfig.Config{})
@@ -119,4 +122,5 @@ func TestRouterReadinessIgnoresRetiredGeneration(t *testing.T) {
 	routerPublishControlPlane(next, EmptyConfig)
 	status = ReadRouterReadiness(false)
 	restartCheck(t, status.Ready && status.Phase == "inactive", "inactive management plane is not ready")
+	restartCheck(t, status.Mixed.Code == "port_in_use" && !status.Mixed.CoreReady, "mixed failure was hidden or mistaken for a ready core")
 }

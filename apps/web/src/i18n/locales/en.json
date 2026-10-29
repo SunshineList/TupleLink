@@ -337,7 +337,6 @@
   "seconds": "seconds",
   "select": "select",
   "selected": "selected",
-  "settings": "Settings",
   "setup endpoint": "Setup your backend endpoint URL (GraphQL)",
   "sniffingTimeout": "Sniffing Timeout",
   "soMarkFromDae": "Set socket mark for dae",
@@ -547,7 +546,11 @@
     "neverUpdated": "Never updated",
     "subscriptionFailed": "The last update failed: {{reason}}",
     "noNodesAfterFailure": "This subscription returned no nodes.",
-    "noRulesYet": "No rules yet. Add one from Set apps or Quick add."
+    "noRulesYet": "No rules yet. Add one from Set apps or Quick add.",
+    "coreSettings": "Proxy and routing",
+    "coreSettingsHint": "Manage core configuration, DNS and routing. Use Apply in the toolbar to activate changes.",
+    "deviceSettings": "Device access and maintenance",
+    "deviceSettingsHint": "Proxy access, notifications and downloads save independently. Saving the mixed port restarts an enabled proxy service."
   },
   "importResource": {
     "optionalTag": "Label (optional)",
@@ -869,7 +872,11 @@
     "testDisabled": "Notifications are off. Turn them on first.",
     "testFailedTitle": "Send failed",
     "testFailed": "Could not send. Check the token, the chat ID, and whether the router can reach api.telegram.org.",
-    "testNoClient": "This firmware has no uclient-fetch, so nothing can be sent."
+    "testNoClient": "This firmware has no uclient-fetch, so nothing can be sent.",
+    "saved": "Notification settings saved and verified.",
+    "configured": "Token saved",
+    "unconfigured": "Token not configured",
+    "rateLimited": "Too many requests. Try again shortly."
   },
   "routingTester": {
     "title": "Rule tester",
@@ -889,5 +896,58 @@
     "shadowed": "Lines {{lines}} sit after the matching rule above, so they are unreachable.",
     "trace": "Step by step ({{count}} rules)",
     "legend": "✓ matched · ✗ definitely not · ? cannot tell (geosite domain lists are not available in the panel)"
-  }
+  },
+  "mixed": {
+    "title": "Mixed proxy port",
+    "description": "HTTP, HTTPS CONNECT and SOCKS5 share one port and follow your routing rules.",
+    "enable": "Enable mixed proxy",
+    "port": "Listen port",
+    "portHint": "1024–65535. Must not conflict with the panel or another service.",
+    "lan": "Allow LAN devices",
+    "lanHint": "Off: local access only. On: trusted LAN access without authentication.",
+    "connect": "Saved device proxy address",
+    "routerIP": "Router LAN IP",
+    "connectHint": "Use this address for HTTP or SOCKS5. HTTPS uses HTTP CONNECT. SOCKS5 supports TCP; UDP is not supported.",
+    "saved": "Mixed proxy settings saved. Check the live runtime status.",
+    "loadFailed": "Cannot read mixed proxy settings. Install the updated router components.",
+    "saveFailed": "Could not save. Check the port and panel port conflict, then retry.",
+    "runtimeTitle": "Live runtime status",
+    "draftAddress": "Proposed address (not saved)",
+    "refresh": "Refresh status",
+    "statusStale": "Cannot refresh runtime status. Your edits are preserved.",
+    "statusUnknown": "Status unknown. Refresh to confirm.",
+    "busy": "Another installation or service operation is running. Try again shortly.",
+    "reapply": "Apply again",
+    "states": {
+      "disabled": "Mixed proxy is disabled.",
+      "service_stopped": "Settings saved. The proxy service is stopped; start it to activate this port.",
+      "core_unavailable": "Cannot reach the proxy core. The service may be restarting.",
+      "runtime_unavailable": "Runtime status is unavailable. Update both runtime and LuCI components.",
+      "pending": "Settings saved. Waiting for the service to use the new configuration.",
+      "lan_unavailable": "LAN address unavailable. Check the LAN network and apply again. Transparent proxy can continue running.",
+      "invalid_port": "Invalid listen port. Change the port. Transparent proxy can continue running.",
+      "port_in_use": "Port is occupied by another service. Choose a different port. Transparent proxy can continue running.",
+      "bind_failed": "Mixed port binding failed. Check the logs. Transparent proxy can continue running.",
+      "listener_failed": "Mixed listener exited unexpectedly. Apply again or check the logs.",
+      "listener_stopped": "Mixed listener has stopped. Apply again.",
+      "listening": "Port is listening and the proxy core is ready.",
+      "core_starting": "Port is listening. Waiting for the proxy core."
+    }
+  },
+  "saveState": {
+    "loading": "Loading",
+    "dirty": "Unsaved changes",
+    "saving": "Saving…",
+    "failed": "Save or load failed",
+    "saved": "Saved",
+    "pending": "Saved · Apply required",
+    "applied": "Applied",
+    "reset": "Discard changes",
+    "immediateEffect": "Takes effect on save. No toolbar Apply needed.",
+    "restartEffect": "Restarts an enabled proxy service. If stopped, used on the next start.",
+    "downloadEffect": "Used for the next download. No restart needed.",
+    "coreEffect": "Use Apply in the toolbar to activate these changes.",
+    "leavePrompt": "You have unsaved settings. Leaving will discard those changes. Leave anyway?"
+  },
+  "settings": "Settings"
 }

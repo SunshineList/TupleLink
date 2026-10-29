@@ -65,6 +65,7 @@ define Package/daed-router/install
 	# Keep the one-shot task outside init.d: package upgrades must not stop it.
 	$(INSTALL_BIN) ./files/maintenance.init $(1)/usr/libexec/daed/nailink-maintenance
 	$(INSTALL_BIN) ./files/daed-check $(1)/usr/libexec/daed/check
+	$(INSTALL_BIN) ./files/mixed-settings $(1)/usr/libexec/daed/mixed-settings
 	$(INSTALL_BIN) ./files/subscription-proxy $(1)/usr/libexec/daed/subscription-proxy
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/btf-probe $(1)/usr/libexec/daed/btf-probe
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/luci-proxy $(1)/usr/libexec/daed/luci-proxy

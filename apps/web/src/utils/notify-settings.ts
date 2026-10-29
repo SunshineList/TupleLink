@@ -34,8 +34,6 @@ export type NotifyTestResult =
   | 'send_failed'
   | 'bad_args'
 
-const EMPTY: NotifySettings = { enabled: false, tokenSet: false, chat: '' }
-
 function rpcHost() {
   const host = window.parent as Window & {
     L?: { require: (name: string) => Promise<{ declare: (spec: object) => (...args: unknown[]) => Promise<unknown> }> }
@@ -53,7 +51,7 @@ export async function readNotifySettings(): Promise<NotifySettings> {
     reject: true,
     raise: true,
   })()) as Record<string, unknown> | undefined
-  if (!result) return EMPTY
+  if (!result) throw new Error('state_failed')
   return {
     enabled: result.enabled === true || result.enabled === 1 || result.enabled === '1',
     tokenSet: result.token_set === true || result.token_set === 1 || result.token_set === '1',
@@ -76,10 +74,10 @@ export async function saveNotifySettings(input: NotifySaveInput): Promise<void> 
     expect: {},
     raise: true,
   })(
-    input.enabled === undefined ? '' : input.enabled ? 1 : 0,
+    input.enabled === undefined ? -1 : input.enabled ? 1 : 0,
     input.token || '',
     input.chat || '',
-    input.clearToken ? 1 : '',
+    input.clearToken ? 1 : 0,
   )) as { success?: boolean; code?: string } | undefined
   if (!result?.success) {
     throw new Error(result?.code || 'state_failed')

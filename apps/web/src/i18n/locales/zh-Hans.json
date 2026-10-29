@@ -337,7 +337,6 @@
   "seconds": "秒",
   "select": "选择",
   "selected": "已选中",
-  "settings": "设置",
   "setup endpoint": "设置你的后端接口地址（graphql）",
   "sniffingTimeout": "嗅探超时",
   "soMarkFromDae": "为 dae 设置套接字标记",
@@ -547,7 +546,11 @@
     "neverUpdated": "尚未更新",
     "subscriptionFailed": "上次更新失败：{{reason}}",
     "noNodesAfterFailure": "这个订阅没有返回任何节点。",
-    "noRulesYet": "还没有规则。用「应用分流」或「快捷添加」加一条。"
+    "noRulesYet": "还没有规则。用「应用分流」或「快捷添加」加一条。",
+    "coreSettings": "代理与分流",
+    "coreSettingsHint": "管理内核配置、DNS 和路由规则。修改后，点击顶部「应用」使其生效。",
+    "deviceSettings": "设备连接与维护",
+    "deviceSettingsHint": "混合代理、通知与下载设置独立保存。保存混合端口会重启已启用的代理服务。"
   },
   "importResource": {
     "optionalTag": "标签（可选）",
@@ -869,7 +872,11 @@
     "testDisabled": "推送当前是关闭状态，先打开再测试。",
     "testFailedTitle": "发送失败",
     "testFailed": "发不出去。确认 token 正确、chat_id 对得上，以及路由器本身能访问 api.telegram.org。",
-    "testNoClient": "固件缺少 uclient-fetch，无法发送。"
+    "testNoClient": "固件缺少 uclient-fetch，无法发送。",
+    "saved": "通知设置已保存并确认。",
+    "configured": "Token 已保存",
+    "unconfigured": "尚未配置 Token",
+    "rateLimited": "发送过于频繁，请稍后再试。"
   },
   "routingTester": {
     "title": "规则测试",
@@ -889,5 +896,58 @@
     "shadowed": "第 {{lines}} 行排在上方命中规则之后，永远轮不到执行。",
     "trace": "逐条判定（{{count}} 条）",
     "legend": "✓ 命中 · ✗ 确定不命中 · ? 无法判定（geosite 分类的域名清单不在面板里）"
-  }
+  },
+  "mixed": {
+    "title": "混合代理端口",
+    "description": "HTTP、HTTPS CONNECT 和 SOCKS5 共用一个端口，使用当前分流规则。",
+    "enable": "启用混合代理",
+    "port": "监听端口",
+    "portHint": "1024–65535，不能与面板或其他服务端口冲突。",
+    "lan": "允许局域网设备连接",
+    "lanHint": "关闭时仅本机可用。开启后仅供可信局域网使用，无需认证。",
+    "connect": "已保存的设备代理地址",
+    "routerIP": "路由器 LAN IP",
+    "connectHint": "HTTP 和 SOCKS5 均填写此地址。HTTPS 网站通过 HTTP CONNECT 访问；SOCKS5 暂支持 TCP，不支持 UDP。",
+    "saved": "混合代理配置已保存，请以实际运行状态为准。",
+    "loadFailed": "无法读取混合代理配置，请确认路由器已安装新版组件。",
+    "saveFailed": "保存失败。请检查端口是否有效、是否与面板冲突，然后重试。",
+    "runtimeTitle": "实际运行状态",
+    "draftAddress": "修改后的地址（尚未保存）",
+    "refresh": "刷新状态",
+    "statusStale": "暂时无法刷新运行状态，表单修改已保留。",
+    "statusUnknown": "状态未知，请刷新后确认。",
+    "busy": "另一个安装或服务操作正在执行，请稍后再试。",
+    "reapply": "重新应用",
+    "states": {
+      "disabled": "混合代理未启用。",
+      "service_stopped": "配置已保存，代理服务已停止；启动代理后生效。",
+      "core_unavailable": "暂时无法连接代理内核，服务可能正在重启。",
+      "runtime_unavailable": "当前运行时没有可用的监听状态，请确认运行时与 LuCI 组件均已升级。",
+      "pending": "配置已保存，等待服务使用新配置。",
+      "lan_unavailable": "LAN 地址不可用；请检查所选 LAN 网络，然后重新应用。透明代理可继续运行。",
+      "invalid_port": "监听端口配置无效，请修改端口。透明代理可继续运行。",
+      "port_in_use": "端口被其他服务占用，请更换端口。透明代理可继续运行。",
+      "bind_failed": "混合端口绑定失败，请检查运行日志。透明代理可继续运行。",
+      "listener_failed": "混合端口监听异常退出，请重新应用或查看日志。",
+      "listener_stopped": "混合端口监听已停止，请重新应用。",
+      "listening": "端口正在监听，代理内核已就绪。",
+      "core_starting": "端口已监听，等待代理内核就绪。"
+    }
+  },
+  "saveState": {
+    "loading": "正在读取",
+    "dirty": "未保存",
+    "saving": "保存中…",
+    "failed": "保存或读取失败",
+    "saved": "已保存",
+    "pending": "已保存，待应用",
+    "applied": "已应用",
+    "reset": "撤销修改",
+    "immediateEffect": "保存后立即生效，无需点击顶部应用。",
+    "restartEffect": "保存后重启已启用的代理服务；停止时保留供下次启动。",
+    "downloadEffect": "保存后用于下一次下载，无需重启。",
+    "coreEffect": "这部分修改需点击顶部「应用」后生效。",
+    "leavePrompt": "还有未保存的设置，离开后这些修改会丢失。确定离开吗？"
+  },
+  "settings": "设置"
 }

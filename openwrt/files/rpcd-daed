@@ -5,10 +5,12 @@ set -e
 
 case "${1:-}" in
 list)
-	printf '%s\n' '{"status":{},"logs":{},"network":{"action":""},"exitip":{},"notify":{},"notifysave":{},"notifytest":{},"groups":{},"maintenance":{},"maintain":{"action":""},"mirror":{"url":""},"action":{"action":""}}'
+	printf '%s\n' '{"mixed":{},"mixedsave":{"enabled":0,"port":0,"lan":0},"status":{},"logs":{},"network":{"action":""},"exitip":{},"notify":{},"notifysave":{"enabled":0,"token":"","chat":"","clear_token":0},"notifytest":{},"groups":{},"maintenance":{},"maintain":{"action":""},"mirror":{"url":""},"action":{"action":""}}'
 	;;
 call)
 	case "${2:-}" in
+	mixed) /usr/libexec/daed/mixed-settings ;;
+	mixedsave) /usr/libexec/daed/mixed-settings save ;;
 	status) /usr/libexec/daed/check ;;
 	groups)
 		# /health/ready 只接受 loopback 访问，iframe 里的面板够不着，
@@ -120,7 +122,7 @@ call)
 		json_load "${input:-\{\}}" || exit 1
 		url=''; json_get_var url url
 		case "$url" in
-			'') uci -q delete daed.main.github_mirror ;;
+			'') uci -q delete daed.main.github_mirror || : ;;
 			https://*) uci -q set daed.main.github_mirror="$url" ;;
 			*) printf '%s\n' '{"success":false,"code":"invalid_mirror"}'; exit 0 ;;
 		esac
@@ -171,9 +173,7 @@ call)
 				*:* ) : ;;
 				*) printf '%s\n' '{"success":false,"code":"invalid_token"}'; exit 0 ;;
 			esac
-			uci -q set daed.notify.token="$_token"
 		fi
-		if [ "$_clear" = "1" ]; then uci -q delete daed.notify.token; fi
 
 		# chat_id 可以是数字（用户/群组）或 @channelname。
 		if [ -n "$_chat" ]; then
@@ -181,9 +181,12 @@ call)
 				-*[!0-9]*) printf '%s\n' '{"success":false,"code":"invalid_chat"}'; exit 0 ;;
 				*[[:space:]]*) printf '%s\n' '{"success":false,"code":"invalid_chat"}'; exit 0 ;;
 			esac
-			uci -q set daed.notify.chat="$_chat"
 		fi
 
+		# Validate the whole request before staging any credentials in UCI.
+		if [ -n "$_token" ]; then uci -q set daed.notify.token="$_token"; fi
+		if [ "$_clear" = "1" ]; then uci -q delete daed.notify.token || :; fi
+		if [ -n "$_chat" ]; then uci -q set daed.notify.chat="$_chat"; fi
 		case "$_enabled" in
 			1|true) uci -q set daed.notify.enabled=1 ;;
 			0|false) uci -q set daed.notify.enabled=0 ;;

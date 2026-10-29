@@ -84,6 +84,9 @@ def router_lifecycle(text):
         text = text.replace('\n\t// Print configuration.', '\n\tdnsCache = routerRestoreRestartDNS(log, conf, dnsCache)\n\t// Print configuration.', 1)
     if 'routerMarkServing(c)' not in text:
         text = text.replace('<-readyChan', '<-readyChan\n\t\t\trouterMarkServing(c)')
+    if 'routerStartMixedProxy()' not in text:
+        text = text.replace('\t// New c.', '\tstopMixed, mixedErr := routerStartMixedProxy()\n\tif mixedErr != nil { log.WithError(mixedErr).Warn("Mixed proxy unavailable; transparent proxy continues") }\n\tdefer stopMixed()\n\n\t// New c.', 1)
+    text = text.replace('if mixedErr != nil { return mixedErr }', 'if mixedErr != nil { log.WithError(mixedErr).Warn("Mixed proxy unavailable; transparent proxy continues") }')
     return text.replace('\n\t\t\tWaitForNetwork(log)', '\n\t\t\trouterWaitForNetwork(log)')
 
 
@@ -405,6 +408,11 @@ type Mutation {
     destination.write_bytes(data)
     generated[key] = digest(data)
     for relative, source in (
+        ("dae/router_mixed_proxy.go", "mixed_proxy.go"),
+        ("dae/router_mixed_listener.go", "mixed_listener.go"),
+        ("dae/router_mixed_listener_test.go", "mixed_listener_test.go"),
+        ("dae-core/control/router_mixed_server.go", "mixed_server.go"),
+        ("dae-core/control/router_mixed_server_test.go", "mixed_server_test.go"),
         ("webrender/router_assets.go", "web_assets.go"),
         ("webrender/router_assets_test.go", "web_assets_test.go"),
         ("db/router_transaction.go", "transaction.go"),

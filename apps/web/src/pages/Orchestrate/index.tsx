@@ -33,6 +33,8 @@ import { useLatencyTests } from '~/hooks/useLatencyTests'
 import { ExitIPCheck } from '~/components/ExitIPCheck'
 import { GroupCandidates } from '~/components/GroupCandidates'
 import { RouterLogs } from '~/pages/RouterLogs'
+import { CoreSettingsSaveState } from '~/components/CoreSettingsSaveState'
+import { MixedProxySettings } from '~/components/MixedProxySettings'
 import { NotifySettings } from '~/components/NotifySettings'
 import { RouterGeodata } from '~/components/RouterMaintenance'
 import { Config } from './Config'
@@ -868,17 +870,50 @@ export function OrchestratePage({ area = 'all' }: { area?: 'all' | 'dashboard' |
         >
           {(area === 'advanced' || (area === 'all' && advancedOpen)) && (
             <>
+              {area === 'advanced' && (
+                <div id="panel-device-settings" className="panel-advanced-wide scroll-mt-28">
+                  <div className="col-span-full flex flex-wrap items-end justify-between gap-3 border-b pb-4">
+                    <div>
+                      <h2 className="text-lg font-semibold tracking-tight">{t('panel.deviceSettings')}</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">{t('panel.deviceSettingsHint')}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-sm font-medium text-primary hover:underline"
+                      onClick={() => document.getElementById('panel-core-settings')?.scrollIntoView({ block: 'start' })}
+                    >
+                      {t('panel.coreSettings')}
+                    </button>
+                  </div>
+                  <MixedProxySettings />
+                  <NotifySettings />
+                  <RouterGeodata />
+                </div>
+              )}
+              {area === 'advanced' && (
+                <div
+                  id="panel-core-settings"
+                  className="col-span-full flex scroll-mt-28 flex-wrap items-end justify-between gap-3 border-b pb-4 pt-4"
+                >
+                  <div>
+                    <h2 className="text-lg font-semibold tracking-tight">{t('panel.coreSettings')}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{t('panel.coreSettingsHint')}</p>
+                    <div className="mt-3">
+                      <CoreSettingsSaveState />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('panel-device-settings')?.scrollIntoView({ block: 'start' })}
+                    className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {t('panel.deviceSettings')}
+                  </button>
+                </div>
+              )}
               <Config />
               <DNS />
               <Routing />
-              {area === 'advanced' && (
-                /* 规则库和通知横跨整行：它们内容宽、高度也不固定，
-                   塞进三列会留出一整列空白。 */
-                <div className="panel-advanced-wide">
-                  <RouterGeodata />
-                  <NotifySettings />
-                </div>
-              )}
             </>
           )}
         </div>

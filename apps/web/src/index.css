@@ -799,8 +799,7 @@ form {
 .panel-workspace[data-workspace='advanced'] .panel-advanced-grid {
   padding: 0;
 }
-/* 宽卡片横跨三列，两栏并排。它内部两张卡高度不一也不留空白，
-   因为容器是 flex 行，各自按内容撑开。 */
+/* Maintenance spans the row; connection and notification settings share two columns. */
 .panel-workspace[data-workspace='advanced'] .panel-advanced-wide {
   grid-column: 1 / -1;
   display: grid;

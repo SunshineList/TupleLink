@@ -412,6 +412,64 @@ echo '{"ready":true,"phase":"ready"}' > /tmp/readiness''')
         self.assertEqual((self.root / "etc/config/daed").read_bytes(), config)
         self.assertEqual((self.root / "etc/daed/wing.db").read_text(), "unchanged database")
 
+    def test_notify_roundtrip_preserves_token_and_mirror_can_be_cleared_twice(self):
+        rpc = "/usr/libexec/rpcd/daed-router"
+        self.write(rpc, (OPENWRT / "files/rpcd-daed").read_bytes(), True)
+        self.run_router("uci", "delete", "daed.notify")
+        schema = json.loads(self.run_router(rpc, "list").stdout)["notifysave"]
+        self.assertEqual(set(schema), {"enabled", "token", "chat", "clear_token"})
+        payload = {"enabled": 1, "token": "123456789:AAfixture_token_0123456789012345", "chat": "-100123", "clear_token": 0}
+        result = self.run_router(rpc, "call", "notifysave", input=json.dumps(payload))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)["success"])
+        stored = json.loads(self.run_router(rpc, "call", "notify").stdout)
+        self.assertEqual(stored, {"enabled": True, "token_set": True, "chat": "-100123"})
+        self.assertNotIn(payload["token"], json.dumps(stored))
+        payload.update(token="", chat="5275305034")
+        self.assertTrue(json.loads(self.run_router(rpc, "call", "notifysave", input=json.dumps(payload)).stdout)["success"])
+        stored = json.loads(self.run_router(rpc, "call", "notify").stdout)
+        self.assertTrue(stored["token_set"])
+        self.assertEqual(stored["chat"], "5275305034")
+        for mirror in ("https://mirror.example", "", ""):
+            result = self.run_router(rpc, "call", "mirror", input=json.dumps({"url": mirror}))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(json.loads(result.stdout)["success"])
+
+    def test_mixed_settings_roundtrip_and_invalid_port_preserves_configuration(self):
+        helper = "/usr/libexec/daed/mixed-settings"
+        self.write(helper, (OPENWRT / "files/mixed-settings").read_bytes(), True)
+        payload = {"enabled": 1, "port": 7893, "lan": 1}
+        saved = self.run_router(helper, "save", input=json.dumps(payload))
+        self.assertTrue(json.loads(saved.stdout)["success"])
+        stored = json.loads(self.run_router(helper).stdout)
+        self.assertEqual(stored, {"enabled": True, "port": 7893, "lan": True, "host": "192.168.8.1", "runtime": {"state": "service_stopped", "address": ""}})
+        for port in (0, 2023, 65536, "7893;touch /tmp/pwned"):
+            payload["port"] = port
+            result = self.run_router(helper, "save", input=json.dumps(payload))
+            self.assertFalse(json.loads(result.stdout)["success"])
+            self.assertEqual(json.loads(self.run_router(helper).stdout), stored)
+        self.assertFalse((self.root / "tmp/pwned").exists())
+
+    def test_mixed_runtime_status_uses_the_core_listener_and_current_configuration(self):
+        helper = "/usr/libexec/daed/mixed-settings"
+        self.write(helper, (OPENWRT / "files/mixed-settings").read_bytes(), True)
+        self.script("/usr/libexec/daed/check", "echo 127.0.0.1:2023")
+        for option, value in {"enabled": "1", "mixed_enabled": "1", "mixed_port": "7893", "mixed_lan": "1"}.items():
+            self.run_router("uci", "set", "daed.main." + option + "=" + value)
+        runtime = {"enabled": True, "address": "192.168.8.1:7893", "listening": True, "core_ready": False, "code": ""}
+        def read_state():
+            self.write("/tmp/readiness", json.dumps({"mixed": runtime}))
+            return json.loads(self.run_router(helper).stdout)["runtime"]["state"]
+        self.assertEqual(read_state(), "core_starting")
+        runtime["core_ready"] = True
+        self.assertEqual(read_state(), "listening")
+        runtime.update(listening=False, code="port_in_use")
+        self.assertEqual(read_state(), "port_in_use")
+        self.run_router("uci", "set", "daed.main.mixed_port=7894")
+        self.assertEqual(read_state(), "pending")
+        self.run_router("uci", "set", "daed.main.enabled=0")
+        self.assertEqual(read_state(), "service_stopped")
+
     def test_rpc_rejects_shell_injection_and_handles_no_newline(self):
         self.managed()
         self.write("/usr/libexec/rpcd/daed-router", (OPENWRT / "files/rpcd-daed").read_bytes(), True)

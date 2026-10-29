@@ -1,4 +1,5 @@
 import { i18n } from '~/i18n'
+import { confirmDiscardSettings } from '~/utils/unsaved-settings'
 
 const pages = {
   dashboard: { route: '/', title: 'panel.dashboard' },
@@ -52,6 +53,7 @@ export function bindRouterNavigation(host: Window, navigate: (route: string) => 
       .querySelector<HTMLIFrameElement>('iframe[src^="/cgi-bin/daed-router/"]')
       ?.setAttribute('title', `NaiLink ${target.title}`)
   }
+  let acceptedURL = host.location.href
   const click = (event: MouseEvent) => {
     if (
       event.defaultPrevented ||
@@ -68,11 +70,21 @@ export function bindRouterNavigation(host: Window, navigate: (route: string) => 
     const target = routerMenuPage(anchor.getAttribute('href') || '', host.location.href)
     if (!target) return
     event.preventDefault()
+    if (target.url !== acceptedURL && !confirmDiscardSettings()) {
+      event.stopImmediatePropagation()
+      return
+    }
+    acceptedURL = target.url
     if (host.location.href !== target.url) host.history.pushState(null, '', target.url)
     update(target)
     navigate(target.route)
   }
   const pop = () => {
+    if (host.location.href !== acceptedURL && !confirmDiscardSettings()) {
+      host.history.pushState(null, '', acceptedURL)
+      return
+    }
+    acceptedURL = host.location.href
     const target = routerMenuPage(host.location.href, host.location.href)
     if (!target) {
       host.location.reload()

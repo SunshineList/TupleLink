@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { looksLikeBotToken, looksLikeChatId } from './notify-settings'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import rpcSource from '../../../../openwrt/files/rpcd-daed?raw'
+import { looksLikeBotToken, looksLikeChatId, saveNotifySettings } from './notify-settings'
 
 describe('bot token 格式', () => {
   it('认得真实形态', () => {
@@ -56,37 +57,35 @@ describe('chat id 格式', () => {
   })
 })
 
-describe('rPC 载荷约定', () => {
-  // LuCI 的 rpc.declare 按 params 名组装：params[name] = args[i]。
-  // rpcd 脚本在顶层 json_get_var 读字段，所以参数名必须与脚本一致。
-  // 之前声明 params: ['input'] 却让脚本读顶层 enabled，载荷被包一层，
-  // 保存等于什么都没写 —— 界面显示「没填」就是这么来的。
-  function buildPayload(names: string[], args: unknown[]) {
-    const payload: Record<string, unknown> = {}
-    for (let i = 0; i < names.length; i++) payload[names[i]] = args[i]
-    return payload
-  }
+describe('luCI / rpcd save contract', () => {
+  afterEach(() => vi.unstubAllGlobals())
 
-  it('保存载荷的字段名与 rpcd 脚本一致', () => {
-    const payload = buildPayload(['enabled', 'token', 'chat', 'clear_token'], [1, '123456789:AAtoken', '-100123', ''])
-    // rpcd 里读的是这三个字段，缺一个就会静默失效。
-    expect(payload.enabled).toBe(1)
-    expect(payload.token).toBe('123456789:AAtoken')
-    expect(payload.chat).toBe('-100123')
+  it('declares every transmitted field with the rpcd parameter type', async () => {
+    const line = rpcSource.split('\n').find((line) => line.includes('"notifysave":'))!
+    const schema = JSON.parse(line.slice(line.indexOf("'{") + 1, line.lastIndexOf("'"))).notifysave
+    let payload: Record<string, unknown> = {}
+    const declare = vi.fn((spec: { method: string; params: string[] }) => async (...args: unknown[]) => {
+      expect(spec.method).toBe('notifysave')
+      payload = Object.fromEntries(spec.params.map((name, i) => [name, args[i]]))
+      for (const [name, value] of Object.entries(payload)) {
+        expect(schema).toHaveProperty(name)
+        expect(typeof value).toBe(typeof schema[name])
+      }
+      return { success: true }
+    })
+    vi.stubGlobal('window', { parent: { L: { require: async () => ({ declare }) } } })
+    await saveNotifySettings({ enabled: true, token: '123456789:AAtoken', chat: '-100123' })
+    expect(payload).toEqual({ enabled: 1, token: '123456789:AAtoken', chat: '-100123', clear_token: 0 })
+    await saveNotifySettings({ chat: '5275305034' })
+    expect(payload).toEqual({ enabled: -1, token: '', chat: '5275305034', clear_token: 0 })
   })
 
-  it('包一层 input 会让脚本读不到任何字段', () => {
-    // 这是回归防线：谁再把 params 写成 ['input'] 就会失败。
-    const wrong = buildPayload(['input'], [{ enabled: 1, token: 'T', chat: 'C' }])
-    expect(wrong.enabled).toBeUndefined()
-    expect(wrong.token).toBeUndefined()
-    expect(wrong.chat).toBeUndefined()
-  })
-
-  it('留空表示不修改，不是写入空值', () => {
-    // 用户只改 chat_id 时，token 必须保持原样，不能被打成空串。
-    const payload = buildPayload(['enabled', 'token', 'chat', 'clear_token'], [1, '', '5275305034', ''])
-    expect(payload.token).toBe('')
-    expect(payload.chat).toBe('5275305034')
+  it('does not accept a failed save', async () => {
+    vi.stubGlobal('window', {
+      parent: {
+        L: { require: async () => ({ declare: () => async () => ({ success: false, code: 'state_failed' }) }) },
+      },
+    })
+    await expect(saveNotifySettings({ enabled: true })).rejects.toThrow('state_failed')
   })
 })

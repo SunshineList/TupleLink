@@ -1,10 +1,12 @@
 import { Download, LoaderCircle, RefreshCw } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import { SettingsSaveState } from '~/components/SettingsSaveState'
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '~/components/ui/dialog'
 import { useRouterMaintenance } from '~/hooks/useRouterMaintenance'
+import { useUnsavedSettings } from '~/hooks/useUnsavedSettings'
 import { jobActive, maintenanceMessages, newerVersion, setMaintenanceMirror } from '~/utils/router-maintenance'
 
 function MaintenanceProgress({ type }: { type: 'update' | 'geodata' }) {
@@ -118,17 +120,23 @@ export function RouterGeodata() {
   const { t } = useTranslation()
   const { query, mutation, busy } = useRouterMaintenance()
   const data = query.data?.geodata
-  const [mirror, setMirror] = useState(query.data?.mirror || '')
+  const [mirrorDraft, setMirrorDraft] = useState<string | null>(null)
+  const mirror = mirrorDraft ?? query.data?.mirror ?? ''
+  const mirrorDirty = !!query.data && mirror.trim().replace(/\/+$/, '') !== (query.data.mirror || '')
+  useUnsavedSettings('mirror', mirrorDirty)
   const [saving, setSaving] = useState(false)
   const [mirrorError, setMirrorError] = useState('')
-  useEffect(() => setMirror(query.data?.mirror || ''), [query.data?.mirror])
   async function saveMirror(event: React.FormEvent) {
     event.preventDefault()
     setSaving(true)
     setMirrorError('')
     try {
       await setMaintenanceMirror(mirror.trim())
-      await query.refetch()
+      const stored = await query.refetch()
+      if (stored.error || (stored.data?.mirror || '') !== mirror.trim().replace(/\/+$/, '')) {
+        throw new Error(t('maintenance.operation_failed'))
+      }
+      setMirrorDraft(null)
       toast.success(t('maintenance.mirrorSaved'))
     } catch (error) {
       setMirrorError((error as Error).message)
@@ -139,7 +147,7 @@ export function RouterGeodata() {
   return (
     <section className="col-span-full rounded-xl border bg-card p-5" aria-label={t('maintenance.geodataRegion')}>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-      <div className="min-w-0">
+        <div className="min-w-0">
           <h3 className="text-base font-semibold">{t('maintenance.geodataTitle')}</h3>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t('maintenance.geodataHint')}</p>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -148,37 +156,63 @@ export function RouterGeodata() {
             })}
           </p>
         </div>
-      <div className="flex flex-col gap-3 lg:border-l lg:border-border lg:pl-5">
-        <Button className="min-h-11" disabled={busy || query.isError} onClick={() => mutation.mutate('geodata')}>
-          <RefreshCw className={busy ? 'animate-spin' : ''} aria-hidden="true" />
-          {t('maintenance.geodataUpdate')}
-        </Button>
-      <form onSubmit={saveMirror}>
-        <label className="block text-sm font-medium" htmlFor="github-mirror">
-          {t('maintenance.mirrorTitle')}
-        </label>
-        <p className="mt-1 max-w-2xl text-xs text-muted-foreground">{t('maintenance.mirrorHint')}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <input
-            id="github-mirror"
-            className="min-h-11 min-w-0 flex-1 rounded-lg border bg-background px-3 text-sm"
-            placeholder="https://mirror.example"
-            value={mirror}
-            onChange={(event) => setMirror(event.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-          />
-          <Button type="submit" variant="outline" className="min-h-11" disabled={saving}>
-            {saving ? t('maintenance.mirrorSaving') : t('maintenance.mirrorSave')}
+        <div className="flex flex-col gap-3 lg:border-l lg:border-border lg:pl-5">
+          <Button className="min-h-11" disabled={busy || query.isError} onClick={() => mutation.mutate('geodata')}>
+            <RefreshCw className={busy ? 'animate-spin' : ''} aria-hidden="true" />
+            {t('maintenance.geodataUpdate')}
           </Button>
+          <form onSubmit={saveMirror}>
+            <label className="block text-sm font-medium" htmlFor="github-mirror">
+              {t('maintenance.mirrorTitle')}
+            </label>
+            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">{t('maintenance.mirrorHint')}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input
+                id="github-mirror"
+                className="min-h-11 w-full min-w-0 rounded-lg border bg-background px-3 text-sm"
+                placeholder="https://mirror.example"
+                value={mirror}
+                onChange={(event) => setMirrorDraft(event.target.value)}
+                disabled={saving || !query.data}
+                spellCheck={false}
+                autoComplete="off"
+              />
+              <Button
+                type="submit"
+                variant="outline"
+                className="min-h-11"
+                disabled={saving || !mirrorDirty || query.isError}
+              >
+                {saving ? t('maintenance.mirrorSaving') : t('maintenance.mirrorSave')}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="min-h-11"
+                disabled={saving || !mirrorDirty}
+                onClick={() => {
+                  setMirrorDraft(null)
+                  setMirrorError('')
+                }}
+              >
+                {t('saveState.reset')}
+              </Button>
+            </div>
+            <div className="mt-3">
+              <SettingsSaveState
+                state={
+                  saving ? 'saving' : mirrorError ? 'failed' : mirrorDirty ? 'dirty' : query.data ? 'saved' : 'loading'
+                }
+                effect={t('saveState.downloadEffect')}
+              />
+            </div>
+            {mirrorError && (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {mirrorError}
+              </p>
+            )}
+          </form>
         </div>
-        {mirrorError && (
-          <p role="alert" className="mt-2 text-sm text-destructive">
-            {mirrorError}
-          </p>
-        )}
-      </form>
-      </div>
       </div>
       <div className="mt-3">
         <MaintenanceProgress type="geodata" />

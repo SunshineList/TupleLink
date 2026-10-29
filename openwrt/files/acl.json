@@ -3,13 +3,13 @@
     "description": "Manage the Daed service",
     "read": {
       "ubus": {
-        "daed-router": ["exitip", "groups", "logs", "maintenance", "network", "notify", "status"]
+        "daed-router": ["exitip", "groups", "logs", "maintenance", "mixed", "network", "notify", "status"]
       },
       "uci": ["daed", "network"]
     },
     "write": {
       "ubus": {
-        "daed-router": ["action", "maintain", "mirror", "notifysave", "notifytest"]
+        "daed-router": ["action", "maintain", "mirror", "mixedsave", "notifysave", "notifytest"]
       },
       "uci": ["daed"]
     }

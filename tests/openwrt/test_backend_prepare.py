@@ -3,6 +3,7 @@ import importlib.util
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -47,7 +48,17 @@ class BackendPrepareTests(unittest.TestCase):
         for relative in SOURCES:
             destination = self.root / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text((ROOT / "wing" / relative).read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            source = ROOT / "wing" / relative
+            if (ROOT / "wing/.daed-openwrt-prepare.json").exists():
+                # Tests always start from the pinned source, also after a local
+                # build has prepared the checkout in place.
+                repo, name = ROOT / "wing", relative
+                if relative.startswith("dae-core/"):
+                    repo, name = repo / "dae-core", relative.removeprefix("dae-core/")
+                content = subprocess.check_output(["git", "-C", str(repo), "show", "HEAD:" + name]).decode()
+            else:
+                content = source.read_text(encoding="utf-8")
+            destination.write_text(content, encoding="utf-8", newline="\n")
         (self.root / "dae-core/control").mkdir(parents=True, exist_ok=True)
         (self.root / "db").mkdir(parents=True)
 
@@ -62,6 +73,9 @@ class BackendPrepareTests(unittest.TestCase):
         self.assertIn("c.routerResolveBootstrap(ctx, host, network, race, resolve)", (self.root / "dae-core/control/control_plane.go").read_text(encoding="utf-8"))
         self.assertIn("return pc.routerRoundTrip(ctx, data)", (self.root / "dae-core/control/dns.go").read_text(encoding="utf-8"))
         lifecycle = (self.root / "dae/run.go").read_text(encoding="utf-8")
+        self.assertEqual(lifecycle.count("routerStartMixedProxy()"), 1)
+        self.assertIn('log.WithError(mixedErr).Warn(', lifecycle)
+        self.assertNotIn('if mixedErr != nil { return mixedErr }', lifecycle)
         self.assertIn("routerSaveRestartDNS(log, c, conf)", lifecycle)
         self.assertIn("dnsCache = routerRestoreRestartDNS(log, conf, dnsCache)", lifecycle)
         self.assertEqual(lifecycle.count("routerMarkServing(c)"), 2)
